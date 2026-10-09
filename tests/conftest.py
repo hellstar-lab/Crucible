@@ -37,6 +37,7 @@ from backend import llm  # noqa: E402
 # Take the key out of the environment for the whole session, before any
 # fixture of any scope runs. Only tests marked ``live`` get it back.
 _LIVE_KEY = os.environ.pop("NEBIUS_API_KEY", None)
+_LIVE_GITHUB_TOKEN = os.environ.pop("GITHUB_TOKEN", None)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -52,9 +53,23 @@ def _session_call_log(tmp_path_factory):
 def _offline_unless_live(request, monkeypatch):
     """Offline unless marked ``live``: no key, no cached clients."""
     llm._clients.clear()
-    if request.node.get_closest_marker("live") is not None and _LIVE_KEY:
+    live = request.node.get_closest_marker("live") is not None
+    if live and _LIVE_KEY:
         monkeypatch.setenv("NEBIUS_API_KEY", _LIVE_KEY)
     else:
         monkeypatch.delenv("NEBIUS_API_KEY", raising=False)
+    if live and _LIVE_GITHUB_TOKEN:
+        monkeypatch.setenv("GITHUB_TOKEN", _LIVE_GITHUB_TOKEN)
+    else:
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     yield
     llm._clients.clear()
+
+
+@pytest.fixture(scope="session")
+def git_fixtures(tmp_path_factory):
+    """Synthetic git repositories, generated at test time (nested .git
+    directories cannot be committed). Deterministic: see make_git_fixtures."""
+    import make_git_fixtures
+
+    return make_git_fixtures.build_all(tmp_path_factory.mktemp("git_repos"))

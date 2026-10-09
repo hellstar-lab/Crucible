@@ -1,0 +1,507 @@
+"""Phase 3: GitHub fetch and authorship attribution. Offline: synthetic git
+repositories with known authors, and a mocked GitHub API (zero real calls)."""
+
+import json
+import os
+import subprocess
+from pathlib import Path
+
+import httpx
+import pytest
+
+import make_git_fixtures as M
+from backend.evidence import analyze_github_detailed, analyze_local_repo, config
+from backend.evidence.blame import merge_ranges, parse_line_porcelain
+from backend.evidence.clone import cloned_repo
+from backend.evidence.errors import (GitHubError, GitHubNetworkError, GitHubNotFound, GitHubRateLimited,
+                                     GitTimeout)
+from backend.evidence.exclusions import GitAttributes, classify
+from backend.evidence.github_client import GitHubClient
+from backend.evidence.gitutil import run_git
+from backend.evidence.identity import IdentitySet, build_identity_set, parse_noreply
+from backend.evidence.repo_signals import DAY, clustered, has_tests
+
+
+@pytest.fixture
+def identity() -> IdentitySet:
+    ident = IdentitySet(login=M.LOGIN, user_id=M.USER_ID)
+    ident.add(M.CAND[1], "profile_email", M.CAND[0])
+    return ident
+
+
+# --------------------------------------------------------------------------
+# fixtures are reproducible
+# --------------------------------------------------------------------------
+
+
+def test_fixture_shas_are_identical_across_builds_and_ignore_user_git_config(tmp_path, monkeypatch):
+    first = M.build("shared_repo", tmp_path / "a")
+    hostile = tmp_path / "hostile.gitconfig"
+    hostile.write_text("[core]\n\tautocrlf = true\n[init]\n\tdefaultBranch = master\n"
+                       "[user]\n\temail = someone@else.example\n")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(hostile))
+    second = M.build("shared_repo", tmp_path / "b")
+    sha = lambda r: subprocess.run(["git", "rev-parse", "HEAD"], cwd=r, capture_output=True, text=True).stdout  # noqa: E731
+    branch = lambda r: subprocess.run(["git", "symbolic-ref", "--short", "HEAD"], cwd=r, capture_output=True,  # noqa: E731
+                                      text=True).stdout.strip()
+    assert sha(first) == sha(second)
+    assert branch(second) == "main"
+
+
+# --------------------------------------------------------------------------
+# exact ground truth per fixture
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", [n for n in M.EXPECTED if n != "empty_repo"])
+def test_fixture_matches_ground_truth_exactly(git_fixtures, identity, name):
+    r = analyze_local_repo(git_fixtures[name], identity, name)
+    got = r.model_dump()
+    expected = M.EXPECTED[name]
+    for key, value in expected.items():
+        if key in got:
+            assert got[key] == value, f"{name}.{key}: expected {value!r}, got {got[key]!r}"
+    if "ranges" in expected:
+        ranges = {f.path: f.authored_ranges for f in r.files}
+        for path, want in expected["ranges"].items():
+            assert ranges[path] == want
+    if "authored_paths" in expected:
+        assert {f.path for f in r.files} == expected["authored_paths"]
+    assert r.builds is None  # Phase 3 cannot know; never a fabricated False
+
+
+def test_shared_repo_split_is_exactly_40_35_25(git_fixtures, identity):
+    for who, lines in ((M.CAND, 40), (M.BOB, 35), (M.CAROL, 25)):
+        ident = IdentitySet(login="nobody")
+        ident.add(who[1], "profile_email")
+        r = analyze_local_repo(git_fixtures["shared_repo"], ident, "shared_repo")
+        assert r.authored_lines == lines and r.code_lines == 100
+
+
+def test_files_list_only_contains_authored_files(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["shared_repo"], identity, "shared_repo")
+    assert [f.path for f in r.files] == ["src/core.py"]
+    assert all(f.authored_lines > 0 for f in r.files)
+
+
+def test_vendored_generated_docs_binary_excluded_from_ratio(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["vendored_repo"], identity, "vendored_repo")
+    assert r.authored_ratio == 1.0  # Bob's node_modules, lock file, minified, dist, gen, pb2 all excluded
+    assert {f.path for f in r.files} == M.EXPECTED["vendored_repo"]["source_paths"]
+
+
+def test_mailmap_unifies_aliases_and_rejects_same_name_impostor(git_fixtures):
+    ident = IdentitySet(login=M.LOGIN, user_id=M.USER_ID)  # knows only the noreply address
+    r = analyze_local_repo(git_fixtures["mailmap_repo"], ident, "mailmap_repo")
+    assert r.authored_lines == 30 and r.authored_ratio == 0.5
+    assert "d.py" not in {f.path for f in r.files}  # "Alex Sample" with another email is not the candidate
+
+
+def test_committer_email_recorded_alongside_author(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["shared_repo"], identity, "shared_repo")
+    [core] = r.files
+    assert core.committer_emails == {M.CAND[1]: 40}
+
+
+def test_empty_repo_is_skipped_with_reason(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["empty_repo"], identity, "empty_repo")
+    assert r.skip_reason == "no commits" and r.files == []
+
+
+def test_oversized_file_is_skipped_and_recorded(git_fixtures, identity, monkeypatch):
+    monkeypatch.setattr(config, "MAX_BLAME_FILE_BYTES", 100)
+    r = analyze_local_repo(git_fixtures["solo_repo"], identity, "solo_repo")
+    assert r.code_lines == 0
+    assert any("over MAX_BLAME_FILE_BYTES" in n for n in r.notes)
+
+
+# --------------------------------------------------------------------------
+# blame parsing and line ranges
+# --------------------------------------------------------------------------
+
+
+def test_merge_ranges_bridges_blank_only_gaps():
+    assert merge_ranges([1, 2, 3, 5, 6, 9], blank={4}) == [(1, 6), (9, 9)]
+    assert merge_ranges([1, 3], blank=set()) == [(1, 1), (3, 3)]
+    assert merge_ranges([], blank={1}) == []
+
+
+def test_parse_line_porcelain_reads_author_and_committer_per_line():
+    sha = "a" * 40
+    out = (f"{sha} 1 1 2\nauthor A\nauthor-mail <A@X.COM>\ncommitter C\ncommitter-mail <c@x.com>\n"
+           f"summary s\nfilename f\n\tcode\n{sha} 2 2\nauthor A\nauthor-mail <a@x.com>\ncommitter C\n"
+           f"committer-mail <c@x.com>\nsummary s\nfilename f\n\t   \n").encode()
+    lines = parse_line_porcelain(out)
+    assert [(ln.number, ln.author_email, ln.committer_email, ln.blank) for ln in lines] == [
+        (1, "a@x.com", "c@x.com", False), (2, "a@x.com", "c@x.com", True)]
+
+
+# --------------------------------------------------------------------------
+# exclusions (table-driven)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path,expected", [
+    ("src/app.py", "source"), ("main.go", "source"), ("CMakeLists.txt", "source"), ("requirements.txt", "source"),
+    ("node_modules/x/index.js", "vendored"), ("vendor/lib.go", "vendored"), ("venv/lib/x.py", "vendored"),
+    (".venv/x.py", "vendored"), ("lib/python3.11/site-packages/x.py", "vendored"), ("third_party/a.c", "vendored"),
+    ("package-lock.json", "generated"), ("yarn.lock", "generated"), ("poetry.lock", "generated"),
+    ("Cargo.lock", "generated"), ("go.sum", "generated"), ("static/app.min.js", "generated"),
+    ("css/site.min.css", "generated"), ("dist/bundle.js", "generated"), ("build/out.js", "generated"),
+    ("target/classes/A.java", "generated"), ("api/user_pb2.py", "generated"), ("api/user.pb.go", "generated"),
+    ("app/migrations/0001_initial.py", "generated"),
+    ("README.md", "documentation"), ("docs/index.rst", "documentation"), ("LICENSE", "documentation"),
+    ("CHANGELOG.md", "documentation"),
+    ("logo.png", "binary"), ("font.woff2", "binary"), ("model.onnx", "binary"), ("report.pdf", "binary"),
+    ("archive.zip", "binary"), ("icon.svg", "binary"),
+])
+def test_classify_by_path(path, expected):
+    assert classify(path) == expected
+
+
+def test_classify_openapi_marker_and_git_binary_verdict():
+    assert classify("client/api.py", head=b"# coding: utf-8\n# Generated by: https://openapi-generator.tech\n") \
+        == "generated"
+    assert classify("data/blob", is_binary=True) == "binary"
+
+
+@pytest.mark.parametrize("attrs,path,expected", [
+    ("gen/** linguist-generated", "gen/api.py", "generated"),
+    ("*.py linguist-vendored", "src/a.py", "vendored"),
+    ("docs/** linguist-documentation", "docs/conf.py", "documentation"),
+    ("vendor/ours.py -linguist-vendored", "vendor/ours.py", "source"),
+    ("vendor/** !linguist-vendored", "vendor/x.go", "source"),
+    ("node_modules/** linguist-vendored=false", "node_modules/a.js", "source"),
+    ("*.js linguist-generated\nsrc/keep.js -linguist-generated", "src/keep.js", "source"),  # later line wins
+    ("*.js -linguist-generated", "app.min.js", "source"),
+])
+def test_gitattributes_overrides(attrs, path, expected):
+    assert classify(path, GitAttributes.parse(attrs)) == expected
+
+
+def test_vendored_fixture_every_file_classified(git_fixtures):
+    attrs = GitAttributes.parse((git_fixtures["vendored_repo"] / ".gitattributes").read_text())
+    for path, expected in M.CATEGORIES.items():
+        is_binary = path.endswith(".png")
+        assert classify(path, attrs, is_binary=is_binary) == expected, path
+
+
+# --------------------------------------------------------------------------
+# identity
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("email,expected", [
+    ("12345678+alex-sample-demo@users.noreply.github.com", (12345678, "alex-sample-demo")),
+    ("alex-sample-demo@users.noreply.github.com", (None, "alex-sample-demo")),
+    ("12345678+Alex-Sample-Demo@USERS.NOREPLY.GITHUB.COM", (12345678, "Alex-Sample-Demo")),
+    ("alex.sample@example.com", None),
+    ("12345678+alex@users.noreply.github.com.evil.example", None),
+])
+def test_parse_noreply(email, expected):
+    assert parse_noreply(email) == expected
+
+
+def test_identity_matching_rules(identity):
+    assert identity.evidence_for("alex.sample@example.com") == ["profile_email"]
+    assert identity.evidence_for("ALEX.SAMPLE@EXAMPLE.COM") == ["profile_email"]
+    assert identity.matches("12345678+alex-sample-demo@users.noreply.github.com")
+    assert identity.matches("alex-sample-demo@users.noreply.github.com")  # legacy form
+    assert not identity.matches("99999999+alex-sample-demo@users.noreply.github.com")  # wrong numeric id
+    assert not identity.matches("12345678+someone-else@users.noreply.github.com")
+    assert not identity.matches("alex.sample@impostor.example")  # same NAME elsewhere is never enough
+
+
+def _mock_client(routes: dict, calls: list | None = None) -> GitHubClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if calls is not None:
+            calls.append(str(request.url))
+        key = request.url.path
+        if key not in routes:
+            return httpx.Response(404, json={"message": "Not Found"})
+        status, body, headers = routes[key] if isinstance(routes[key], tuple) else (200, routes[key], {})
+        return httpx.Response(status, json=body, headers=headers)
+    return GitHubClient(token="", transport=httpx.MockTransport(handler))
+
+
+PROFILE = {"login": M.LOGIN, "id": M.USER_ID, "email": "alex.sample@example.com", "name": "Alex Sample"}
+
+
+def test_build_identity_set_uses_three_signals_with_evidence():
+    repo = {"name": "proj", "owner": {"login": M.LOGIN}}
+    commits = [
+        {"sha": "a1" * 20, "author": {"login": M.LOGIN},
+         "commit": {"author": {"name": "Alex S", "email": "alex@work.example"}}},
+        {"sha": "b2" * 20, "author": None,  # GitHub could not link it: not evidence
+         "commit": {"author": {"name": "Alex Sample", "email": "unlinked@example.com"}}},
+        {"sha": "c3" * 20, "author": {"login": "someone-else"},
+         "commit": {"author": {"name": "Alex Sample", "email": "other@example.com"}}},
+    ]
+    client = _mock_client({f"/users/{M.LOGIN}": PROFILE, f"/repos/{M.LOGIN}/proj/commits": commits})
+    ident = build_identity_set(M.LOGIN, client, repos=[repo])
+    assert ident.evidence_for("alex@work.example") == [f"github_commit_login:proj@{'a1' * 6}"]
+    assert ident.evidence_for("alex.sample@example.com") == ["profile_email"]
+    assert ident.evidence_for(f"{M.USER_ID}+{M.LOGIN}@users.noreply.github.com") == ["noreply"]
+    assert not ident.matches("unlinked@example.com")
+    assert not ident.matches("other@example.com")
+    assert ("Alex S", "alex@work.example") in ident.pairs()
+
+
+# --------------------------------------------------------------------------
+# GitHub client (mocked transport)
+# --------------------------------------------------------------------------
+
+
+def test_client_paginates_via_link_header():
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = int(request.url.params.get("page", "1"))
+        link = {} if page == 3 else {"link": f'<https://api.github.com/users/u/repos?page={page + 1}>; rel="next"'}
+        return httpx.Response(200, json=[{"name": f"r{page}"}], headers={"x-ratelimit-remaining": str(100 - page), **link})
+    client = GitHubClient(token="", transport=httpx.MockTransport(handler))
+    assert [r["name"] for r in client.list_repos("u")] == ["r1", "r2", "r3"]
+    assert client.calls_made == 3 and client.rate_limit_remaining == 97
+
+
+def test_client_404_rate_limit_retry_after_network_and_empty_repo():
+    from backend.evidence.errors import GitHubAuthError
+
+    with pytest.raises(GitHubAuthError):
+        _mock_client({"/users/u": (401, {"message": "Bad credentials"}, {})}).get_user("u")
+    client = _mock_client({"/users/ghost": (404, {}, {})})
+    with pytest.raises(GitHubNotFound):
+        client.get_user("ghost")
+    limited = _mock_client({"/users/u": (403, {"message": "rate limited"},
+                                         {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "1999999999"})})
+    with pytest.raises(GitHubRateLimited) as exc:
+        limited.get_user("u")
+    assert exc.value.reset_at == 1999999999 and exc.value.remaining == 0
+    secondary = _mock_client({"/users/u": (429, {}, {"retry-after": "30"})})
+    with pytest.raises(GitHubRateLimited) as exc:
+        secondary.get_user("u")
+    assert exc.value.reset_at is not None
+    forbidden = _mock_client({"/users/u": (403, {"message": "forbidden"}, {"x-ratelimit-remaining": "50"})})
+    with pytest.raises(GitHubError):
+        forbidden.get_user("u")
+
+    def boom(request):
+        raise httpx.ConnectError("no route")
+    with pytest.raises(GitHubNetworkError):
+        GitHubClient(token="", transport=httpx.MockTransport(boom)).get_user("u")
+    empty = _mock_client({"/repos/u/e/commits": (409, {"message": "Git Repository is empty."}, {})})
+    assert empty.list_commits("u", "e") == []
+
+
+# --------------------------------------------------------------------------
+# clone, timeouts, cleanup
+# --------------------------------------------------------------------------
+
+
+def test_clone_is_full_history_and_cleaned_up(git_fixtures):
+    with cloned_repo(str(git_fixtures["shared_repo"]), allow_local=True) as repo:
+        kept = repo
+        assert run_git(["rev-list", "--count", "HEAD"], cwd=repo).strip() == b"3"
+        assert run_git(["rev-parse", "--is-shallow-repository"], cwd=repo).strip() == b"false"
+    assert not kept.exists() and not kept.parent.exists()
+
+
+def test_clone_cleans_up_on_failure(git_fixtures):
+    with pytest.raises(RuntimeError):
+        with cloned_repo(str(git_fixtures["solo_repo"]), allow_local=True) as repo:
+            kept = repo
+            raise RuntimeError("analysis crashed")
+    assert not kept.parent.exists()
+
+
+def test_local_clone_refused_unless_allowed(git_fixtures):
+    from backend.evidence.errors import GitError
+
+    with pytest.raises(GitError):
+        with cloned_repo(f"file://{git_fixtures['solo_repo']}"):
+            pass
+
+
+def test_git_timeout_kills_process():
+    with pytest.raises(GitTimeout):
+        run_git(["slp"], extra_config=("-c", "alias.slp=!sleep 5"), timeout=0.5)
+
+
+# --------------------------------------------------------------------------
+# repo signals
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("author,committer,expected", [
+    ([0, 400 * DAY], [10, 70], (True, None)),  # rewrite: spread authors, minutes of commits
+    ([0, 400 * DAY], [0, 400 * DAY], (False, None)),  # normal history
+    ([0, 10 * DAY], [0, 3600], (True, None)),  # 1h / 10d = 0.42% < 1%
+    ([0, 20 * DAY], [0, 6 * 3600], (False, None)),  # 6h / 20d = 1.25% >= 1%
+    ([0, 7 * DAY], [0, 7 * DAY * 0.0099], (True, None)),  # boundary: exactly 7 days is evaluated
+    ([0, 6 * DAY], [0, 60], (None, "insufficient_history")),  # under 7 days: not evaluated
+    ([5], [5], (None, "insufficient_history")),  # single commit
+    ([5, 5], [5, 900], (None, "insufficient_history")),  # author span 0
+    ([], [], (None, "insufficient_history")),
+])
+def test_clustered_rule(author, committer, expected):
+    assert clustered(author, committer) == expected
+
+
+def test_short_history_records_insufficient_history(tmp_path, identity):
+    repo = tmp_path / "short"
+    M.init(repo)
+    M.commit(repo, {"a.py": M.code("a", 5)}, M.CAND, "2024-01-01T10:00:00+00:00")
+    M.commit(repo, {"b.py": M.code("b", 5)}, M.CAND, "2024-01-04T10:00:00+00:00")
+    r = analyze_local_repo(repo, identity, "short")
+    assert r.committer_dates_clustered is None
+    assert "committer_dates_clustered not evaluated: insufficient_history" in r.notes
+
+
+def test_skipped_repo_reports_none_never_zero(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["empty_repo"], identity, "empty_repo")
+    assert r.skip_reason == "no commits"
+    for field in ("authored_ratio", "source_files", "total_lines", "code_lines", "authored_lines",
+                  "commit_span_days", "commit_count", "contributor_count", "largest_commit_share",
+                  "author_date_span_days", "committer_date_span_days"):
+        assert getattr(r, field) is None, f"{field} must be None (not measured), got {getattr(r, field)!r}"
+    for flag in ("single_commit_import", "committer_dates_clustered", "builds"):
+        assert getattr(r, flag) is None
+
+
+def test_repo_without_source_lines_has_ratio_none(tmp_path, identity):
+    repo = tmp_path / "docs_only"
+    M.init(repo)
+    M.commit(repo, {"README.md": M.code("readme", 5)}, M.CAND, "2024-01-01T10:00:00+00:00")
+    r = analyze_local_repo(repo, identity, "docs_only")
+    assert r.skip_reason is None and r.code_lines == 0
+    assert r.authored_ratio is None  # 0/0 is "nothing to measure", not 0%
+
+
+@pytest.mark.parametrize("paths,expected", [
+    (["src/a.py", "tests/test_a.py"], True), (["test_x.py"], True), (["pkg/x_test.go"], True),
+    (["web/a.test.ts"], True), (["src/test/java/ATest.java"], True), (["src/a.py", "README.md"], False),
+])
+def test_has_tests(paths, expected):
+    assert has_tests(paths) is expected
+
+
+# --------------------------------------------------------------------------
+# analyze_github end to end, mocked API + local clones
+# --------------------------------------------------------------------------
+
+
+def test_analyze_github_selection_caps_and_contract(git_fixtures, monkeypatch):
+    import backend.evidence as ev
+
+    def repo(name, fork=False, pushed="2025-01-01T00:00:00Z", size=10):
+        return {"name": name, "fork": fork, "pushed_at": pushed, "size": size, "language": "Python",
+                "owner": {"login": M.LOGIN}, "clone_url": str(git_fixtures.get(name, git_fixtures["solo_repo"]))}
+
+    repos = [repo("shared_repo", pushed="2025-03-01T00:00:00Z"), repo("solo_repo", pushed="2025-02-01T00:00:00Z"),
+             repo("forked", fork=True, pushed="2025-06-01T00:00:00Z"), repo("huge", size=10**9),
+             repo("empty_repo", pushed="2024-01-01T00:00:00Z")]
+    calls: list[str] = []
+    client = _mock_client({f"/users/{M.LOGIN}": PROFILE, f"/users/{M.LOGIN}/repos": repos}, calls)
+    real = ev.cloned_repo
+    monkeypatch.setattr(ev, "cloned_repo", lambda url: real(url, allow_local=True))
+    result = analyze_github_detailed(M.LOGIN, max_repos=4, client=client)
+    by = {r.name: r for r in result.repos}
+    assert [r.name for r in result.repos][:4] == ["shared_repo", "solo_repo", "huge", "empty_repo"]  # non-forks first
+    assert by["forked"].skip_reason == "beyond max_repos (4)"  # fork sorted after non-forks
+    assert "over MAX_REPO_MB" in by["huge"].skip_reason
+    assert by["empty_repo"].skip_reason == "no commits"
+    for skipped in (by["huge"], by["forked"], by["empty_repo"]):
+        assert skipped.authored_ratio is None and skipped.total_lines is None and skipped.source_files is None
+    assert by["shared_repo"].authored_ratio == 0.4 and by["solo_repo"].authored_ratio == 1.0
+    assert all(c.startswith("https://api.github.com/") for c in calls)
+    from backend.contracts import EvidenceReport
+
+    EvidenceReport(candidate_id="synthetic", repositories=result.repos, findings=[])
+
+
+def test_unknown_user_raises_not_found():
+    with pytest.raises(GitHubNotFound):
+        analyze_github_detailed("ghost", client=_mock_client({}))
+
+
+def test_evidence_package_never_imports_the_model_router():
+    pkg = Path(__file__).resolve().parent.parent / "backend" / "evidence"
+    for src in pkg.glob("*.py"):
+        text = src.read_text()
+        for forbidden in ("backend.llm", "from backend import llm", "import llm", "openai"):
+            assert forbidden not in text, f"{src.name} references {forbidden}"
+
+
+# --------------------------------------------------------------------------
+# live (one real GitHub run)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.live
+@pytest.mark.skipif(os.environ.get("RUN_LIVE_TESTS") != "1", reason="set RUN_LIVE_TESTS=1 to call GitHub")
+def test_live_analyze_small_public_user():
+    result = analyze_github_detailed("octocat", max_repos=1)
+    assert result.api_calls > 0
+    analysed = [r for r in result.repos if r.skip_reason is None]
+    assert len(analysed) == 1
+    r = analysed[0]
+    assert 0.0 <= r.authored_ratio <= 1.0 and r.commit_count and r.commit_count > 0
+    assert r.builds is None
+
+
+# --------------------------------------------------------------------------
+# unlinked identities: unmatched authors and the identity-gap fact
+# --------------------------------------------------------------------------
+
+OWNED = {"owner": {"login": M.LOGIN}, "fork": False}
+
+
+def test_owner_under_unlinked_email_sets_identity_gap(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["identity_gap_repo"], identity, "identity_gap_repo", OWNED)
+    assert r.authored_ratio == 0.0
+    assert r.likely_identity_gap is True
+    top = r.unmatched_authors[0]
+    assert (top.email_redacted, top.name, top.authored_lines, top.commit_count) == ("ale...@laptop.local",
+                                                                                  "Alex Sample", 90, 1)
+    assert [a.authored_lines for a in r.unmatched_authors] == [90, 10]
+
+
+def test_genuine_team_repo_is_not_an_identity_gap(git_fixtures):
+    stranger = IdentitySet(login=M.LOGIN, user_id=M.USER_ID)  # matches nobody in shared_repo
+    r = analyze_local_repo(git_fixtures["shared_repo"], stranger, "shared_repo", OWNED)
+    assert r.authored_ratio == 0.0
+    assert r.likely_identity_gap is False  # top unmatched author has 40%, not > 80%
+    assert [a.authored_lines for a in r.unmatched_authors] == [40, 35, 25]
+
+
+@pytest.mark.parametrize("meta,expected", [
+    ({"owner": {"login": M.LOGIN}, "fork": True}, False),  # a fork is never an identity gap
+    ({"owner": {"login": "someone-else"}, "fork": False}, False),  # not owned by the candidate
+    ({}, None),  # ownership unknown: not evaluated
+])
+def test_identity_gap_requires_owned_non_fork(git_fixtures, identity, meta, expected):
+    r = analyze_local_repo(git_fixtures["identity_gap_repo"], identity, "identity_gap_repo", meta)
+    assert r.likely_identity_gap is expected
+
+
+def test_identity_gap_false_when_candidate_has_any_lines(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["shared_repo"], identity, "shared_repo", OWNED)
+    assert r.authored_ratio == 0.4 and r.likely_identity_gap is False
+
+
+def test_unmatched_authors_redacted_sorted_capped():
+    from backend.evidence import redact_email, unmatched_authors
+
+    assert redact_email("auratech704@gmail.com") == "aur...@gmail.com"
+    assert redact_email("ab@x.org") == "ab...@x.org"
+    lines = {f"user{i:02d}@corp.example": 100 - i for i in range(15)}
+    out = unmatched_authors(lines, {"user00@corp.example": 7}, {"user00@corp.example": "U Zero"})
+    assert len(out) == 10
+    assert [a.authored_lines for a in out] == sorted((a.authored_lines for a in out), reverse=True)
+    assert out[0].email_redacted == "use...@corp.example" and out[0].commit_count == 7 and out[0].name == "U Zero"
+    assert all("@" in a.email_redacted and "..." in a.email_redacted for a in out)
+    dumped = json.dumps([a.model_dump() for a in out])
+    assert "user00@corp.example" not in dumped  # no full third-party email is stored
+
+
+def test_skipped_repo_has_no_identity_facts(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["empty_repo"], identity, "empty_repo", OWNED)
+    assert r.unmatched_authors == [] and r.likely_identity_gap is None

@@ -1,0 +1,104 @@
+# Authorship attribution: known limitations
+
+Phase 3 decides which lines of code a candidate personally wrote. Every later
+phase builds on that answer, so this page sets out plainly what it can and
+cannot see. These limits come from the data available, not from bugs, and a
+reviewer reading Crucible's evidence should keep them in mind.
+
+## What the numbers mean
+
+`authored_ratio` is the share of non-blank lines in a repository's **source
+files** that `git blame` attributes, at the current HEAD, to an email that
+belongs to the candidate. Vendored, generated and documentation files are
+excluded, using rules modelled on GitHub Linguist and overridable through
+`.gitattributes`, and so are binaries. An email belongs to the candidate only
+when one of these supports it:
+
+- GitHub linked commits under that email to the candidate's account;
+- it is a GitHub noreply address containing their login;
+- it is the email on their public profile.
+
+A repository's `.mailmap` unifies aliases. A matching name is never enough.
+
+## Limitations
+
+**1. Only the candidate's own public repositories are analysed.**
+Work contributed as pull requests to other people's projects is invisible to
+this phase. A strong engineer whose best work lives in someone else's
+repository, such as an open-source maintainer or a contributor to a large
+project, will be **under-credited**. A low number here means "little authored
+code in their own public repositories", not "little authored code".
+
+**2. Private and enterprise work is invisible.**
+Most professional software is written in private repositories. Phase 3
+cannot see any of it, so for many experienced engineers it covers only a
+small, unrepresentative slice of their work.
+
+**3. Git author email is entirely user-controlled.**
+Anyone can commit under any name and email, and a repository's history can
+be rewritten (`git filter-branch`, `git filter-repo`) to replace the original
+authors with the candidate. `git blame` then credits them with every line,
+and GitHub's own attribution agrees, because it trusts the same email.
+Phase 3 records a **history-rewrite signal** to make this visible:
+`committer_dates_clustered` is true when committer dates fall in a narrow
+window while author dates are spread out, which is what a rewrite leaves
+behind. It is a **fact, not proof**. Rebases, imports and some migration
+tools produce the same pattern for innocent reasons, and a careful forger
+can fake committer dates as well. A human must interpret it.
+
+**4. Unlinked git identities are the most common cause of under-attribution.**
+Git records whatever email a machine is configured with. If a candidate
+commits from a laptop whose `user.email` was never added to their GitHub
+account, GitHub does not link those commits to them, and neither do we:
+the only connection is a name, and a name is never enough. Their own
+repository then reports **0% authored**. That is correct as a measurement,
+but it would be misleading if read as "wrote none of this". It means "we
+could not link the author". Phase 3 surfaces this instead of guessing:
+
+- `unmatched_authors` lists the authors of surviving source lines who did
+  not match. Their emails are **redacted** to the first three characters
+  plus the domain (`aur...@gmail.com`), so the candidate can recognise
+  their own address without the report holding third parties' full emails.
+- `likely_identity_gap` is true when a repository is owned by the
+  candidate, is not a fork, is 0% authored, and one unmatched author wrote
+  more than 80% of its source lines. That is the exact data shape of "same
+  person, unlinked identity". It is a fact about the data, not a
+  conclusion, and the CLI prints a note asking a human to verify.
+
+**The fix is on the candidate's GitHub account, not in our code.** Adding the
+missing email as a verified address on their GitHub account (Settings →
+Emails) makes GitHub link those commits, and Phase 3 then picks them up
+automatically through the commits-API signal. Crucible never matches by name
+to "help": that would also credit impostors.
+
+**5. Blame credits surviving lines, not historical contribution.**
+`git blame` reports who last changed each line that exists today. Early work
+that was later refactored, reformatted or rewritten by someone else is
+credited to whoever touched it last. Someone who built a project's
+foundations and then handed it over can show a low ratio. Equally, a
+large-scale reformat can move credit to the person who ran the formatter.
+
+## Smaller caveats
+
+- **Line counting.** Blank lines are excluded; comments are not, because
+  that would need a parser per language.
+- **Caps.** Very large repositories, very large files and slow operations
+  are skipped and recorded under caps set in `backend/evidence/config.py`,
+  never silently dropped. A skipped repository reports `None` for every
+  number, never 0: "not measured" and "measured as zero" are different
+  facts. The same applies to a repository with no source lines at all,
+  whose ratio is `None`, not 0%.
+- **History-rewrite signal needs history.** `committer_dates_clustered` is
+  only evaluated when author dates span at least 7 days; below that it is
+  `None` with the reason `insufficient_history`.
+- **Mixed-content commits.** `single_commit_import` compares the largest
+  commit's added source lines with today's source lines. A small repository
+  whose code arrived in one commit trips it legitimately.
+- **Classification rules.** File classification uses path, extension and
+  header rules. Unusual layouts, such as generated code checked in without
+  markers or vendored code without a conventional directory name, can be
+  misclassified. A repository can correct this with `.gitattributes`.
+- **Only the root `.gitattributes` is read.** Nested `.gitattributes` files
+  are ignored.
+- **Only the default branch is analysed.** Work on other branches is not
+  counted.

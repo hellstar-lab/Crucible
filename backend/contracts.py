@@ -77,12 +77,65 @@ class Claims(BaseModel):
 # --------------------------------------------------------------------------
 
 
-class RepoInfo(BaseModel):
+class FileAuthorship(BaseModel):
+    """Candidate authorship of one source file (only files with
+    authored_lines > 0 are recorded). Line numbers are 1-based, inclusive."""
+
+    path: str
+    total_lines: int  # raw lines, blank included
+    code_lines: int  # non-blank lines
+    authored_lines: int  # non-blank lines attributed to the candidate
+    authored_ranges: list[tuple[int, int]]  # merged across blank-only gaps
+    committer_emails: dict[str, int] = {}  # committer email -> authored lines (attribution stays on author)
+
+
+class UnmatchedAuthor(BaseModel):
+    """An author of surviving source lines who did not match the candidate's
+    identity set. The email is redacted (first 3 characters + domain): enough
+    for the candidate to recognise their own address, never a full email of a
+    third party."""
+
+    email_redacted: str
     name: str
-    authored_ratio: float
-    builds: bool
+    authored_lines: int  # non-blank source lines at HEAD
+    commit_count: int
+
+
+class RepoInfo(BaseModel):
+    """Phase 3 facts about one repository. No field is a judgement.
+
+    ``authored_ratio`` = candidate non-blank lines / all non-blank lines in
+    source files. ``None`` always means "not measured", never zero: every
+    numeric field is None on a skipped repo (``skip_reason`` set), and the
+    ratio is None when a repo has no non-blank source lines (0/0).
+    """
+
+    name: str
+    authored_ratio: Optional[float] = None
+    builds: Optional[bool] = None  # None = not evaluated (Phase 3 cannot know)
     tests_present: bool
-    commit_span_days: int
+    commit_span_days: Optional[int] = None  # first to last commit, by author date
+    language: Optional[str] = None
+    is_fork: Optional[bool] = None
+    commit_count: Optional[int] = None
+    contributor_count: Optional[int] = None
+    single_commit_import: Optional[bool] = None
+    largest_commit_share: Optional[float] = None  # largest commit's added source lines / current source lines
+    author_date_span_days: Optional[float] = None
+    committer_date_span_days: Optional[float] = None
+    committer_dates_clustered: Optional[bool] = None  # history-rewrite signal; a fact, not proof. None = not evaluated
+    source_files: Optional[int] = None
+    total_lines: Optional[int] = None
+    code_lines: Optional[int] = None
+    authored_lines: Optional[int] = None
+    skip_reason: Optional[str] = None
+    notes: list[str] = []  # partial-analysis facts, e.g. files skipped over a cap
+    files: list[FileAuthorship] = []
+    unmatched_authors: list[UnmatchedAuthor] = []  # analysed repos only; top 10 by authored_lines
+    # Data shape of "same person, unlinked git identity": owned, not a fork,
+    # 0% authored, one unmatched author > 80% of source lines. A fact, not a
+    # conclusion. None = not evaluated (skipped, or ownership unknown).
+    likely_identity_gap: Optional[bool] = None
 
 
 class Finding(BaseModel):
