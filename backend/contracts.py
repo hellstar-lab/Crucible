@@ -86,7 +86,7 @@ class FileAuthorship(BaseModel):
     code_lines: int  # non-blank lines
     authored_lines: int  # non-blank lines attributed to the candidate
     authored_ranges: list[tuple[int, int]]  # merged across blank-only gaps
-    committer_emails: dict[str, int] = {}  # committer email -> authored lines (attribution stays on author)
+    committer_emails: dict[str, int] = {}  # REDACTED committer email -> authored lines (attribution stays on author)
 
 
 class UnmatchedAuthor(BaseModel):
@@ -95,10 +95,11 @@ class UnmatchedAuthor(BaseModel):
     for the candidate to recognise their own address, never a full email of a
     third party."""
 
-    email_redacted: str
+    email_redacted: str  # "aur...@gmail.com", or "abh...@<local-machine>" for hostname-derived domains
     name: str
     authored_lines: int  # non-blank source lines at HEAD
     commit_count: int
+    reason: Optional[str] = None  # e.g. "user.email not configured on the committing machine"
 
 
 class RepoInfo(BaseModel):
@@ -113,7 +114,7 @@ class RepoInfo(BaseModel):
     name: str
     authored_ratio: Optional[float] = None
     builds: Optional[bool] = None  # None = not evaluated (Phase 3 cannot know)
-    tests_present: bool
+    tests_present: Optional[bool] = None  # None = not checked (skipped repo), never "no tests"
     commit_span_days: Optional[int] = None  # first to last commit, by author date
     language: Optional[str] = None
     is_fork: Optional[bool] = None

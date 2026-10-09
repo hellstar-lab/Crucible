@@ -52,14 +52,36 @@ class GithubAnalysis:
 def _skipped(name: str, reason: str, meta: dict | None = None) -> RepoInfo:
     meta = meta or {}
     # Not measured: every numeric field stays None (never 0), see RepoInfo.
-    return RepoInfo(name=name, tests_present=False, language=meta.get("language"),
+    return RepoInfo(name=name, language=meta.get("language"),
                     is_fork=meta.get("fork"), skip_reason=reason)
 
 
+LOCAL_MACHINE = "<local-machine>"
+UNCONFIGURED_EMAIL = "user.email not configured on the committing machine"
+_NON_ROUTABLE_SUFFIXES = (".local", ".lan", ".home", ".internal", ".localdomain")
+
+
+def is_machine_domain(domain: str) -> bool:
+    """Non-routable or hostname-derived domains (what git invents from the
+    machine name when user.email is unset): .local, .lan, .home, .internal,
+    .localdomain, localhost, or any domain without a dot."""
+    d = domain.strip().lower().rstrip(".")
+    return d == "localhost" or "." not in d or d.endswith(_NON_ROUTABLE_SUFFIXES)
+
+
 def redact_email(email: str) -> str:
-    """First 3 characters of the local part plus the domain: 'aur...@gmail.com'."""
+    """First 3 characters of the local part plus the domain ('aur...@gmail.com').
+    Hostname-derived domains leak a person's name and device model while
+    adding nothing, so they become '<local-machine>' ('abh...@<local-machine>')."""
     local, at, domain = email.partition("@")
-    return f"{local[:3]}...@{domain}" if at else f"{email[:3]}..."
+    if not at:
+        return f"{email[:3]}..."
+    return f"{local[:3]}...@{LOCAL_MACHINE if is_machine_domain(domain) else domain}"
+
+
+def email_reason(email: str) -> str | None:
+    _local, at, domain = email.partition("@")
+    return UNCONFIGURED_EMAIL if at and is_machine_domain(domain) else None
 
 
 def unmatched_authors(other_lines: dict[str, int], commits: dict[str, int],
@@ -67,8 +89,16 @@ def unmatched_authors(other_lines: dict[str, int], commits: dict[str, int],
     """Non-candidate authors of surviving source lines, redacted, most lines first."""
     ranked = sorted(other_lines.items(), key=lambda kv: (-kv[1], kv[0]))[: config.MAX_UNMATCHED_AUTHORS]
     return [UnmatchedAuthor(email_redacted=redact_email(email), name=names.get(email, ""),
-                            authored_lines=lines, commit_count=commits.get(email, 0))
+                            authored_lines=lines, commit_count=commits.get(email, 0), reason=email_reason(email))
             for email, lines in ranked]
+
+
+def _redact_counts(by_email: dict[str, int]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for email, n in by_email.items():
+        key = redact_email(email)
+        out[key] = out.get(key, 0) + n
+    return out
 
 
 def identity_gap(owned: bool | None, is_fork: bool | None, ratio: float | None,
@@ -172,7 +202,7 @@ def analyze_local_repo(repo: Path, identity: IdentitySet, name: str, meta: dict 
         files=[
             FileAuthorship(path=f.path, total_lines=f.total_lines, code_lines=f.code_lines,
                            authored_lines=f.authored_lines, authored_ranges=f.authored_ranges,
-                           committer_emails=f.committer_emails)
+                           committer_emails=_redact_counts(f.committer_emails))
             for f in blame.files if f.authored_lines > 0
         ],
         unmatched_authors=unmatched_authors(others, facts.commits_by_author, facts.name_by_author),

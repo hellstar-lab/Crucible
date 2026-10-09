@@ -69,6 +69,8 @@ def main(argv: list[str]) -> int:
             print(f"    NOTE: 0% authored, but one unmatched author ({top.email_redacted}) wrote "
                   f"{top.authored_lines} lines. The candidate may have committed under an unlinked git "
                   "identity. Verify before relying on this number.")
+            if top.reason:
+                print(f"          cause: {top.reason}")
         for note in r.notes:
             print(f"    note: {note}")
     if skipped:

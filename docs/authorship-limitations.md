@@ -59,6 +59,12 @@ could not link the author". Phase 3 surfaces this instead of guessing:
   not match. Their emails are **redacted** to the first three characters
   plus the domain (`aur...@gmail.com`), so the candidate can recognise
   their own address without the report holding third parties' full emails.
+  Hostname-derived domains (`.local`, `.lan`, `.home`, `.internal`,
+  `localhost`, or no dot), which git invents when `user.email` was never
+  set, would leak a person's name and device model. They become
+  `abh...@<local-machine>`, with the reason "user.email not configured on
+  the committing machine", because the cause is what a reader needs. The
+  same redaction applies to recorded committer emails.
 - `likely_identity_gap` is true when a repository is owned by the
   candidate, is not a fork, is 0% authored, and one unmatched author wrote
   more than 80% of its source lines. That is the exact data shape of "same

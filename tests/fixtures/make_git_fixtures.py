@@ -29,7 +29,8 @@ CAND = ("Alex Sample", "alex.sample@example.com")  # the candidate's public prof
 CAND_WORK = ("Alex Sample", "alex@work.example")  # aliases unified only by .mailmap
 CAND_HOME = ("A. Sample", "alex.home@example.net")
 IMPOSTOR = ("Alex Sample", "alex.sample@impostor.example")  # same name, different email: NOT the candidate
-UNLINKED = ("Alex Sample", "alex@laptop.local")  # the owner's own machine identity, never linked to GitHub
+# git's hostname-derived address when user.email is unset: the domain leaks a name and device model
+UNLINKED = ("Alex Sample", "alex@alexs-macbook-pro-7.local")
 BOB = ("Bob Builder", "bob@example.org")
 CAROL = ("Carol Coder", "carol@example.org")
 

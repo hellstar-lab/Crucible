@@ -100,7 +100,7 @@ def test_mailmap_unifies_aliases_and_rejects_same_name_impostor(git_fixtures):
 def test_committer_email_recorded_alongside_author(git_fixtures, identity):
     r = analyze_local_repo(git_fixtures["shared_repo"], identity, "shared_repo")
     [core] = r.files
-    assert core.committer_emails == {M.CAND[1]: 40}
+    assert core.committer_emails == {"ale...@example.com": 40}  # redacted like every stored email
 
 
 def test_empty_repo_is_skipped_with_reason(git_fixtures, identity):
@@ -362,7 +362,7 @@ def test_skipped_repo_reports_none_never_zero(git_fixtures, identity):
                   "commit_span_days", "commit_count", "contributor_count", "largest_commit_share",
                   "author_date_span_days", "committer_date_span_days"):
         assert getattr(r, field) is None, f"{field} must be None (not measured), got {getattr(r, field)!r}"
-    for flag in ("single_commit_import", "committer_dates_clustered", "builds"):
+    for flag in ("single_commit_import", "committer_dates_clustered", "builds", "tests_present"):
         assert getattr(r, flag) is None
 
 
@@ -459,8 +459,9 @@ def test_owner_under_unlinked_email_sets_identity_gap(git_fixtures, identity):
     assert r.authored_ratio == 0.0
     assert r.likely_identity_gap is True
     top = r.unmatched_authors[0]
-    assert (top.email_redacted, top.name, top.authored_lines, top.commit_count) == ("ale...@laptop.local",
-                                                                                  "Alex Sample", 90, 1)
+    assert (top.email_redacted, top.name, top.authored_lines, top.commit_count) == (
+        "ale...@<local-machine>", "Alex Sample", 90, 1)
+    assert top.reason == "user.email not configured on the committing machine"
     assert [a.authored_lines for a in r.unmatched_authors] == [90, 10]
 
 
@@ -492,6 +493,10 @@ def test_unmatched_authors_redacted_sorted_capped():
 
     assert redact_email("auratech704@gmail.com") == "aur...@gmail.com"
     assert redact_email("ab@x.org") == "ab...@x.org"
+    for machine in ("abhinav@abhinav-ka-macbook-air-2.local", "dev@box.lan", "u@nas.home", "u@ci.internal",
+                    "root@localhost", "me@my-laptop", "me@host.localdomain"):
+        assert redact_email(machine).endswith("...@<local-machine>"), machine
+    assert redact_email("me@company.co.uk") == "me...@company.co.uk"  # routable domains keep recognisability
     lines = {f"user{i:02d}@corp.example": 100 - i for i in range(15)}
     out = unmatched_authors(lines, {"user00@corp.example": 7}, {"user00@corp.example": "U Zero"})
     assert len(out) == 10
@@ -505,3 +510,21 @@ def test_unmatched_authors_redacted_sorted_capped():
 def test_skipped_repo_has_no_identity_facts(git_fixtures, identity):
     r = analyze_local_repo(git_fixtures["empty_repo"], identity, "empty_repo", OWNED)
     assert r.unmatched_authors == [] and r.likely_identity_gap is None
+
+
+def test_machine_hostname_never_appears_in_output(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["identity_gap_repo"], identity, "identity_gap_repo", OWNED)
+    dumped = r.model_dump_json()
+    for leak in ("alexs-macbook-pro-7", "macbook", ".local", M.UNLINKED[1]):
+        assert leak not in dumped, f"{leak!r} leaked into the RepoInfo output"
+    assert "<local-machine>" in dumped
+
+
+def test_skipped_repo_via_api_reports_tests_present_none(git_fixtures, monkeypatch):
+    import backend.evidence as ev
+
+    repos = [{"name": "huge", "fork": False, "pushed_at": "2025-01-01T00:00:00Z", "size": 10**9,
+              "language": "C", "owner": {"login": M.LOGIN}, "clone_url": "unused"}]
+    client = _mock_client({f"/users/{M.LOGIN}": PROFILE, f"/users/{M.LOGIN}/repos": repos})
+    [r] = analyze_github_detailed(M.LOGIN, client=client).repos
+    assert r.skip_reason and r.tests_present is None and r.authored_ratio is None
