@@ -1,0 +1,7 @@
+{
+  "description": "honest resume, nothing hidden",
+  "expect_error": null,
+  "expected_status": "clean",
+  "file": "clean.pdf",
+  "hidden": []
+}

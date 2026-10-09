@@ -1,0 +1,12 @@
+{
+  "description": "0.5pt text",
+  "expect_error": null,
+  "expected_status": "hidden_text_found",
+  "file": "tiny_font.pdf",
+  "hidden": [
+    {
+      "technique": "tiny_font",
+      "text": "Expert in Kubernetes, Rust and CUDA with 15 years of experience."
+    }
+  ]
+}

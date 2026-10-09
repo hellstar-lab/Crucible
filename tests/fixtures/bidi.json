@@ -1,0 +1,12 @@
+{
+  "description": "right-to-left override reversing an email address",
+  "expect_error": null,
+  "expected_status": "hidden_text_found",
+  "file": "bidi.pdf",
+  "hidden": [
+    {
+      "technique": "bidi",
+      "text": "\u202emoc.elpmaxe@elpmas.xela\u202c"
+    }
+  ]
+}

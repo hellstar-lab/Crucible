@@ -1,0 +1,7 @@
+{
+  "description": "user-password-protected PDF",
+  "expect_error": "ShieldEncryptedError",
+  "expected_status": null,
+  "file": "encrypted.pdf",
+  "hidden": []
+}

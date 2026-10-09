@@ -1,0 +1,7 @@
+{
+  "description": "truncated, malformed PDF bytes",
+  "expect_error": "ShieldCorruptError",
+  "expected_status": null,
+  "file": "corrupt.pdf",
+  "hidden": []
+}

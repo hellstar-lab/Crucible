@@ -1,0 +1,12 @@
+{
+  "description": "16-char zero-width run (binary steganography)",
+  "expect_error": null,
+  "expected_status": "hidden_text_found",
+  "file": "zero_width.pdf",
+  "hidden": [
+    {
+      "technique": "zero_width",
+      "text": "\u200b\u200c\u200c\u200b\u200c\u200b\u200b\u200c\u200b\u200c\u200c\u200c\u200b\u200b\u200c\u200b"
+    }
+  ]
+}

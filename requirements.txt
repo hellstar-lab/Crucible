@@ -1,0 +1,14 @@
+openai
+python-dotenv
+fastapi
+uvicorn
+pydantic
+httpx
+pytest
+pytest-mock
+# shield (step 2A) — permissive licences only; never PyMuPDF/fitz (AGPL)
+pypdfium2>=5,<6
+pdfplumber
+Pillow
+# test fixtures
+reportlab
