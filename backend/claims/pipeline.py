@@ -53,6 +53,18 @@ class _Budget(Exception):
     pass
 
 
+BARE_DATE_REASON = "bare date range belongs to the timeline extractor"
+
+
+def is_bare_date_range(text: str) -> bool:
+    """True when the whole text is a date range ("2014 - 2018", "Jan 2020 - Present", "03/2020-12/2021"): a field value
+    for 2C's timeline extractor, not a claim (Phase 4C F3). Deterministic."""
+    from backend.shield import resume
+
+    t = re.sub(r"^[\s(\[]+|[\s)\].,;:]+$", "", text or "")
+    return bool(t) and resume._RANGE.fullmatch(t) is not None
+
+
 def gate(report: DocumentReport) -> ShieldGate:
     detectors = sorted({f.detector for f in report.security_findings})
     return ShieldGate(applied=bool(report.security_findings or report.hidden_fragments), document_status=report.status,
@@ -234,6 +246,9 @@ class _Run:
         self.units.append(cu)
         context = u.context()
         source = f"{u.text}\n{context}"
+        if is_bare_date_range(u.text):  # F3: never reaches a model, 4B or 4C
+            self.counters["bare_date_units"] += 1
+            return self.exclude(u, "selection", "no_verifiable_claims", BARE_DATE_REASON)
         try:
             # Stage 2: selection
             r = self.stage(stages.select, cu, u.text, context, self.tiers["selection"])
@@ -291,6 +306,13 @@ class _Run:
                                       support_source=unit_source):
                     return None  # rule 3: the whole unit is excluded
             kept = []
+            for c in list(raw_claims):
+                if is_bare_date_range(c["text"]):  # F3: a date range produced by decomposition is a field value too
+                    self.counters["bare_date_claims_dropped"] += 1
+                    cu.dropped_claims.append(c["text"])
+                    raw_claims.remove(c)
+            if not raw_claims:
+                return self.exclude(u, "decomposition", "no_verifiable_claims", BARE_DATE_REASON)
             for c in raw_claims:
                 missing = dropped_qualifiers(c["text"], [q for q in (c.get("qualifiers") or []) if q], u.text)
                 if missing:
@@ -300,7 +322,8 @@ class _Run:
                 kept.append(c)
             for i, c in enumerate(kept):
                 rt = routing.route(c["text"])
-                self.claims.append(ExtractedClaim(
+                scope, target = routing.scope_of(c["text"], rt["kind"], u.text, u.section)
+                self.claims.append(ExtractedClaim(scope=scope, scope_target=target, 
                     claim_id=f"{u.unit_id}.c{i}", unit_id=u.unit_id, text=c["text"], qualifiers=[q for q in (c.get("qualifiers") or []) if q],
                     source_span=(u.start, u.end), source_section=u.section, kind=rt["kind"], secondary_kinds=rt["secondary_kinds"],
                     checkable_from_code=rt["checkable_from_code"], evidence_kind=rt["evidence_kind"], why_not_checkable=rt["why_not_checkable"],
@@ -321,7 +344,7 @@ def _finish(run: _Run, document: str, gate_info: ShieldGate, extra_excluded: lis
     counters = dict(run.counters)
     for k in ("model_refused", "sentinel_normalized", "injection_suspected", "fabricated_quantity", "fabricated_entity",
               "qualifier_dropped", "stage3_pregate_skips", "rubric_leak", "ungrounded_qualifier", "stage3_escalations",
-              "greedy_disagreement", "stage3_ensemble_disagreements"):
+              "greedy_disagreement", "stage3_ensemble_disagreements", "bare_date_units", "bare_date_claims_dropped"):
         counters.setdefault(k, 0)
     counters["model_decisions"] = run.decisions
     return ClaimExtraction(

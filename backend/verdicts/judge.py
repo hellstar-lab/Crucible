@@ -77,10 +77,16 @@ def prompt(claim_text: str, es) -> str:
             f"{wrap_untrusted(json.dumps(p['items'], ensure_ascii=False, indent=1), 'repository_evidence')}")
 
 
-def judge(claim_text: str, es, tier: str, run_tag: str | None = None) -> dict:
-    r = llm.call("verify_claim", prompt(claim_text, es), json_schema=SCHEMA, tier=tier, thinking=False, temperature=0,
-                 max_tokens=config.MAX_TOKENS, run_tag=run_tag)
-    data = r["data"] or {}
-    dist = (r.get("value_distributions") or {}).get("content_supported")
-    return {"data": data, "tier": tier, "distribution": dist, "greedy_disagreement": bool(r.get("greedy_disagreement")),
-            "prompt_hash": r.get("prompt_hash"), "cost_usd": r.get("cost_usd")}
+def judge(claim_text: str, es, tier: str, run_tag: str | None = None, n: int = config.ENSEMBLE_N,
+          temperature: float = config.ENSEMBLE_TEMPERATURE) -> dict:
+    """One request; ``n`` sampled judgements (n=1 -> a single temperature-0 call)."""
+    kw = {"n": n, "temperature": temperature} if n > 1 else {"temperature": 0}
+    r = llm.call("verify_claim", prompt(claim_text, es), json_schema=SCHEMA, tier=tier, thinking=False,
+                 max_tokens=config.MAX_TOKENS, run_tag=run_tag, **kw)
+    if n > 1:
+        samples = [{"data": c.get("data") or {}, "distribution": (c.get("value_distributions") or {}).get("content_supported"),
+                    "greedy_disagreement": bool(c.get("greedy_disagreement")), "error": c.get("error")} for c in r.get("choices") or []]
+    else:
+        samples = [{"data": r["data"] or {}, "distribution": (r.get("value_distributions") or {}).get("content_supported"),
+                    "greedy_disagreement": bool(r.get("greedy_disagreement")), "error": None}]
+    return {"samples": samples, "tier": tier, "prompt_hash": r.get("prompt_hash"), "cost_usd": r.get("cost_usd")}

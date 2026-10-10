@@ -348,3 +348,31 @@ def test_stage4_claims_must_come_from_the_unit_not_its_context(fake):
     assert [(e.reason_code, e.unit_id) for e in out.excluded] == [("fabricated_entity", out.units[0].unit_id)]
     assert [c.text for c in out.claims] == ["Migrated a card-settlement service to Kubernetes"]
     assert all(c.unit_id == out.units[1].unit_id for c in out.claims)
+
+
+
+# --- Phase 4C F3: bare date ranges are field values, never claims -------------------------------------------
+
+def test_bare_date_range_unit_is_excluded_without_a_model_call(fake):
+    out = run_text("2014 - 2018")
+    assert codes(out) == {"no_verifiable_claims"} and out.excluded[0].detail == pipeline.BARE_DATE_REASON
+    assert fake.prompts == [] and out.counters["bare_date_units"] == 1
+
+
+def test_bare_date_range_claim_from_decomposition_is_dropped(fake):
+    unit = "B.Sc. Computer Science, University of Example 2014 - 2018"
+    fake.script[("claim_decomposition", unit)] = J("decomposed", claims=[{"text": "B.Sc. Computer Science", "qualifiers": []},
+                                                                          {"text": "2014 - 2018", "qualifiers": []}])
+    out = run_text(unit)
+    assert [c.text for c in out.claims] == ["B.Sc. Computer Science"] and out.counters["bare_date_claims_dropped"] == 1
+    assert out.units[0].dropped_claims == ["2014 - 2018"]
+
+
+@pytest.mark.parametrize("text", ["2014 - 2018", "Jan 2020 - Present", "03/2020-12/2021", "(Mar 2021 - Present)"])
+def test_is_bare_date_range(text):
+    assert pipeline.is_bare_date_range(text)
+
+
+@pytest.mark.parametrize("text", ["B.Sc. 2014 - 2018", "Worked there 2014 - 2018", "2018", "Built a cache"])
+def test_is_not_bare_date_range(text):
+    assert not pipeline.is_bare_date_range(text)

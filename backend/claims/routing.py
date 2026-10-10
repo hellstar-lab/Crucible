@@ -84,3 +84,47 @@ def route(claim_text: str) -> dict:
 def _is_tech(entity: str) -> bool:
     table, norm = support._lexicon()
     return norm(entity) in table or any(c == entity for c, _a in table.values())
+
+
+# --------------------------------------------------------------------------
+# Scope (Phase 4C F1): what the claim is ABOUT. Deterministic. Used by the verdict matrix: a contradiction requires the
+# evidence and the claim to be about the same object, and Crucible sees only a partial, candidate-selected sample of
+# public repositories, so a career, timeline or aggregate claim can never be contradicted by it.
+# --------------------------------------------------------------------------
+
+_FILE_TOKEN = re.compile(r"(?<![\w/])([\w.-]*/)?[\w-]+\.(py|js|jsx|ts|tsx|go|java|kt|rb|rs|c|cc|cpp|h|hpp|cs|php|swift|scala|sql|"
+                         r"ya?ml|json|toml|sh|tf|proto)\b")
+_NAMED_PROJECT = re.compile(r"(?i)\b(?:the\s+)?([A-Za-z0-9][\w.-]*[A-Za-z0-9])\s+(?:project|repository|repo|codebase|library|package)\b")
+_LABEL_PREFIX = re.compile(r"^\s*([A-Za-z0-9][\w.-]*[A-Za-z0-9])\s*[:–—]\s")
+_CAREER = re.compile(r"(?i)\b(\d+\+?\s*(?:years?|yrs?)|years? of experience|career|throughout|over the (?:last|past)|"
+                     r"(?:19|20)\d{2}\s*(?:-|–|to)\s*(?:(?:19|20)\d{2}|present))\b")
+_COMPONENT_NOUNS = r"(?:module|service|library|package|component|engine|layer|client|pipeline|api|system|tool|job|worker|scheduler|parser|cli)"
+_COMPONENT = re.compile(rf"(?i)\b(?:the|a|an|our|its)\s+((?:[a-z][\w-]*\s+){{0,3}}){_COMPONENT_NOUNS}\b")
+_PROJECT_SECTIONS = re.compile(r"(?i)project|open source|portfolio")
+_GENERIC = frozenset("new main core internal custom simple small large first own".split())
+
+
+def scope_of(claim_text: str, kind: str, unit_text: str | None = None, section: str | None = None) -> tuple[str, str | None]:
+    """(scope, scope_target). specific_artifact > project > career > none, except that timeline and scale claims are
+    always career (their evidence is a repository sample's history or size, never the object itself)."""
+    text = claim_text or ""
+    if kind in ("timeline", "scale"):
+        return "career", None
+    m = _FILE_TOKEN.search(text)
+    if m:
+        return "specific_artifact", m.group(0)
+    label = _LABEL_PREFIX.match(unit_text or "")
+    if label and section and _PROJECT_SECTIONS.search(section) and label.group(1).lower() in text.lower():
+        return "project", label.group(1)
+    m = _NAMED_PROJECT.search(text)
+    if m and m.group(1).lower() not in ("the", "a", "this", "that", "open-source", "open"):
+        return "project", m.group(1)
+    if _CAREER.search(text):
+        return "career", None
+    if kind == "ownership":
+        m = _COMPONENT.search(text)
+        if m:
+            words = [w for w in m.group(1).split() if w.lower() not in _GENERIC]
+            if words:
+                return "specific_artifact", " ".join(words)
+    return "none", None

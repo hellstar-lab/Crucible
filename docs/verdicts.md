@@ -31,6 +31,28 @@ payload is built from an allow-list, and a test asserts this.
 6. **The verdict matrix**, applied to the cited item, with the hard gates: authorship_confidence "none" -> never
    supported; likely_identity_gap -> never contradicted on authorship grounds.
 
+## Scope rule (F1)
+
+A contradiction requires the evidence and the claim to be about the SAME OBJECT. Crucible sees a partial sample of
+repositories (public only, candidate-selected, unknown total), so absence in that sample is never evidence of absence.
+A career, timeline or aggregate claim can never be contradicted by a repository sample.
+
+Stage 5 sets `scope` deterministically (`backend/claims/routing.scope_of`): `specific_artifact` (a named file or
+component), `project` (a named project), `career` (timeline, scale, years of experience), or `none`. `contradicted` is
+permitted only for `specific_artifact` / `project` claims whose cited item belongs to that object; otherwise the verdict
+is `inconclusive`, "evidence is not about the same scope as the claim". A history or count item can never contradict;
+that is an explicit early check.
+
+The failure that motivated it: "2014 - 2018" (a degree's dates) came back contradicted in 3 of 3 runs, citing one
+repository's 2026 commit history.
+
+## Ensemble (F2)
+
+The content judgement is one request with n=3 samples at temperature 0.7. Each sample goes through the citation check
+and the matrix; only 3 of 3 identical FINAL verdicts produce that verdict. Anything else is `inconclusive`, "verdicts
+disagreed", and all three samples are recorded. Escalation to an Ultra ensemble (same rule) happens only after
+unanimity: when the verdict is contradicted, or when a sample's chosen-label probability is below 0.70.
+
 ## Notes
 
 - This replaces the earlier 4C judgement contract (`evidence_sufficient` with a code override). It reuses the

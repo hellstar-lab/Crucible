@@ -737,6 +737,7 @@ class ClaimUnit(CrucibleModel):
     selected_text: Optional[str] = None  # Stage 2 output (the verifiable part when "mixed")
     dropped_text: Optional[str] = None  # what Stage 2 removed
     clarified_text: Optional[str] = None  # Stage 3 output
+    dropped_claims: list[str] = []  # Stage 4 claims removed deterministically (e.g. a bare date range)
 
 
 class ExcludedUnit(CrucibleModel):
@@ -766,6 +767,10 @@ class ExtractedClaim(CrucibleModel):
     checkability_note: Optional[str] = None  # for "weak" / "conditional"
     support_ratio: Optional[float] = None  # diagnostic only, never a gate
     decomposition_tier: str
+    # Phase 4C F1: what the claim is ABOUT, set deterministically at Stage 5. A contradiction requires the evidence and
+    # the claim to be about the same object (see backend/verdicts/matrix.py).
+    scope: Literal["specific_artifact", "project", "career", "none"] = "none"
+    scope_target: Optional[str] = None  # the named file / module / project, when scope names one
 
 
 class ShieldGate(CrucibleModel):
@@ -887,6 +892,10 @@ class ClaimVerdict(CrucibleModel):
     cited_item_index: Optional[int] = None
     cited_item: Optional[EvidenceItem] = None  # the cited evidence, authorship fields included (decided by code, 4B)
     citation_downgraded: bool = False  # supported/contradicted without a resolvable citation -> inconclusive
+    scope: Optional[str] = None  # the claim's scope (F1): contradicted needs specific_artifact/project + same object
+    scope_target: Optional[str] = None
+    samples: Optional[list[dict]] = None  # F2 ensemble: every sampled judgement, so a disagreement is auditable
+    agreement: Optional[str] = None  # e.g. "3/3" of the final-verdict samples that agreed
     # model bookkeeping
     model_tier: Optional[str] = None
     escalated: bool = False

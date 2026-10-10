@@ -80,7 +80,11 @@ def main() -> int:
             cite = (f"[{v.cited_item_index}] {v.cited_item.rule} {v.cited_item.path}:{v.cited_item.start_line} "
                     f"{(v.cited_item.excerpt or v.cited_item.observed_value or '')[:60]!r}") if v.cited_item else "-"
             print(f"{v.claim_id:<10} {v.verdict:<13} {v.claim_text[:60]!r}")
-            print(f"           row={v.matrix_row} tier={v.model_tier} escalated={v.escalated} content={v.content_supported}")
+            print(f"           row={v.matrix_row} tier={v.model_tier} escalated={v.escalated} content={v.content_supported} "
+                  f"scope={v.scope}{'(' + v.scope_target + ')' if v.scope_target else ''} agreement={v.agreement}")
+            for smp in v.samples or []:
+                print(f"             sample[{smp['tier']}]: {smp['content_supported']} -> {smp['final_verdict']} "
+                      f"cite={smp['cited_item_index']} p={smp['top_prob']} :: {(smp['content_reason'] or '')[:110]}")
             print(f"           reason: {v.reason}")
             if v.content_reason:
                 print(f"           content_reason: {v.content_reason}")

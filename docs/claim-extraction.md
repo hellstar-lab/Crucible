@@ -157,6 +157,12 @@ Round 2 (2026-10-11, after S1-S6):
 
 ## Known gaps
 
+- **Bare date ranges (Phase 4C F3, fixed deterministically).** A unit or a Stage 4 claim whose entire content is a date
+  range ("2014 - 2018", "Jan 2020 - Present", "03/2020-12/2021") is a field value, not a claim. Units are excluded before
+  Stage 2 as `no_verifiable_claims` ("bare date range belongs to the timeline extractor"), with no model call. Claims
+  Stage 4 produces from a longer unit are dropped and recorded in `ClaimUnit.dropped_claims`. The live failure came from
+  the second path: the unit was "B.Sc. Computer Science, University of Example 2014 - 2018". Like role lines, these
+  belong to 2C's timeline extractor (`resume.timeline`).
 - **Role lines:** Stage 5 types role lines ("Senior Engineer, Northwind Payments") as `other` and loses their dates.
   This is a routing bug: role lines belong to 2C's timeline extractor (`resume.timeline`), not the claim pipeline.
 - **Ungrounded words:** Stage 4 adds words the source does not say ("Proficient in Python" from a skills list). The
