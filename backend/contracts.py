@@ -796,3 +796,115 @@ class ClaimExtraction(CrucibleModel):
     # judgements where the model wrote a non-"inconclusive" verdict next to evidence_sufficient=false / all judgements
     sufficiency_disagreement_rate: Optional[float] = None
     key_order_follows_schema_rate: Optional[float] = None  # replies whose top-level keys came in schema order
+
+
+# --------------------------------------------------------------------------
+# Phase 4B: evidence retrieval. Deterministic, zero model calls.
+# --------------------------------------------------------------------------
+
+EvidenceKind = Literal["dependency", "import", "file_presence", "function", "config", "history", "count"]
+
+
+class SearchedBlock(CrucibleModel):
+    """What retrieval looked at. Present (even with zero files) whenever retrieval was performed."""
+    manifests: list[str] = []  # manifest paths whose entries were compared
+    source_files: int = 0  # countable (post-exclusion) source files available to the rules
+    repos: list[str] = []  # repo full names searched
+    structure_keys: list[str] = []  # repo_facts.structure keys consulted
+    rules_fired: list[str] = []  # rule names that ran, plus outcome markers such as "no_benchmark_present"
+    technologies: list[str] = []  # lexicon technologies recognised in the claim
+    excluded_files_skipped: int = 0  # files in scope that the 3.5 exclusion rules removed: never evidence
+
+
+class EvidenceItem(CrucibleModel):
+    """One piece of repository evidence for a claim. A FACT about the repository, never a verdict."""
+    repo_full_name: str
+    path: Optional[str] = None
+    start_line: Optional[int] = None  # 1-based, inclusive; None when not applicable or unknown
+    end_line: Optional[int] = None
+    kind: EvidenceKind
+    excerpt: Optional[str] = None  # verbatim from the file at head_sha, <= 400 chars; None without a checkout
+    rule: str  # which retrieval rule produced this item
+    match: Optional[str] = None  # exact | fuzzy | pattern | config_key | path | structure | count | history
+    match_detail: Optional[str] = None  # e.g. "fuzzy ratio 93.3 >= cutoff 90", "parser=tree-sitter"
+    score: float = 0.0  # the ranking score (see backend/retrieval/rank.py)
+    technology: Optional[str] = None
+    authored_by_candidate: Optional[bool] = None  # None = not measurable here (never inferred later)
+    authored_ratio: Optional[float] = None  # for THIS file, candidate-authored source lines / source lines
+    authorship_confidence: Optional[str] = None  # carried through from Phase 3.6; None when no authorship ran
+    likely_identity_gap: Optional[bool] = None  # carried through so 4C sees the 0%-authored caveat
+    authorship_caveat: Optional[str] = None  # human-readable reason authored_by_candidate is None / misleading
+    observed_value: Optional[str] = None  # r_scale / r_history: what the repository shows
+    claimed_value: Optional[str] = None  # r_scale / r_history: what the claim states (no comparison is made)
+
+
+class EvidenceSet(CrucibleModel):
+    """All retrieved evidence for one claim, ready for 4C.
+
+    INVARIANT (empty results): an empty ``items`` list with a POPULATED ``searched`` block means WE LOOKED AND FOUND
+    NOTHING; an empty ``items`` list with ``searched`` = None means WE DID NOT LOOK. 4C must tell these apart: the
+    first is evidence for no_evidence, the second is not evidence at all.
+
+    INVARIANT (authorship): ``authored_by_candidate`` is decided HERE, from the data, and never inferred later.
+    Evidence that a technology exists in a repository is NOT evidence that the candidate used it. When authorship
+    confidence is "none" (single-commit import), ``authored_ratio`` is reported but ``authored_by_candidate`` is None:
+    blame attributed everything to the committer by construction, so it cannot answer the question.
+    """
+    claim_id: str
+    claim_kind: Optional[str] = None
+    retrieval_performed: bool
+    skip_reason: Optional[str] = None
+    searched: Optional[SearchedBlock] = None
+    items: list[EvidenceItem] = []
+    items_dropped: int = 0
+    retrieval_version: str
+    notes: list[str] = []
+
+
+# --------------------------------------------------------------------------
+# Phase 4C: verdicts. The model judges CONTENT; code decides AUTHORSHIP. No scores, no ranking, no hire signal.
+# --------------------------------------------------------------------------
+
+FinalVerdict = Literal["supported", "contradicted", "no_evidence", "inconclusive", "unverifiable"]
+ContentVerdict = Literal["supported", "contradicted", "no_evidence", "inconclusive"]
+
+
+class ClaimVerdict(CrucibleModel):
+    """One row of the evidence table. ``verdict`` is produced by code from the model's content judgement and the
+    EvidenceSet's authorship data (backend/verdicts/matrix.py); the model never sees or decides authorship."""
+    claim_id: str
+    claim_text: str
+    claim_kind: Optional[str] = None
+    verdict: FinalVerdict
+    reason: str  # why the final verdict, in words: matrix row, gate, or pass-through
+    matrix_row: str  # e.g. "supported+authored+identity_ok", "gate:retrieval_not_performed"
+    gates: list[str] = []  # hard gates that fired
+    authorship_note: Optional[str] = None  # e.g. "the cited code exists but was not written by the candidate"
+    # the model's content judgement (None when no model call was made)
+    evidence_summary: Optional[str] = None
+    content_reason: Optional[str] = None
+    content_supported: Optional[ContentVerdict] = None
+    cited_item_index: Optional[int] = None
+    cited_item: Optional[EvidenceItem] = None  # the cited evidence, authorship fields included (decided by code, 4B)
+    citation_downgraded: bool = False  # supported/contradicted without a resolvable citation -> inconclusive
+    # model bookkeeping
+    model_tier: Optional[str] = None
+    escalated: bool = False
+    escalation_reason: Optional[str] = None
+    value_distribution: Optional[dict] = None  # sequence probabilities of the content labels (grammar-allowed shares)
+    greedy_disagreement: bool = False
+    prompt_hash: Optional[str] = None
+    cost_usd: Optional[float] = None
+    retrieval_version: Optional[str] = None
+
+
+class ClaimVerdicts(CrucibleModel):
+    """All verdicts for one document. Claims not judged because the cost cap bit are listed, never given a verdict."""
+    verdicts: list[ClaimVerdict] = []
+    not_judged: list[str] = []  # claim ids left unjudged when the per-document cost cap bit
+    truncated: bool = False
+    calls: int = 0
+    cost_usd: Optional[float] = None
+    cost_cap_usd: float
+    counters: dict[str, int] = {}
+    greedy_disagreement_rate: Optional[float] = None

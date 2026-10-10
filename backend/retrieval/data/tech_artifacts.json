@@ -1,0 +1,1074 @@
+{
+ "_comment": "Phase 4B technology -> artifact lexicon. DATA, not code. A string in 'files' is a glob matched against the file name and the full path; a trailing '/' matches a directory anywhere in the path; an object {glob, contains} also requires the text to occur in the file (checkout needed). code_artifacts=false means the technology leaves no artifact a repository could show.",
+ "technologies": {
+  "python": {
+   "aliases": [
+    "Python"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.py"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": "language: evidence is countable .py source"
+  },
+  "go": {
+   "aliases": [
+    "Go",
+    "Golang"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.go",
+    "go.mod"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "java": {
+   "aliases": [
+    "Java"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.java",
+    "pom.xml",
+    "build.gradle"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "scala": {
+   "aliases": [
+    "Scala"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.scala",
+    "build.sbt"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "rust": {
+   "aliases": [
+    "Rust"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.rs",
+    "Cargo.toml"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "c": {
+   "aliases": [
+    "C"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.c",
+    "*.h"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "c++": {
+   "aliases": [
+    "C++",
+    "CPP"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.cpp",
+    "*.cc",
+    "*.hpp",
+    "CMakeLists.txt"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "html": {
+   "aliases": [
+    "HTML"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.html",
+    "*.htm"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "sass": {
+   "aliases": [
+    "SASS",
+    "SCSS",
+    "Sass"
+   ],
+   "deps": [
+    "sass",
+    "node-sass"
+   ],
+   "imports": [],
+   "files": [
+    "*.scss",
+    "*.sass"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "node.js": {
+   "aliases": [
+    "Node.js",
+    "NodeJS",
+    "Node"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "package.json",
+    ".nvmrc"
+   ],
+   "config_keys": [
+    "engines"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "fastapi": {
+   "aliases": [
+    "FastAPI"
+   ],
+   "deps": [
+    "fastapi"
+   ],
+   "imports": [
+    "fastapi"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "django": {
+   "aliases": [
+    "Django"
+   ],
+   "deps": [
+    "django",
+    "Django"
+   ],
+   "imports": [
+    "django"
+   ],
+   "files": [
+    "manage.py",
+    "settings.py"
+   ],
+   "config_keys": [
+    "INSTALLED_APPS",
+    "DJANGO_SETTINGS_MODULE"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "flask": {
+   "aliases": [
+    "Flask"
+   ],
+   "deps": [
+    "flask",
+    "Flask"
+   ],
+   "imports": [
+    "flask"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "express": {
+   "aliases": [
+    "Express",
+    "Express.js"
+   ],
+   "deps": [
+    "express"
+   ],
+   "imports": [
+    "express"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "koa": {
+   "aliases": [
+    "Koa",
+    "Koa.js"
+   ],
+   "deps": [
+    "koa"
+   ],
+   "imports": [
+    "koa"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "react": {
+   "aliases": [
+    "React",
+    "React.js",
+    "ReactJS"
+   ],
+   "deps": [
+    "react",
+    "react-dom"
+   ],
+   "imports": [
+    "react",
+    "react-dom"
+   ],
+   "files": [
+    "*.jsx",
+    "*.tsx"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "redux": {
+   "aliases": [
+    "Redux"
+   ],
+   "deps": [
+    "redux",
+    "@reduxjs/toolkit",
+    "react-redux"
+   ],
+   "imports": [
+    "redux",
+    "@reduxjs/toolkit",
+    "react-redux"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "grpc": {
+   "aliases": [
+    "gRPC",
+    "GRPC"
+   ],
+   "deps": [
+    "grpcio",
+    "grpcio-tools",
+    "@grpc/grpc-js",
+    "google.golang.org/grpc",
+    "io.grpc"
+   ],
+   "imports": [
+    "grpc",
+    "@grpc/grpc-js",
+    "google.golang.org/grpc",
+    "io.grpc"
+   ],
+   "files": [
+    "*.proto"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "pytest": {
+   "aliases": [
+    "pytest",
+    "PyTest"
+   ],
+   "deps": [
+    "pytest"
+   ],
+   "imports": [
+    "pytest"
+   ],
+   "files": [
+    "pytest.ini",
+    "conftest.py"
+   ],
+   "config_keys": [
+    "[tool.pytest.ini_options]"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "redis": {
+   "aliases": [
+    "Redis"
+   ],
+   "deps": [
+    "redis",
+    "redis-py",
+    "ioredis",
+    "go-redis",
+    "github.com/redis/go-redis/v9",
+    "github.com/go-redis/redis",
+    "jedis",
+    "redis.clients:jedis",
+    "aioredis"
+   ],
+   "imports": [
+    "redis",
+    "ioredis",
+    "aioredis",
+    "github.com/redis/go-redis",
+    "github.com/go-redis/redis",
+    "redis.clients.jedis"
+   ],
+   "files": [
+    "redis.conf"
+   ],
+   "config_keys": [
+    "REDIS_URL",
+    "redis_host",
+    "REDIS_HOST"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "postgresql": {
+   "aliases": [
+    "PostgreSQL",
+    "Postgres",
+    "psql"
+   ],
+   "deps": [
+    "psycopg2",
+    "psycopg2-binary",
+    "psycopg",
+    "asyncpg",
+    "pg",
+    "github.com/lib/pq",
+    "github.com/jackc/pgx/v5",
+    "org.postgresql:postgresql"
+   ],
+   "imports": [
+    "psycopg2",
+    "psycopg",
+    "asyncpg",
+    "pg",
+    "github.com/lib/pq",
+    "github.com/jackc/pgx"
+   ],
+   "files": [],
+   "config_keys": [
+    "postgresql://",
+    "postgres://",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_DB"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "kafka": {
+   "aliases": [
+    "Kafka",
+    "Apache Kafka"
+   ],
+   "deps": [
+    "kafka-python",
+    "confluent-kafka",
+    "aiokafka",
+    "kafkajs",
+    "github.com/segmentio/kafka-go",
+    "org.apache.kafka:kafka-clients"
+   ],
+   "imports": [
+    "kafka",
+    "confluent_kafka",
+    "aiokafka",
+    "kafkajs",
+    "github.com/segmentio/kafka-go",
+    "org.apache.kafka"
+   ],
+   "files": [],
+   "config_keys": [
+    "KAFKA_BOOTSTRAP_SERVERS",
+    "bootstrap.servers"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "elasticsearch": {
+   "aliases": [
+    "Elasticsearch",
+    "ElasticSearch"
+   ],
+   "deps": [
+    "elasticsearch",
+    "@elastic/elasticsearch",
+    "github.com/elastic/go-elasticsearch"
+   ],
+   "imports": [
+    "elasticsearch",
+    "@elastic/elasticsearch",
+    "github.com/elastic/go-elasticsearch"
+   ],
+   "files": [
+    "elasticsearch.yml"
+   ],
+   "config_keys": [
+    "ELASTICSEARCH_URL"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "influxdb": {
+   "aliases": [
+    "InfluxDB"
+   ],
+   "deps": [
+    "influxdb",
+    "influxdb-client",
+    "@influxdata/influxdb-client"
+   ],
+   "imports": [
+    "influxdb",
+    "influxdb_client",
+    "@influxdata/influxdb-client"
+   ],
+   "files": [],
+   "config_keys": [
+    "INFLUXDB_URL"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "logstash": {
+   "aliases": [
+    "Logstash"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "logstash.conf",
+    "*.logstash.conf",
+    "logstash.yml"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "kibana": {
+   "aliases": [
+    "Kibana"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "kibana.yml"
+   ],
+   "config_keys": [
+    "kibana"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "elk": {
+   "aliases": [
+    "ELK",
+    "ELK Stack"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "logstash.conf",
+    "kibana.yml",
+    "elasticsearch.yml"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "grafana": {
+   "aliases": [
+    "Grafana"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "grafana/",
+    "*.grafana.json"
+   ],
+   "config_keys": [
+    "grafana"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "docker": {
+   "aliases": [
+    "Docker"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "Dockerfile",
+    "Dockerfile.*",
+    "*.Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "compose.yaml",
+    ".dockerignore"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "kubernetes": {
+   "aliases": [
+    "Kubernetes",
+    "K8s",
+    "k8s"
+   ],
+   "deps": [
+    "kubernetes",
+    "@kubernetes/client-node",
+    "k8s.io/client-go"
+   ],
+   "imports": [
+    "kubernetes",
+    "@kubernetes/client-node",
+    "k8s.io"
+   ],
+   "files": [
+    "k8s/",
+    "kubernetes/",
+    "deployment.yaml",
+    "kustomization.yaml",
+    "Chart.yaml",
+    {
+     "glob": "*.yaml",
+     "contains": "kind:"
+    },
+    {
+     "glob": "*.yml",
+     "contains": "kind:"
+    }
+   ],
+   "config_keys": [
+    "apiVersion",
+    "kind"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "terraform": {
+   "aliases": [
+    "Terraform"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "*.tf",
+    "*.tfvars",
+    ".terraform.lock.hcl"
+   ],
+   "config_keys": [
+    "resource \"",
+    "provider \""
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "ansible": {
+   "aliases": [
+    "Ansible"
+   ],
+   "deps": [
+    "ansible"
+   ],
+   "imports": [],
+   "files": [
+    "ansible.cfg",
+    "playbook.yml",
+    "playbooks/",
+    "roles/"
+   ],
+   "config_keys": [
+    "hosts:",
+    "tasks:"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "vagrant": {
+   "aliases": [
+    "Vagrant"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "Vagrantfile"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "argocd": {
+   "aliases": [
+    "ArgoCD",
+    "Argo CD"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "argocd/",
+    {
+     "glob": "*.yaml",
+     "contains": "argoproj.io"
+    }
+   ],
+   "config_keys": [
+    "argoproj.io"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "istio": {
+   "aliases": [
+    "Istio"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "istio/",
+    {
+     "glob": "*.yaml",
+     "contains": "networking.istio.io"
+    }
+   ],
+   "config_keys": [
+    "networking.istio.io"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "consul": {
+   "aliases": [
+    "Consul"
+   ],
+   "deps": [
+    "python-consul",
+    "consul",
+    "github.com/hashicorp/consul/api"
+   ],
+   "imports": [
+    "consul",
+    "github.com/hashicorp/consul"
+   ],
+   "files": [
+    "consul.hcl",
+    "consul/"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "vault": {
+   "aliases": [
+    "Vault",
+    "HashiCorp Vault"
+   ],
+   "deps": [
+    "hvac",
+    "node-vault",
+    "github.com/hashicorp/vault/api"
+   ],
+   "imports": [
+    "hvac",
+    "node-vault",
+    "github.com/hashicorp/vault"
+   ],
+   "files": [
+    "vault.hcl"
+   ],
+   "config_keys": [
+    "VAULT_ADDR"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "github actions": {
+   "aliases": [
+    "GitHub Actions"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    ".github/workflows/"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "circleci": {
+   "aliases": [
+    "CircleCI"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    ".circleci/"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "jenkins": {
+   "aliases": [
+    "Jenkins"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "Jenkinsfile"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "gitlab": {
+   "aliases": [
+    "GitLab",
+    "GitLab CI"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    ".gitlab-ci.yml"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "github": {
+   "aliases": [
+    "GitHub"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    ".github/"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": "hosting: a repository on GitHub says little; evidence is .github/ configuration"
+  },
+  "aws": {
+   "aliases": [
+    "AWS",
+    "Amazon Web Services"
+   ],
+   "deps": [
+    "boto3",
+    "botocore",
+    "aws-sdk",
+    "@aws-sdk/client-s3",
+    "github.com/aws/aws-sdk-go-v2",
+    "aws-cdk-lib"
+   ],
+   "imports": [
+    "boto3",
+    "botocore",
+    "aws-sdk",
+    "@aws-sdk",
+    "github.com/aws/aws-sdk-go"
+   ],
+   "files": [
+    "serverless.yml",
+    "template.yaml",
+    "cdk.json",
+    "buildspec.yml"
+   ],
+   "config_keys": [
+    "AWS_REGION",
+    "AWS_ACCESS_KEY_ID",
+    "aws_region",
+    "provider \"aws\""
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "s3": {
+   "aliases": [
+    "S3",
+    "Amazon S3"
+   ],
+   "deps": [
+    "boto3",
+    "@aws-sdk/client-s3"
+   ],
+   "imports": [
+    "@aws-sdk/client-s3"
+   ],
+   "files": [],
+   "config_keys": [
+    "s3://",
+    "aws_s3_bucket",
+    "S3_BUCKET"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "ec2": {
+   "aliases": [
+    "EC2",
+    "Amazon EC2"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [],
+   "config_keys": [
+    "aws_instance",
+    "AWS::EC2::"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "ecs": {
+   "aliases": [
+    "ECS",
+    "Amazon ECS"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "task-definition.json",
+    "ecs-params.yml"
+   ],
+   "config_keys": [
+    "aws_ecs_",
+    "AWS::ECS::"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "eks": {
+   "aliases": [
+    "EKS",
+    "Amazon EKS"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "eksctl.yaml",
+    "cluster.yaml"
+   ],
+   "config_keys": [
+    "aws_eks_cluster",
+    "eksctl.io"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "rds": {
+   "aliases": [
+    "RDS",
+    "Amazon RDS"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [],
+   "config_keys": [
+    "aws_db_instance",
+    "AWS::RDS::"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "lambda": {
+   "aliases": [
+    "Lambda",
+    "AWS Lambda"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "serverless.yml",
+    "template.yaml"
+   ],
+   "config_keys": [
+    "aws_lambda_function",
+    "AWS::Lambda::",
+    "AWS::Serverless::Function"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "cloudfront": {
+   "aliases": [
+    "CloudFront"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [],
+   "config_keys": [
+    "aws_cloudfront_distribution",
+    "AWS::CloudFront::"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "netlify": {
+   "aliases": [
+    "Netlify"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "netlify.toml",
+    "_redirects"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "heroku": {
+   "aliases": [
+    "Heroku"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "Procfile",
+    "app.json",
+    "runtime.txt"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "cloudflare": {
+   "aliases": [
+    "Cloudflare"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "wrangler.toml",
+    "wrangler.json"
+   ],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "okta": {
+   "aliases": [
+    "Okta"
+   ],
+   "deps": [
+    "@okta/okta-auth-js",
+    "okta",
+    "@okta/okta-react"
+   ],
+   "imports": [
+    "@okta",
+    "okta"
+   ],
+   "files": [],
+   "config_keys": [
+    "OKTA_DOMAIN",
+    "OKTA_CLIENT_ID"
+   ],
+   "code_artifacts": true,
+   "note": null
+  },
+  "linux": {
+   "aliases": [
+    "Linux"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": false,
+   "note": "an operating system, not a code artifact"
+  },
+  "unix": {
+   "aliases": [
+    "Unix"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": false,
+   "note": "an operating system, not a code artifact"
+  },
+  "rest": {
+   "aliases": [
+    "REST",
+    "RESTful"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": false,
+   "note": "an architectural style; no artifact names it"
+  },
+  "metasploit": {
+   "aliases": [
+    "Metasploit"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": false,
+   "note": "a tool used, not a dependency of a project"
+  },
+  "android sdk": {
+   "aliases": [
+    "Android SDK"
+   ],
+   "deps": [],
+   "imports": [],
+   "files": [
+    "AndroidManifest.xml",
+    "build.gradle"
+   ],
+   "config_keys": [
+    "com.android.application",
+    "compileSdk"
+   ],
+   "code_artifacts": true,
+   "note": null
+  }
+ }
+}
