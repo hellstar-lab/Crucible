@@ -199,6 +199,9 @@ td.claim{width:20%}td.verdict{width:15%}td.reason{width:19%}td.cite{width:15%}td
 .warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:4px;padding:2px 6px;display:inline-block;margin-top:4px}
 .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:0 0 12px;font-size:.85rem}
 blockquote{margin:0;padding:0 0 0 10px;border-left:3px solid var(--line)}
+pre.span{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--code);border-radius:4px;padding:6px 8px;margin:4px 0 10px;
+font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+ol.shield-items{padding-left:22px}
 """
 
 
@@ -221,6 +224,18 @@ class Page:
     # ---- sections ------------------------------------------------------------------------------------------------
     def analysed(self) -> str:
         out = ['<section id="analysed"><h2>Analysed</h2>']
+        cand = self.get("header", "candidate")
+        out.append('<dl class="kv"><dt>candidate (as supplied by the operator)</dt><dd>')
+        if cand is None:
+            out.append(f"{NOT_MEASURED}: no candidate identifier was supplied, so this report cannot say whose it is")
+        else:
+            parts = []
+            if "github_user" in cand:
+                parts.append(f'GitHub user <strong class="mono">{self.val(("header", "candidate", "github_user"))}</strong>')
+            if "reference" in cand:
+                parts.append(f'reference <strong class="mono">{self.val(("header", "candidate", "reference"))}</strong>')
+            out.append(" · ".join(parts) or NOT_MEASURED)
+        out.append("</dd></dl>")
         repos = self.get("header", "analysed") or []
         if not repos:
             out.append(f"<p>{NOT_MEASURED}: no repository was analysed in this report.</p>")
@@ -283,6 +298,20 @@ class Page:
         out.append(f"<dt>hidden text fragments</dt><dd>{self.val(b + ('hidden_fragments',))}</dd>")
         out.append(f"<dt>resume units removed</dt><dd>{self.val(b + ('units_removed',))}</dd>")
         out.append(f"<dt>needs human review</dt><dd>{self.val(b + ('needs_review',), 'bool')}</dd></dl>")
+        items = self.get(*b, "items")
+        if items is None:
+            out.append(f'<p class="small">Finding locations and text: {NOT_MEASURED}.</p>')
+        elif items:
+            out.append('<h3>Findings, with the hidden text as a machine reads it</h3><ol class="shield-items">')
+            for i, it in enumerate(items):
+                ib = b + ("items", i)
+                reasons = f" ({self.val(ib + ('reasons',))})" if it.get("reasons") else ""
+                sev = f" · severity {self.val(ib + ('severity',))}" if it.get("severity") else ""
+                cut = ' <span class="muted">(shown up to the cap; the original is longer)</span>' if it.get("span_truncated") else ""
+                out.append(f'<li><strong>{self.val(ib + ("kind",), "label")}</strong> · {self.val(ib + ("detector",), "label")}'
+                           f'{reasons}{sev} · {self.val(ib + ("location",))}'
+                           f'<pre class="span">{self.val(ib + ("span",))}</pre>{cut}</li>')
+            out.append("</ol>")
         if self.get(*b, "status") not in (None, "clean"):
             out.append('<p class="warn small">The document carried hidden or suspicious content. Claims were extracted from the '
                        'cleaned text only; read the original with this in mind.</p>')
@@ -322,7 +351,12 @@ class Page:
 
         verdict = [f'<td class="verdict"><span class="verdict-badge v-{E(v or "")}">{shape}{self.val(b + ("verdict",), "label")}</span>',
                    '<div class="basis">']
-        if r.get("agreement") and r.get("matrix_row") == "ensemble:disagreed":
+        if r.get("matrix_row") == "contradiction:not_confirmed":
+            verdict.append(f'a contradiction was proposed but not confirmed by both tiers; final tier '
+                           f'{self.val(b + ("model_tier",))} agreement {self.val(b + ("agreement",))}')
+            if r.get("escalated"):
+                verdict.append(f'<br>escalated: {self.val(b + ("escalation_reason",))}')
+        elif r.get("agreement") and r.get("matrix_row") == "ensemble:disagreed":
             verdict.append(f'samples disagreed: largest agreeing share {self.val(b + ("agreement",))} '
                            f'({self.val(b + ("model_tier",))} tier), not enough for a verdict')
         elif r.get("agreement"):
@@ -341,6 +375,9 @@ class Page:
         reason = f'<td class="reason">{self.val(b + ("reason",))}'
         if r.get("content_reason"):
             reason += f'<div class="small muted" style="margin-top:6px">model\'s reading of the evidence: {self.val(b + ("content_reason",))}</div>'
+        if r.get("superseded_reason"):
+            reason += (f'<div class="small" style="margin-top:6px">reason before grounding replaced it: '
+                       f'{self.val(b + ("superseded_reason",))}</div>')
         if r.get("authorship_note"):
             reason += f'<div class="small" style="margin-top:6px">authorship note: {self.val(b + ("authorship_note",))}</div>'
         reason += "</td>"
@@ -452,6 +489,8 @@ class Page:
                                 ("disagreements_resolved_by_ultra", "of those, Ultra samples unanimous", "text"),
                                 ("escalations_on_check", "escalated after a unanimous Super verdict (contradicted or low probability)", "text"),
                                 ("ensemble_disagreements", "left inconclusive because samples still disagreed", "text"),
+                                ("contradictions_confirmed", "contradictions confirmed by both tiers unanimously", "text"),
+                                ("contradictions_not_confirmed", "contradictions one tier did not confirm (left inconclusive)", "text"),
                                 ("citation_downgraded", "samples downgraded for an unresolvable citation", "text"),
                                 ("greedy_disagreement_rate", "samples whose most probable label differed from the label generated", "ratio"),
                                 ("cost_usd", "verdict cost", "usd"),

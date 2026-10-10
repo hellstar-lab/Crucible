@@ -167,8 +167,62 @@ def test_unanimous_contradiction_on_the_same_object_escalates_to_ultra(scenarios
     assert v.scope == "specific_artifact" and v.scope_target == "ledger reconciliation"
     assert v.scope_match_rule in ("r_ownership:whole_path_component:ledger", "r_ownership:whole_word_in_function:ledger") and v.scope_match_score == 100.0
     assert v.verdict == "contradicted" and calls == 2 and v.escalated and v.model_tier == "ultra"
-    assert [t for t, _p, _n in fake.calls] == ["super", "ultra"] and v.escalation_reason == "unanimous verdict contradicted"
+    assert [t for t, _p, _n in fake.calls] == ["super", "ultra"] and v.escalation_reason.startswith("unanimous verdict contradicted")
     assert len(v.samples) == 6  # 3 Super + 3 Ultra, all recorded
+
+
+# --- I1: a contradiction needs Super 3/3 AND Ultra 3/3 ------------------------------------------------------------
+
+def _ledger_idx(es):
+    return next(i for i, it in enumerate(es.items) if it.path == "src/billing/ledger.py")
+
+
+@pytest.mark.parametrize("name,super_ans,ultra_ans", [
+    # the measured run-2 case: Super held back 2/3, Ultra alone would have made it a contradiction
+    ("ultra_overrules_super_majority", [("inconclusive", None, 0.9, False)] * 2 + [("contradicted", "IDX", 0.9, False)],
+     ("contradicted", "IDX", 0.95, False)),
+    # (labels are content labels; the matrix runs per sample, so "supported" on Bob's ledger is already a
+    #  contradiction after blame; these cases use labels that stay non-contradicting after the matrix)
+    ("ultra_overrules_unanimous_low_prob_super", ("inconclusive", None, 0.55, False), ("contradicted", "IDX", 0.95, False)),
+    ("ultra_does_not_confirm_super", ("contradicted", "IDX", 0.9, False), ("inconclusive", None, 0.9, False)),
+    ("ultra_confirms_only_2_of_3", ("contradicted", "IDX", 0.9, False),
+     [("contradicted", "IDX", 0.9, False)] * 2 + [("inconclusive", None, 0.9, False)]),
+    ("ultra_says_no_evidence_after_super_contradicted", ("contradicted", "IDX", 0.9, False), ("no_evidence", None, 0.9, False)),
+])
+def test_contradiction_without_both_tiers_unanimous_is_inconclusive_with_both_sample_sets(scenarios, fake, name, super_ans, ultra_ans):
+    c, es = _ledger_evidence(scenarios, "ownership")
+    i = _ledger_idx(es)
+    fix = lambda a: tuple(i if x == "IDX" else x for x in a)  # noqa: E731
+    fake.answers = [[fix(a) for a in super_ans] if isinstance(super_ans, list) else fix(super_ans),
+                    [fix(a) for a in ultra_ans] if isinstance(ultra_ans, list) else fix(ultra_ans)]
+    from collections import Counter
+    counters = Counter()
+    v, calls, _ = verdicts.verdict_for(c, es, counters)
+    assert v.verdict == "inconclusive" and v.matrix_row == "contradiction:not_confirmed" and calls == 2
+    assert "gate:contradiction_needs_both_tiers" in v.gates and v.reason.startswith("not a contradiction")
+    assert [s["tier"] for s in v.samples] == ["super"] * 3 + ["ultra"] * 3  # the near miss is auditable
+    assert v.cited_item_index == i and counters["contradictions_not_confirmed"] == 1 and not counters["contradictions_confirmed"]
+    assert not counters["disagreements_resolved_by_ultra"]  # a near miss is not a resolution
+
+
+def test_contradiction_confirmed_by_both_tiers(scenarios, fake):
+    c, es = _ledger_evidence(scenarios, "ownership")
+    i = _ledger_idx(es)
+    fake.answers = [("contradicted", i, 0.9, False), ("contradicted", i, 0.95, False)]
+    from collections import Counter
+    counters = Counter()
+    v, calls, _ = verdicts.verdict_for(c, es, counters)
+    assert v.verdict == "contradicted" and calls == 2 and counters["contradictions_confirmed"] == 1
+
+
+def test_super_disagreement_resolved_to_supported_by_ultra_is_unchanged(scenarios, fake):
+    """I1 touches contradictions only: other labels still resolve through Ultra as before."""
+    es = ev(scenarios, "clean_small", REDIS)
+    i = first_index(es, "r_import")
+    fake.answers = [[("supported", i, 0.9, False), ("contradicted", i, 0.9, False), ("supported", i, 0.9, False)],
+                    ("supported", i, 0.95, False)]
+    v, calls, _ = verdicts.verdict_for(REDIS, es)
+    assert v.verdict == "supported" and calls == 2
 
 
 def test_low_confidence_label_escalates_and_ultra_decides(scenarios, fake):

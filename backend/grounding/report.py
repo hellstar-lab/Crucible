@@ -26,7 +26,8 @@ REPRODUCIBILITY_NOTE = ("Verdicts come from sampled model judgements: the platfo
                         "request and every sample is kept in the 4C verdict output. Retrieval, the verdict matrix and "
                         "grounding are deterministic code.")
 PROVENANCE_COUNTERS = ("samples", "escalations", "escalations_on_disagreement", "disagreements_resolved_by_ultra",
-                       "escalations_on_check", "ensemble_disagreements", "citation_downgraded")
+                       "escalations_on_check", "ensemble_disagreements", "contradictions_confirmed",
+                       "contradictions_not_confirmed", "citation_downgraded")
 
 
 def fmt_ratio(r) -> str:
@@ -56,7 +57,13 @@ def _provenance(run, extraction, run_label) -> dict:
 
 
 def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, grounding_failures=None, run=None,
-                 run_label: str | None = None) -> ClaimEvidenceReport:
+                 run_label: str | None = None, claims=None, candidate: dict | None = None) -> ClaimEvidenceReport:
+    """``claims``: the 4A claims (dicts or ExtractedClaim); defaults to ``extraction.claims``. ``candidate``: what the
+    operator supplied, {"github_user": ..., "reference": ...}; an email is refused (3.6 redacts them)."""
+    if candidate:
+        for k, v in candidate.items():
+            if isinstance(v, str) and "@" in v:
+                raise ValueError(f"candidate {k} looks like an email; the report never carries emails (3.6 redaction)")
     by_id = {es.claim_id: es for es in evidence_sets}
     auth_by_repo = {t.repo_facts.full_name: t.authorship for t in target_reports if t.repo_facts is not None}
     rows = []
@@ -79,7 +86,7 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
             escalated=v.escalated if v.samples else None, escalation_reason=v.escalation_reason, scope=v.scope,
             scope_target=v.scope_target, scope_match_rule=v.scope_match_rule, prompt_hash=v.prompt_hash,
             grounding_passed=v.grounding_passed, grounding_checks=v.grounding_checks,
-            pre_grounding_verdict=v.pre_grounding_verdict, sources=ROW_SOURCES))
+            pre_grounding_verdict=v.pre_grounding_verdict, superseded_reason=v.superseded_reason, sources=ROW_SOURCES))
 
     analysed, excluded, authorship = [], [], []
     for t in target_reports:
@@ -105,14 +112,17 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
         g = extraction.shield
         shield = {"document": extraction.document, "status": g.document_status, "gate_applied": g.applied, "detectors": g.detectors,
                   "hidden_fragments": g.hidden_fragments, "units_removed": g.units_removed, "needs_review": g.needs_review,
+                  "items": [i.model_dump() for i in g.items],
                   "source": "2C via the 4A Shield gate"}
-    texts = {v.claim_id: v.claim_text for v in verdicts}
+    claims = claims if claims is not None else (getattr(extraction, "claims", None) or [])
+    texts = {(c.get("claim_id") if isinstance(c, dict) else c.claim_id): (c.get("text") if isinstance(c, dict) else c.text)
+             for c in claims}  # I2d: from the CLAIM, never from a verdict that may not exist
     not_checkable = [{"claim_id": es.claim_id, "claim_text": texts.get(es.claim_id), "kind": es.claim_kind,
                       "skip_reason": es.skip_reason, "source": "4B"} for es in evidence_sets if not es.retrieval_performed]
     excluded_units = [{"unit_id": u.unit_id, "section": u.source_section, "stage": u.stage, "reason_code": u.reason_code,
                        "detail": u.detail, "source": "4A"} for u in (getattr(extraction, "excluded", None) or [])]
     versions = {"retrieval": next((es.retrieval_version for es in evidence_sets), None)}
-    header = ReportHeader(analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
+    header = ReportHeader(candidate=dict(candidate) if candidate else None, analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
                           grounding_failures=(None if grounding_failures is None else
                                               {c: grounding_failures.get(c, 0) for c in CHECKS}), excluded_units=excluded_units,
                           provenance=_provenance(run, extraction, run_label), stage_versions=versions)

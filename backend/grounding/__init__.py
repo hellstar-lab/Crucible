@@ -102,7 +102,8 @@ def ground(verdict: ClaimVerdict, es: EvidenceSet, views, failures: Counter | No
     first = failed[0]
     reason = f"grounding check {first} failed: {why[first]}" + (f" (also failed: {', '.join(failed[1:])})" if failed[1:] else "")
     return verdict.model_copy(update={"grounding_checks": res, "grounding_passed": False, "pre_grounding_verdict": verdict.verdict,
-                                      "verdict": "inconclusive", "reason": reason, "matrix_row": f"grounding:{first}",
+                                      "verdict": "inconclusive", "reason": reason, "superseded_reason": verdict.reason,
+                                      "matrix_row": f"grounding:{first}",
                                       "gates": verdict.gates + [f"grounding:{c}" for c in failed]})
 
 

@@ -179,3 +179,47 @@ def test_ownership_contradiction_needs_r_ownership_provenance():
         out = matrix.decide("supported", "ownership", _item("src/billing/ledger.py", rule=rule), "specific_artifact", "ledger reconciliation")
         assert out.verdict == "inconclusive" and "gate:provenance" in out.gates and out.reason == matrix.PROVENANCE_REASON
         assert out.scope_match_rule == "whole_path_component:ledger"  # the word match is still recorded
+
+
+
+# --- I2 ---------------------------------------------------------------------------------------------------------------
+
+def test_grounding_downgrade_keeps_the_reason_it_replaced(scenarios):
+    v, es = setup(scenarios, OWN_CACHE)
+    i = next(k for k, it in enumerate(es.items) if it.path == "src/cache.py")
+    vd = verdict(OWN_CACHE, es, i)
+    from backend.retrieval.sources import RepoView
+    broken = RepoView(report=v.report, snap=None, checkout=None, identity=v.identity)
+    out = grounding.ground(vd, es, [broken])
+    assert out.verdict == "inconclusive" and out.reason.startswith("grounding check") and out.superseded_reason == vd.reason
+    rep = build_report(verdicts=[out], evidence_sets=[es], target_reports=[v.report], grounding_failures={})
+    assert rep.rows[0].superseded_reason == vd.reason and rep.rows[0].reason == out.reason
+
+
+def test_not_checkable_text_comes_from_the_claim_not_a_verdict(scenarios):
+    v, _es = setup(scenarios, OWN_CACHE)
+    role = claim("Led a team of 6", "role_or_team", "r1", "no")
+    es_role = retrieval.retrieve(role, [v])
+    rep = build_report(verdicts=[], evidence_sets=[es_role], target_reports=[v.report], claims=[role])
+    assert rep.header.not_checkable[0]["claim_text"] == "Led a team of 6"
+
+
+def test_candidate_is_carried_and_an_email_is_refused(scenarios):
+    v, es = setup(scenarios, OWN_CACHE)
+    rep = build_report(verdicts=[], evidence_sets=[], target_reports=[v.report], candidate={"github_user": "alex", "reference": "req-17"})
+    assert rep.header.candidate == {"github_user": "alex", "reference": "req-17"}
+    with pytest.raises(ValueError, match="email"):
+        build_report(verdicts=[], evidence_sets=[], target_reports=[v.report], candidate={"reference": "alex@example.com"})
+
+
+def test_shield_items_carry_location_and_span():
+    from pathlib import Path
+    from backend.claims.pipeline import gate
+    from backend.shield.analyze import analyze_document
+    docs = Path(__file__).parent / "fixtures" / "docs"
+    g = gate(analyze_document(docs / "docx_hidden.docx"))
+    assert len(g.items) == 4 and all(i.kind == "hidden_fragment" and i.span for i in g.items)
+    assert all(i.page is None and i.location == "DOCX run (no fixed pages)" for i in g.items)  # 2C says page 0 for DOCX
+    assert any("IGNORE ALL PREVIOUS INSTRUCTIONS" in i.span for i in g.items)
+    pdf = gate(analyze_document(Path(__file__).parent / "fixtures" / "white_text.pdf"))
+    assert pdf.items and all(i.page and i.page >= 1 and i.location == f"page {i.page}" for i in pdf.items if i.kind == "hidden_fragment")

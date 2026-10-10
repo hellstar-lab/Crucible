@@ -773,6 +773,23 @@ class ExtractedClaim(CrucibleModel):
     scope_target: Optional[str] = None  # the named file / module / project, when scope names one
 
 
+class ShieldItem(CrucibleModel):
+    """One Shield finding as the reviewer must see it (I2c): where it is and the reconstructed text, so it can be checked.
+    ``page`` is 1-based for PDFs; None for DOCX (a Word file has no fixed pages; 2C records 0 there) and for
+    document-level findings. ``span`` is the hidden / reconstructed text, capped at SHIELD_SPAN_CAP characters."""
+    kind: Literal["hidden_fragment", "security_finding"]
+    detector: str  # hidden fragment: its detection method; security finding: its detector
+    reasons: list[str] = []
+    severity: Optional[str] = None
+    page: Optional[int] = None
+    location: Optional[str] = None  # "page N", "document metadata", "DOCX run (no fixed pages)", "document"
+    span: Optional[str] = None
+    span_truncated: bool = False
+
+
+SHIELD_SPAN_CAP = 2000
+
+
 class ShieldGate(CrucibleModel):
     applied: bool  # the document carried findings or hidden fragments, so extraction ran on cleaned text only
     document_status: Literal["clean", "suspicious", "hidden_text_found"]
@@ -780,6 +797,7 @@ class ShieldGate(CrucibleModel):
     detectors: list[str] = []  # security finding detectors present
     hidden_fragments: int = 0
     units_removed: int = 0  # units that still contained a hidden-fragment string (defence in depth)
+    items: list[ShieldItem] = []  # I2c: every hidden fragment and security finding, with location and span
 
 
 class ClaimExtraction(CrucibleModel):
@@ -901,6 +919,7 @@ class ClaimVerdict(CrucibleModel):
     grounding_checks: Optional[dict[str, str]] = None  # None = not grounded (no supported/contradicted content label)
     grounding_passed: Optional[bool] = None
     pre_grounding_verdict: Optional[str] = None  # set when grounding downgraded the verdict
+    superseded_reason: Optional[str] = None  # I2a: the reason a grounding downgrade replaced
     agreement: Optional[str] = None  # e.g. "3/3" of the final-verdict samples that agreed
     # model bookkeeping
     model_tier: Optional[str] = None
@@ -960,10 +979,12 @@ class ReportRow(CrucibleModel):
     grounding_passed: Optional[bool] = None  # 4D
     grounding_checks: Optional[dict[str, str]] = None  # 4D
     pre_grounding_verdict: Optional[str] = None  # 4D: the 4C verdict before a grounding downgrade
+    superseded_reason: Optional[str] = None  # 4D: the 4C reason the grounding downgrade replaced (I2a)
     sources: dict[str, str] = {}  # field -> producing stage
 
 
 class ReportHeader(CrucibleModel):
+    candidate: Optional[dict] = None  # I2b: what the operator supplied: {github_user, reference}; emails never appear
     analysed: list[dict] = []  # 3.6 repo_facts: repo, ref, head_sha, scope, source files and lines, languages
     excluded: list[dict] = []  # 3.5 via 3.6: excluded files and lines by reason, per repo
     authorship: list[dict] = []  # 3.6: per repo authored ratio WITH its confidence and reason (rendering rule)

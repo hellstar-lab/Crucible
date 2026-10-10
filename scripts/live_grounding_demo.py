@@ -68,7 +68,7 @@ def main() -> int:
         for run in range(1, a.runs + 1):
             out = verdicts.verdicts_for(claims, sets, run_tag=f"live_grounding:{run}")
             grounded, failures = grounding.ground_all(out.verdicts, sets, [view])
-            rep = build_report(verdicts=grounded, evidence_sets=sets, target_reports=[report], grounding_failures=failures, run=out,
+            rep = build_report(verdicts=grounded, evidence_sets=sets, target_reports=[report], grounding_failures=failures, run=out, claims=claims, candidate={"github_user": M.LOGIN},
                                run_label=f"Live run {run} of {a.runs} on the clean_small fixture repository; no resume document "
                                          f"(the claims are fixed strings).")
             if a.report_dir:

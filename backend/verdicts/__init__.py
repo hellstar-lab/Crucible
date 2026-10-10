@@ -19,6 +19,14 @@ Order of decisions, all in code:
      is also asked after a unanimous Super verdict that is contradicted or whose lowest chosen-label probability is
      below ESCALATION_MIN_TOP_PROB. Measured (G5): Super unanimity alone turned 3 of 6 ownership runs inconclusive.
      Every escalation and its reason is recorded.
+     CONTRADICTION (I1) is the exception to "Ultra decides": it needs Super 3/3 AND Ultra 3/3. A unanimous Super
+     contradiction therefore always costs one Ultra confirmation; any other path to contradicted (Ultra overruling a
+     Super round that held back or disagreed, or Ultra failing to confirm) is inconclusive, with both sample sets kept
+     on the row so the near miss can be audited.
+
+     STANCE: Crucible never accuses on thin evidence. Either two independent models agree and deterministic blame
+     agrees, or the claim becomes a question for the interview. The second half depends on Phase 4G (interview
+     questions from inconclusive claims) existing; until it does, a near miss is only an inconclusive row.
   5. supported / contradicted without a citation that resolves to an item -> inconclusive (counted).
   6. the verdict matrix with the CITED item's authorship fields and the claim's SCOPE (F1: a contradiction needs the
      evidence and the claim to be about the same object).
@@ -127,6 +135,7 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
 
     kind = base["claim_kind"]
     j, judged, unanimous = _round(base["claim_text"], es, config.CONTENT_TIER, kind, scope, target, counters, run_tag)
+    super_judged, super_unanimous = judged, unanimous
     calls, cost = 1, j["cost_usd"] or 0.0
     samples = _record(judged, j["tier"])
     escalated, why = False, None
@@ -136,7 +145,7 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
         final = judged[0]["outcome"].verdict
         low = min((x["top_prob"] for x in judged if x["top_prob"] is not None), default=None)
         if final == "contradicted":
-            why = "unanimous verdict contradicted"
+            why = "unanimous verdict contradicted: a contradiction needs Ultra to confirm it (I1)"
         elif low is not None and low < config.ESCALATION_MIN_TOP_PROB:
             why = f"lowest sample probability of the chosen label {low:.3f} < {config.ESCALATION_MIN_TOP_PROB}"
     if why:
@@ -147,13 +156,31 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
         escalated = True
         counters["escalations"] += 1
         counters["escalations_on_disagreement" if why.startswith("Super samples disagreed") else "escalations_on_check"] += 1
-        if unanimous and why.startswith("Super samples disagreed"):
-            counters["disagreements_resolved_by_ultra"] += 1
     counters["judgements"] += 1
     agreement = f"{max((sum(1 for x in judged if x['outcome'].verdict == v) for v in {x['outcome'].verdict for x in judged}), default=0)}/{len(judged)}"
     common = dict(model_tier=j["tier"], escalated=escalated, escalation_reason=why, samples=samples, agreement=agreement,
                   prompt_hash=j["prompt_hash"], cost_usd=round(cost, 8),
                   greedy_disagreement=any(x["greedy_disagreement"] for x in judged))
+    # I1: contradicted needs BOTH tiers unanimous. One tier overruling the other, in either direction, is a near miss.
+    super_contra = super_unanimous and super_judged[0]["outcome"].verdict == "contradicted"
+    ultra_contra = escalated and unanimous and judged[0]["outcome"].verdict == "contradicted"
+    if super_contra or ultra_contra:
+        if super_contra and ultra_contra:
+            counters["contradictions_confirmed"] += 1
+        else:
+            counters["contradictions_not_confirmed"] += 1
+            x = next(y for y in super_judged + judged if y["outcome"].verdict == "contradicted")
+            finals = lambda js: ", ".join(y["outcome"].verdict for y in js)  # noqa: E731
+            reason = (f"not a contradiction: that needs Super 3/3 and Ultra 3/3, and Super gave {finals(super_judged)}; "
+                      f"Ultra gave {finals(judged)}. Both sample sets are recorded")
+            return ClaimVerdict(**base, verdict="inconclusive", reason=reason, matrix_row="contradiction:not_confirmed",
+                                gates=["gate:contradiction_needs_both_tiers"], authorship_note=x["outcome"].authorship_note,
+                                scope_match_rule=x["outcome"].scope_match_rule, scope_match_score=x["outcome"].scope_match_score,
+                                evidence_summary=x["evidence_summary"], content_reason=x["content_reason"],
+                                content_supported=x["label"] if x["label"] in ("supported", "contradicted") else None,
+                                cited_item_index=x["cited_item_index"], cited_item=x["cited"], **common), calls, cost
+    if escalated and unanimous and why.startswith("Super samples disagreed"):
+        counters["disagreements_resolved_by_ultra"] += 1  # counted only once I1 has let Ultra's verdict stand
     if not unanimous:
         counters["ensemble_disagreements"] += 1
         tiers = "Super and Ultra" if escalated else "the samples"

@@ -116,7 +116,8 @@ def test_no_score_rank_total_or_hire_signal(page):
     text = _text(page.split("</header>", 1)[1]).lower()  # the lede's disclaimer ("there is no score...") aside
     for word in ("score", "rank ", "ranked", "total", "overall", "recommend hire", "fit for", "pass rate"):
         assert word not in text, word
-    top = _text(page.split('id="claims"')[0]).lower()
+    top = page.split('id="claims"')[0]
+    top = _text(re.sub(r'<pre class="span">.*?</pre>', "", top, flags=re.S)).lower()  # quoted Shield spans are resume text
     for v in ("supported", "contradicted", "no evidence", "inconclusive", "unverifiable"):
         assert v not in top  # nothing summarising verdicts above the claims
 
@@ -181,3 +182,14 @@ def test_degraded_report_shows_every_degradation(degraded, page):
     assert "These claims were not searched" in text
     # no row claims support the data cannot carry
     assert all(r["verdict"] != "supported" for r in degraded["rows"])
+
+
+def test_committed_degraded_fixture_still_validates_and_renders():
+    """tests/fixtures/reports/degraded.json is a committed fixture (scripts/degraded_report_fixture.py --out ...):
+    a contract change that breaks it, or a renderer change that cannot trace it, fails here."""
+    import json
+    data = json.loads((ROOT / "tests" / "fixtures" / "reports" / "degraded.json").read_text())
+    ClaimEvidenceReport.model_validate(data)
+    page = render_html(data)
+    assert assert_traceable(page, data) > 50 and page.count('<pre class="span">') == 2
+    assert "reason before grounding replaced it" in page and "degraded-fixture" in page

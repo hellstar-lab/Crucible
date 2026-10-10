@@ -35,7 +35,8 @@ from collections import Counter
 from pathlib import Path
 
 from backend import llm
-from backend.contracts import (ClaimExtraction, ClaimUnit, DocumentReport, ExcludedUnit, ExtractedClaim, ShieldGate, StageDecision)
+from backend.contracts import (ClaimExtraction, ClaimUnit, DocumentReport, ExcludedUnit, ExtractedClaim, ShieldGate, ShieldItem,
+                               StageDecision, SHIELD_SPAN_CAP)
 
 from . import config, guards, routing, stages, support
 from .split import Unit, split_structure
@@ -65,10 +66,29 @@ def is_bare_date_range(text: str) -> bool:
     return bool(t) and resume._RANGE.fullmatch(t) is not None
 
 
+def _span(text):
+    if text is None:
+        return None, False
+    return text[:SHIELD_SPAN_CAP], len(text) > SHIELD_SPAN_CAP
+
+
 def gate(report: DocumentReport) -> ShieldGate:
     detectors = sorted({f.detector for f in report.security_findings})
+    items = []
+    for h in report.hidden_fragments:
+        docx = h.detection_method.startswith("docx")
+        page = None if (docx or h.page == 0) else h.page
+        where = "DOCX run (no fixed pages)" if docx else ("document metadata" if h.page == 0 else f"page {h.page}")
+        span, cut = _span(h.text)
+        items.append(ShieldItem(kind="hidden_fragment", detector=h.detection_method, reasons=list(h.reasons), page=page,
+                                location=where, span=span, span_truncated=cut))
+    for f in report.security_findings:
+        span, cut = _span(f.reconstructed_text)
+        items.append(ShieldItem(kind="security_finding", detector=f.detector, severity=f.severity, page=f.page,
+                                location=f"page {f.page}" if f.page else "document", span=span, span_truncated=cut))
     return ShieldGate(applied=bool(report.security_findings or report.hidden_fragments), document_status=report.status,
-                      needs_review=report.needs_review, detectors=detectors, hidden_fragments=len(report.hidden_fragments))
+                      needs_review=report.needs_review, detectors=detectors, hidden_fragments=len(report.hidden_fragments),
+                      items=items)
 
 
 def _norm(s: str) -> str:

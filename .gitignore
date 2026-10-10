@@ -37,4 +37,4 @@ tests/fixtures/git_repos/
 .cache/
 
 # rendered report pages and their JSON (outputs; the canonical example lives in docs/, the fixture in tests/fixtures/reports/)
-reports/
+/reports/
