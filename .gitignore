@@ -29,3 +29,6 @@ tests/fixtures/git_repos/
 
 # manual test PDFs dropped in the repo root (fixtures live under tests/fixtures/ and bench/)
 /*.pdf
+
+# Phase 3.5 exclusion fixture: these vendored files must be committed
+!tests/fixtures/exclusion_repo/node_modules/

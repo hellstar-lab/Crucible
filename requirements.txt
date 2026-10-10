@@ -12,3 +12,6 @@ pdfplumber
 Pillow
 # test fixtures
 reportlab
+# evidence (Phase 3.5): line classification and Linguist data loading
+pygount==3.2.0  # BSD-3-Clause; pinned: counting.py uses its line classifier (_line_parts)
+PyYAML

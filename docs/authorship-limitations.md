@@ -84,10 +84,45 @@ credited to whoever touched it last. Someone who built a project's
 foundations and then handed it over can show a low ratio. Equally, a
 large-scale reformat can move credit to the person who ran the formatter.
 
+## What is counted (Phase 3.5)
+
+- **Lines.** Every line is classified by pygount as code, documentation
+  (comments and docstrings), string or empty. Authorship counts **source
+  lines = code + string** only. Comments and blank lines are not evidence of
+  engineering. All four counts are recorded per file, so the basis can be
+  audited.
+- **Files.** Exclusions use GitHub Linguist's own `vendor.yml` and
+  `documentation.yml` (vendored and pinned; see `THIRD_PARTY.md`), two of
+  Linguist's content heuristics (minified files, source-map references),
+  the repository's `.gitattributes` overrides, and pygount's analysis
+  states: generated (lock-file names, "do not edit" headers), duplicate
+  (byte-identical copies are counted once), binary, empty, and unparseable.
+  Every exclusion is reported per repository by reason, in files and lines.
+
+## Known gaps in the exclusion data
+
+Linguist's vendor and documentation data, which we deliberately use instead
+of our own lists, does **not** exclude the following. Files like these are
+currently **counted as source**:
+
+- **Data files** such as `data/raw/*.json` and CSV exports. pygount counts
+  every JSON line as code. In one real repository, 18 JSON files made up 81%
+  of its "source" lines.
+- **Committed virtualenvs and installed packages:** `venv/`, `.venv/`,
+  `site-packages/`.
+- **Build output** outside `dist/`, for example `build/` and `target/`.
+- **Framework migrations** without a generated-file header.
+- **Generated code without a header** that pygount recognises.
+
+Linguist itself handles some of these through other data (language types in
+`languages.yml`, and more of `generated.rb`). Adopting that is a separate
+decision.
+
 ## Smaller caveats
 
-- **Line counting.** Blank lines are excluded; comments are not, because
-  that would need a parser per language.
+- **Line counting.** See "What is counted" above. Comments are classified
+  by pygount's lexers, so an unusual language or an unrecognised file type
+  can be misclassified or excluded as unparseable.
 - **Caps.** Very large repositories, very large files and slow operations
   are skipped and recorded under caps set in `backend/evidence/config.py`,
   never silently dropped. A skipped repository reports `None` for every

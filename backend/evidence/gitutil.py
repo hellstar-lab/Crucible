@@ -102,3 +102,38 @@ def blob_heads(repo: Path, shas: list[str], n: int = 600, timeout: float = 120) 
         except subprocess.TimeoutExpired:
             os.killpg(proc.pid, signal.SIGKILL)
     return out
+
+
+def write_blobs(repo: Path, items: list[tuple[str, Path]], timeout: float = 300) -> None:
+    """Stream each (blob sha, destination) to disk through one ``git cat-file
+    --batch`` process. Destinations must already be safe, absolute paths."""
+    if not items:
+        return
+    cmd = ["git", *SAFE_CONFIG, "cat-file", "--batch"]
+    proc = subprocess.Popen(cmd, cwd=repo, env=git_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        assert proc.stdin and proc.stdout
+        for sha, dest in items:
+            proc.stdin.write(sha.encode() + b"\n")
+            proc.stdin.flush()
+            header = proc.stdout.readline().split()
+            if len(header) != 3 or header[1] != b"blob":
+                continue
+            remaining = int(header[2])
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(dest, "wb") as fh:
+                while remaining:
+                    chunk = proc.stdout.read(min(remaining, 65536))
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    remaining -= len(chunk)
+            proc.stdout.read(1)  # trailing newline after each object
+    finally:
+        with contextlib.suppress(Exception):
+            proc.stdin.close()  # type: ignore[union-attr]
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)

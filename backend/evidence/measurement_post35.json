@@ -1,0 +1,902 @@
+{
+  "measurement": "post-phase-3.5",
+  "username": "hellstar-lab",
+  "code_commit": "00546e42350317c2d9b38afa87c814fede8f3030",
+  "generated_at": "2026-10-10T06:02:32+00:00",
+  "counting": "pygount source lines (code + string) in countable files; authored = authored source lines",
+  "repos": [
+    {
+      "name": "sentinel",
+      "authored_ratio": 0.0,
+      "source_files": 55,
+      "total_lines": 3909,
+      "code_lines": 2192,
+      "documentation_lines": 411,
+      "string_lines": 395,
+      "empty_lines": 911,
+      "source_lines": 2587,
+      "authored_lines": 0,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 1,
+        "documentation_path": 7,
+        "generated": 1,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 0,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 21,
+        "documentation_path": 493,
+        "generated": 1298,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 0,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "package-lock.json",
+          "lines": 1298,
+          "reason": "generated"
+        },
+        {
+          "path": "README.md",
+          "lines": 162,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "CHANGELOG.md",
+          "lines": 100,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "docs/internal/01-sentinel-project-brief.md",
+          "lines": 61,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "docs/internal/03-sentinel-master-prompt.md",
+          "lines": 57,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "eval/README.md",
+          "lines": 55,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "docs/internal/02-sentinel-rules-for-fable5.md",
+          "lines": 37,
+          "reason": "documentation_path"
+        },
+        {
+          "path": ".gitignore",
+          "lines": 21,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "LICENSE",
+          "lines": 21,
+          "reason": "documentation_path"
+        }
+      ]
+    },
+    {
+      "name": "Meeting-Summarizer",
+      "authored_ratio": 0.0,
+      "source_files": 39,
+      "total_lines": 33505,
+      "code_lines": 12922,
+      "documentation_lines": 793,
+      "string_lines": 239,
+      "empty_lines": 19551,
+      "source_lines": 13161,
+      "authored_lines": 0,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 1,
+        "documentation_path": 1,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 7,
+        "unparseable": 1,
+        "binary": 0,
+        "empty": 1,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 70,
+        "documentation_path": 167,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 175,
+        "unparseable": 14,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "README.md",
+          "lines": 167,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "tests/verify_summary_blob.py",
+          "lines": 77,
+          "reason": "duplicate"
+        },
+        {
+          "path": ".gitignore",
+          "lines": 70,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "tests/test_api.py",
+          "lines": 51,
+          "reason": "duplicate"
+        },
+        {
+          "path": "tests/check_db_status.py",
+          "lines": 47,
+          "reason": "duplicate"
+        },
+        {
+          "path": ".env.example",
+          "lines": 14,
+          "reason": "unparseable"
+        },
+        {
+          "path": "src/__init__.py",
+          "lines": 0,
+          "reason": "empty"
+        },
+        {
+          "path": "src/data_prep/__init__.py",
+          "lines": 0,
+          "reason": "duplicate"
+        },
+        {
+          "path": "src/pipeline/__init__.py",
+          "lines": 0,
+          "reason": "duplicate"
+        },
+        {
+          "path": "src/security/__init__.py",
+          "lines": 0,
+          "reason": "duplicate"
+        }
+      ]
+    },
+    {
+      "name": "LIVECODINGPLATFORM",
+      "authored_ratio": 1.0,
+      "source_files": 97,
+      "total_lines": 7289,
+      "code_lines": 4925,
+      "documentation_lines": 603,
+      "string_lines": 4,
+      "empty_lines": 1757,
+      "source_lines": 4929,
+      "authored_lines": 4929,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 7,
+        "documentation_path": 2,
+        "generated": 1,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 2,
+        "unparseable": 8,
+        "binary": 0,
+        "empty": 1,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 573,
+        "documentation_path": 307,
+        "generated": 1991,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 232,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "frontend/package-lock.json",
+          "lines": 1991,
+          "reason": "generated"
+        },
+        {
+          "path": "README.md",
+          "lines": 306,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "backend/mvnw",
+          "lines": 295,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "backend/mvnw.cmd",
+          "lines": 189,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "docker/nginx.prod.conf",
+          "lines": 96,
+          "reason": "unparseable"
+        },
+        {
+          "path": "backend/.gitignore",
+          "lines": 38,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "docker/Dockerfile.backend",
+          "lines": 33,
+          "reason": "unparseable"
+        },
+        {
+          "path": ".gitignore",
+          "lines": 31,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "docker/Dockerfile.backend.local",
+          "lines": 26,
+          "reason": "unparseable"
+        },
+        {
+          "path": "docker/Dockerfile.executor",
+          "lines": 26,
+          "reason": "unparseable"
+        }
+      ]
+    },
+    {
+      "name": "Sorting_Visulizer",
+      "authored_ratio": 1.0,
+      "source_files": 29,
+      "total_lines": 3392,
+      "code_lines": 2488,
+      "documentation_lines": 170,
+      "string_lines": 77,
+      "empty_lines": 657,
+      "source_lines": 2565,
+      "authored_lines": 2565,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 3,
+        "documentation_path": 2,
+        "generated": 1,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 2,
+        "binary": 648,
+        "empty": 0,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 48,
+        "documentation_path": 320,
+        "generated": 1134,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 25,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "pnpm-lock.yaml",
+          "lines": 1134,
+          "reason": "generated"
+        },
+        {
+          "path": "README.md",
+          "lines": 207,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "backend/README.md",
+          "lines": 113,
+          "reason": "documentation_path"
+        },
+        {
+          "path": ".gitignore",
+          "lines": 32,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "backend/.env.example",
+          "lines": 20,
+          "reason": "unparseable"
+        },
+        {
+          "path": "backend/.gitignore",
+          "lines": 11,
+          "reason": "vendored_path"
+        },
+        {
+          "path": ".env.example",
+          "lines": 5,
+          "reason": "unparseable"
+        },
+        {
+          "path": "next-env.d.ts",
+          "lines": 5,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "public/frames/end/ezgif-frame-001.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "public/frames/end/ezgif-frame-002.jpg",
+          "lines": 0,
+          "reason": "binary"
+        }
+      ]
+    },
+    {
+      "name": "siddhi-admin",
+      "authored_ratio": 0.0,
+      "source_files": 61,
+      "total_lines": 8391,
+      "code_lines": 6528,
+      "documentation_lines": 178,
+      "string_lines": 14,
+      "empty_lines": 1671,
+      "source_lines": 6542,
+      "authored_lines": 0,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 1,
+        "documentation_path": 1,
+        "generated": 1,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 1,
+        "binary": 1,
+        "empty": 0,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 29,
+        "documentation_path": 73,
+        "generated": 3957,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 11,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "package-lock.json",
+          "lines": 3957,
+          "reason": "generated"
+        },
+        {
+          "path": "README.md",
+          "lines": 73,
+          "reason": "documentation_path"
+        },
+        {
+          "path": ".gitignore",
+          "lines": 29,
+          "reason": "vendored_path"
+        },
+        {
+          "path": ".env.example",
+          "lines": 11,
+          "reason": "unparseable"
+        },
+        {
+          "path": "src/assets/hero.png",
+          "lines": 0,
+          "reason": "binary"
+        }
+      ]
+    },
+    {
+      "name": "Siddhi-website",
+      "authored_ratio": 0.0,
+      "source_files": 48,
+      "total_lines": 3466,
+      "code_lines": 2589,
+      "documentation_lines": 161,
+      "string_lines": 73,
+      "empty_lines": 643,
+      "source_lines": 2662,
+      "authored_lines": 0,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 1,
+        "documentation_path": 1,
+        "generated": 1,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 1,
+        "binary": 3,
+        "empty": 0,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 42,
+        "documentation_path": 36,
+        "generated": 6317,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 19,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "package-lock.json",
+          "lines": 6317,
+          "reason": "generated"
+        },
+        {
+          "path": ".gitignore",
+          "lines": 42,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "README.md",
+          "lines": 36,
+          "reason": "documentation_path"
+        },
+        {
+          "path": ".env.example",
+          "lines": 19,
+          "reason": "unparseable"
+        },
+        {
+          "path": "app/favicon.ico",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "public/video/hero-optimized.mp4",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "public/video/hero.mp4",
+          "lines": 0,
+          "reason": "binary"
+        }
+      ]
+    },
+    {
+      "name": "temp23",
+      "authored_ratio": 0.0,
+      "source_files": 14,
+      "total_lines": 1796,
+      "code_lines": 1127,
+      "documentation_lines": 258,
+      "string_lines": 1,
+      "empty_lines": 410,
+      "source_lines": 1128,
+      "authored_lines": 0,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 1,
+        "documentation_path": 0,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 0,
+        "binary": 810,
+        "empty": 0,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 8,
+        "documentation_path": 0,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 0,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": ".gitignore",
+          "lines": 8,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "frames/end/001.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/002.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/003.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/004.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/005.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/006.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/007.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/008.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "frames/end/009.jpg",
+          "lines": 0,
+          "reason": "binary"
+        }
+      ]
+    },
+    {
+      "name": "SAAMS-BACKEND",
+      "authored_ratio": 0.0,
+      "source_files": 74,
+      "total_lines": 15972,
+      "code_lines": 10210,
+      "documentation_lines": 1466,
+      "string_lines": 121,
+      "empty_lines": 4175,
+      "source_lines": 10331,
+      "authored_lines": 0,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 1,
+        "documentation_path": 1,
+        "generated": 1,
+        "minified": 1,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 3,
+        "binary": 3,
+        "empty": 0,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 30,
+        "documentation_path": 168,
+        "generated": 4231,
+        "minified": 222,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 294,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "package-lock.json",
+          "lines": 4231,
+          "reason": "generated"
+        },
+        {
+          "path": "firestore.rules",
+          "lines": 259,
+          "reason": "unparseable"
+        },
+        {
+          "path": "generate_postman.js",
+          "lines": 222,
+          "reason": "minified"
+        },
+        {
+          "path": "README.md",
+          "lines": 168,
+          "reason": "documentation_path"
+        },
+        {
+          "path": ".env.example",
+          "lines": 30,
+          "reason": "unparseable"
+        },
+        {
+          "path": ".gitignore",
+          "lines": 30,
+          "reason": "vendored_path"
+        },
+        {
+          "path": ".firebaserc",
+          "lines": 5,
+          "reason": "unparseable"
+        },
+        {
+          "path": "sample_report.xlsx",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "session_u7geAME0iKQjCa30ntJm_1772766799538.xlsx",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "test_students.xlsx",
+          "lines": 0,
+          "reason": "binary"
+        }
+      ]
+    },
+    {
+      "name": "cozy-cafe-",
+      "authored_ratio": 0.0,
+      "source_files": 22,
+      "total_lines": 2948,
+      "code_lines": 1999,
+      "documentation_lines": 237,
+      "string_lines": 36,
+      "empty_lines": 676,
+      "source_lines": 2035,
+      "authored_lines": 0,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 1,
+        "documentation_path": 0,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 0,
+        "binary": 18,
+        "empty": 0,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 16,
+        "documentation_path": 0,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 0,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": ".gitignore",
+          "lines": 16,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "assets/images/croissant.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/exterior.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/hands.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/hero-cup.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/interior.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/latte-art.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/menu-almond-tart.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/menu-butter-croissant.jpg",
+          "lines": 0,
+          "reason": "binary"
+        },
+        {
+          "path": "assets/images/menu-cold-brew.jpg",
+          "lines": 0,
+          "reason": "binary"
+        }
+      ]
+    },
+    {
+      "name": "Advance_File_Compressor",
+      "authored_ratio": 1.0,
+      "source_files": 76,
+      "total_lines": 20178,
+      "code_lines": 12700,
+      "documentation_lines": 2420,
+      "string_lines": 72,
+      "empty_lines": 4986,
+      "source_lines": 12772,
+      "authored_lines": 12772,
+      "skip_reason": null,
+      "excluded_files_by_reason": {
+        "vendored_path": 14,
+        "documentation_path": 8,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 2,
+        "binary": 25,
+        "empty": 1,
+        "too_large": 0
+      },
+      "excluded_lines_by_reason": {
+        "vendored_path": 13183,
+        "documentation_path": 1392,
+        "generated": 0,
+        "minified": 0,
+        "source_map": 0,
+        "duplicate": 0,
+        "unparseable": 45,
+        "binary": 0,
+        "empty": 0,
+        "too_large": 0
+      },
+      "top_excluded_files": [
+        {
+          "path": "third_party/miniz/miniz_zip.c",
+          "lines": 4895,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "third_party/lz4/lz4.c",
+          "lines": 2832,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "third_party/miniz/miniz_tdef.c",
+          "lines": 1597,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "third_party/lz4/lz4.h",
+          "lines": 886,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "third_party/miniz/miniz_tinfl.c",
+          "lines": 770,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "third_party/miniz/miniz.c",
+          "lines": 646,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "third_party/miniz/miniz.h",
+          "lines": 609,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "docs/COMPRESSION_ALGORITHMS_HINGLISH.md",
+          "lines": 504,
+          "reason": "documentation_path"
+        },
+        {
+          "path": "third_party/miniz/miniz_zip.h",
+          "lines": 454,
+          "reason": "vendored_path"
+        },
+        {
+          "path": "README.md",
+          "lines": 331,
+          "reason": "documentation_path"
+        }
+      ]
+    },
+    {
+      "name": "Sof_Event_Extractor",
+      "authored_ratio": null,
+      "source_files": null,
+      "total_lines": null,
+      "code_lines": null,
+      "documentation_lines": null,
+      "string_lines": null,
+      "empty_lines": null,
+      "source_lines": null,
+      "authored_lines": null,
+      "skip_reason": "beyond max_repos (10)",
+      "excluded_files_by_reason": {},
+      "excluded_lines_by_reason": {},
+      "top_excluded_files": []
+    },
+    {
+      "name": "Automatic_Certificate_Generator",
+      "authored_ratio": null,
+      "source_files": null,
+      "total_lines": null,
+      "code_lines": null,
+      "documentation_lines": null,
+      "string_lines": null,
+      "empty_lines": null,
+      "source_lines": null,
+      "authored_lines": null,
+      "skip_reason": "beyond max_repos (10)",
+      "excluded_files_by_reason": {},
+      "excluded_lines_by_reason": {},
+      "top_excluded_files": []
+    },
+    {
+      "name": "ai-policy-execution-platform",
+      "authored_ratio": null,
+      "source_files": null,
+      "total_lines": null,
+      "code_lines": null,
+      "documentation_lines": null,
+      "string_lines": null,
+      "empty_lines": null,
+      "source_lines": null,
+      "authored_lines": null,
+      "skip_reason": "beyond max_repos (10)",
+      "excluded_files_by_reason": {},
+      "excluded_lines_by_reason": {},
+      "top_excluded_files": []
+    }
+  ]
+}

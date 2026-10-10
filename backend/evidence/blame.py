@@ -5,9 +5,10 @@ need (evidence and bug targets must exist today). Git applies the repo's
 .mailmap to the author/committer emails it reports, so they are compared
 against the identity set's canonical emails.
 
-Blank lines are excluded from every count except ``total_lines``.
-Attribution is on AUTHOR email only; committer email is recorded so a
-systematic author/committer divergence stays visible.
+Only SOURCE lines count: those pygount marks as code or string (see
+counting.py). Comments, docstrings and blank lines are not evidence of
+engineering. Attribution is on AUTHOR email only; committer email is
+recorded so a systematic author/committer divergence stays visible.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import config
+from .counting import SOURCE_MARKS, FileCount
 from .errors import GitError, GitTimeout
 from .gitutil import run_git
 
@@ -37,12 +39,19 @@ class BlameLine:
 @dataclass
 class FileBlame:
     path: str
-    total_lines: int
-    code_lines: int
-    authored_lines: int
+    count: FileCount  # pygount's per-file counts (code / documentation / string / empty)
+    authored_lines: int  # candidate-authored SOURCE lines (code + string)
     authored_ranges: list[tuple[int, int]]
-    committer_emails: dict[str, int]  # committer -> authored (non-blank) lines
-    other_authors: dict[str, int] = field(default_factory=dict)  # non-candidate author -> non-blank lines
+    committer_emails: dict[str, int]  # committer -> authored source lines
+    other_authors: dict[str, int] = field(default_factory=dict)  # non-candidate author -> source lines
+
+    @property
+    def total_lines(self) -> int:
+        return self.count.line_count
+
+    @property
+    def source_lines(self) -> int:
+        return self.count.source_count
 
 
 @dataclass
@@ -51,8 +60,11 @@ class RepoBlame:
     skipped: list[str] = field(default_factory=list)  # "path: reason"
 
     @property
-    def code_lines(self) -> int:
-        return sum(f.code_lines for f in self.files)
+    def source_lines(self) -> int:
+        return sum(f.source_lines for f in self.files)
+
+    def counted(self, attr: str) -> int:
+        return sum(getattr(f.count, attr) for f in self.files)
 
     @property
     def authored_lines(self) -> int:
@@ -70,8 +82,9 @@ class RepoBlame:
 
     @property
     def authored_ratio(self) -> float | None:
-        """None when there are no non-blank source lines (0/0 is not 0%)."""
-        return self.authored_lines / self.code_lines if self.code_lines else None
+        """Authored source lines / source lines. None when there are no
+        source lines at all (0/0 is "not measured", not 0%)."""
+        return self.authored_lines / self.source_lines if self.source_lines else None
 
 
 def parse_line_porcelain(out: bytes) -> list[BlameLine]:
@@ -95,67 +108,72 @@ def parse_line_porcelain(out: bytes) -> list[BlameLine]:
     return lines
 
 
-def merge_ranges(authored: list[int], blank: set[int]) -> list[tuple[int, int]]:
+def merge_ranges(authored: list[int], bridgeable: set[int]) -> list[tuple[int, int]]:
     """Merge sorted authored line numbers into inclusive ranges, bridging gaps
-    made only of blank lines (a function with blank lines inside stays whole)."""
+    made only of non-source lines (blank, comments, docstrings), so a function
+    with comments inside stays whole."""
     ranges: list[tuple[int, int]] = []
     for n in authored:
         if ranges:
             start, end = ranges[-1]
-            if all(g in blank for g in range(end + 1, n)):
+            if all(g in bridgeable for g in range(end + 1, n)):
                 ranges[-1] = (start, n)
                 continue
         ranges.append((n, n))
     return ranges
 
 
-def summarize(path: str, lines: list[BlameLine], is_candidate) -> FileBlame:
-    blank = {ln.number for ln in lines if ln.blank}
-    authored = [ln for ln in lines if not ln.blank and is_candidate(ln.author_email)]
+class AlignmentError(ValueError):
+    """Blame and pygount disagree on a file's line count (e.g. lone CR line endings)."""
+
+
+def summarize(count: FileCount, lines: list[BlameLine], is_candidate) -> FileBlame:
+    """Combine blame (who wrote each line) with pygount marks (what each line is)."""
+    marks = list(count.marks)
+    extra = lines[len(marks):]
+    if len(lines) > len(marks) and all(ln.blank for ln in extra):
+        marks += ["e"] * len(extra)  # trailing blank lines that pygount's splitter drops
+    if len(lines) != len(marks):
+        raise AlignmentError(f"blame has {len(lines)} lines, pygount {len(count.marks)}")
+    source = {i + 1 for i, m in enumerate(marks) if m in SOURCE_MARKS}
+    non_source = {i + 1 for i, m in enumerate(marks) if m not in SOURCE_MARKS}
+    authored = [ln for ln in lines if ln.number in source and is_candidate(ln.author_email)]
     return FileBlame(
-        path=path,
-        total_lines=len(lines),
-        code_lines=sum(1 for ln in lines if not ln.blank),
+        path=count.path,
+        count=count,
         authored_lines=len(authored),
-        authored_ranges=merge_ranges(sorted(ln.number for ln in authored), blank),
+        authored_ranges=merge_ranges(sorted(ln.number for ln in authored), non_source),
         committer_emails=dict(Counter(ln.committer_email for ln in authored)),
         other_authors=dict(Counter(ln.author_email for ln in lines
-                                   if not ln.blank and not is_candidate(ln.author_email))),
+                                   if ln.number in source and not is_candidate(ln.author_email))),
     )
 
 
-def blame_file(repo: Path, path: str, is_candidate) -> FileBlame:
-    out = run_git(["blame", "--line-porcelain", "HEAD", "--", path], cwd=repo, timeout=config.BLAME_TIMEOUT_S)
-    return summarize(path, parse_line_porcelain(out), is_candidate)
+def blame_file(repo: Path, count: FileCount, is_candidate) -> FileBlame:
+    out = run_git(["blame", "--line-porcelain", "HEAD", "--", count.path], cwd=repo, timeout=config.BLAME_TIMEOUT_S)
+    return summarize(count, parse_line_porcelain(out), is_candidate)
 
 
-def blame_repo(repo: Path, files: list[tuple[str, int]], is_candidate) -> RepoBlame:
-    """Blame every (path, size) source file, honouring the per-file size cap,
-    the file-count cap and the repo time budget. Skips are recorded, not fatal."""
+def blame_repo(repo: Path, counts: list[FileCount], is_candidate) -> RepoBlame:
+    """Blame every counted file within the repo time budget. Skips are
+    recorded as "path: reason", never fatal."""
     result = RepoBlame()
-    todo: list[str] = []
-    for i, (path, size) in enumerate(files):
-        if i >= config.MAX_SOURCE_FILES_PER_REPO:
-            result.skipped.append(f"{path}: over MAX_SOURCE_FILES_PER_REPO ({config.MAX_SOURCE_FILES_PER_REPO})")
-        elif size > config.MAX_BLAME_FILE_BYTES:
-            result.skipped.append(f"{path}: {size} bytes over MAX_BLAME_FILE_BYTES")
-        else:
-            todo.append(path)
-
     deadline = time.monotonic() + config.REPO_TIME_BUDGET_S
 
-    def work(path: str) -> FileBlame | str:
+    def work(count: FileCount) -> FileBlame | str:
         if time.monotonic() > deadline:
-            return f"{path}: repo time budget exhausted"
+            return f"{count.path}: repo time budget exhausted"
         try:
-            return blame_file(repo, path, is_candidate)
+            return blame_file(repo, count, is_candidate)
+        except AlignmentError as exc:
+            return f"{count.path}: not counted, {exc}"
         except GitTimeout:
-            return f"{path}: blame exceeded {config.BLAME_TIMEOUT_S}s"
+            return f"{count.path}: blame exceeded {config.BLAME_TIMEOUT_S}s"
         except GitError as exc:
-            return f"{path}: blame failed ({exc})"
+            return f"{count.path}: blame failed ({exc})"
 
     with ThreadPoolExecutor(max_workers=config.BLAME_WORKERS) as pool:
-        for item in pool.map(work, todo):
+        for item in pool.map(work, counts):
             if isinstance(item, str):
                 result.skipped.append(item)
             else:

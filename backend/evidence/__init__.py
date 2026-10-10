@@ -4,29 +4,37 @@ no model calls anywhere in this package.
     analyze_github(username, max_repos=N) -> list[RepoInfo]
 
 For every public repository the candidate owns (non-forks first, most
-recently pushed first) it clones full history, classifies files the way
-GitHub Linguist does, and credits each surviving non-blank source line to
-the candidate only when its author email belongs to their identity set.
-Every skip is recorded with its reason; a missing number is preferred to a
-wrong one.
+recently pushed first) it clones full history, excludes files using GitHub
+Linguist's own vendor/documentation data plus two of its content
+heuristics, classifies every remaining line with pygount, and credits each
+surviving SOURCE line (code or string, not comments or blanks) to the
+candidate only when its author email belongs to their identity set.
+Every exclusion is counted and reported by reason; a missing number is
+preferred to a wrong one.
 """
 
 from __future__ import annotations
 
 import logging
+import tempfile
 import time
+from collections import Counter
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from backend.contracts import FileAuthorship, RepoInfo, UnmatchedAuthor
+from pygount.analysis import DuplicatePool
+
+from backend.contracts import ExcludedFile, FileAuthorship, RepoInfo, SkippedFile, UnmatchedAuthor
 
 from . import config
 from .blame import blame_repo
 from .clone import cloned_repo, dir_mb
 from .errors import EvidenceError, GitError, GitHubNotFound, GitHubRateLimited, GitTimeout
-from .exclusions import GitAttributes, classify
+from . import exclusions as ex
+from .counting import FileCount, count_file
+from .exclusions import GitAttributes, content_reason, path_reason
 from .github_client import GitHubClient
-from .gitutil import blob_heads, has_commits, run_git
+from .gitutil import has_commits, run_git, write_blobs
 from .identity import IdentitySet, build_identity_set
 from .repo_signals import commit_facts, has_tests
 
@@ -35,6 +43,9 @@ __all__ = ["analyze_github", "analyze_github_detailed", "analyze_local_repo", "G
 
 log = logging.getLogger(__name__)
 MAX_NOTES = 20
+MAX_TOP_EXCLUDED = 10
+MAX_SKIPPED_FILES = 50
+_STATE_REASON = {"duplicate": ex.DUPLICATE, "generated": ex.GENERATED, "empty": ex.EMPTY, "binary": ex.BINARY}
 
 
 @dataclass
@@ -143,6 +154,74 @@ def _gitattributes(repo: Path) -> GitAttributes:
         return GitAttributes()
 
 
+def _raw_line_counts(repo: Path) -> dict[str, int]:
+    """Raw line count of every text file at HEAD (for reporting exclusions)."""
+    try:
+        out = run_git(["grep", "-I", "-c", "-z", "-e", "", "HEAD"], cwd=repo, timeout=120)
+    except GitError:
+        return {}
+    # -z output is "HEAD:<path>\0<count>\n" repeated: each token after a NUL is
+    # "<count>\n" followed by the next "HEAD:<path>".
+    counts: dict[str, int] = {}
+    parts = out.split(b"\x00")
+    name = parts[0]
+    for token in parts[1:]:
+        num, _, following = token.partition(b"\n")
+        if num.isdigit():
+            counts[name.decode("utf-8", "replace").split(":", 1)[-1]] = int(num)
+        name = following
+    return counts
+
+
+def _safe_dest(root: Path, rel: str) -> Path | None:
+    p = PurePosixPath(rel)
+    if p.is_absolute() or ".." in p.parts or not p.parts:
+        return None
+    return root.joinpath(*p.parts)
+
+
+def _measure(repo: Path, files: list[tuple[str, int, str]], attrs: GitAttributes, text: set[str],
+             raw: dict[str, int], tmp: Path) -> tuple[list[FileCount], list[tuple[str, int, str]], list[SkippedFile]]:
+    """Decide every file: countable (with pygount counts) or excluded (with a reason)."""
+    excluded: list[tuple[str, int, str]] = []
+    candidates: list[tuple[str, int, str, Path]] = []
+    for path, size, sha in sorted(files):
+        reason = path_reason(path, attrs)
+        if reason is None and size > 0 and path not in text:
+            reason = ex.BINARY
+        if reason is None and size > config.MAX_BLAME_FILE_BYTES:
+            reason = ex.TOO_LARGE
+        dest = _safe_dest(tmp, path) if reason is None else None
+        if reason is None and dest is None:
+            reason = ex.UNPARSEABLE  # unsafe path
+        if reason is not None:
+            excluded.append((path, raw.get(path, 0), reason))
+            continue
+        candidates.append((path, size, sha, dest))  # type: ignore[arg-type]
+
+    for path, _size, _sha, _dest in candidates[config.MAX_SOURCE_FILES_PER_REPO:]:
+        excluded.append((path, raw.get(path, 0), ex.TOO_LARGE))
+    candidates = candidates[: config.MAX_SOURCE_FILES_PER_REPO]
+    write_blobs(repo, [(sha, dest) for _p, _s, sha, dest in candidates])
+
+    pool = DuplicatePool()
+    counted: list[FileCount] = []
+    skipped: list[SkippedFile] = []
+    for path, _size, _sha, dest in candidates:  # sorted, so the first copy of a duplicate is the one counted
+        text_content = dest.read_bytes().decode("utf-8", "replace")
+        reason = content_reason(path, text_content)
+        if reason is not None:
+            excluded.append((path, raw.get(path, 0), reason))
+            continue
+        fc = count_file(dest, path, pool, root=tmp)
+        if fc.counted:
+            counted.append(fc)
+        else:
+            excluded.append((path, raw.get(path, 0), _STATE_REASON.get(fc.state, ex.UNPARSEABLE)))
+            skipped.append(SkippedFile(path=path, state=fc.state, state_info=fc.state_info))
+    return counted, excluded, skipped
+
+
 def analyze_local_repo(repo: Path, identity: IdentitySet, name: str, meta: dict | None = None) -> RepoInfo:
     """Analyse one repository already on disk (bare or not), at HEAD."""
     meta = meta or {}
@@ -152,38 +231,51 @@ def analyze_local_repo(repo: Path, identity: IdentitySet, name: str, meta: dict 
     files = _list_files(repo)
     attrs = _gitattributes(repo)
     text = _text_paths(repo)
-    heads = blob_heads(repo, [sha for _p, size, sha in files if 0 < size <= config.MAX_BLAME_FILE_BYTES])
-    categories = {
-        path: classify(path, attrs, head=heads.get(sha), is_binary=(size > 0 and path not in text))
-        for path, size, sha in files
-    }
-    sources = [(path, size) for path, size, _sha in files if categories[path] == "source"]
-    source_set = {p for p, _ in sources}
+    raw = _raw_line_counts(repo)
+    with tempfile.TemporaryDirectory(prefix="crucible-measure-") as tmp:
+        counted, excluded, skipped = _measure(repo, files, attrs, text, raw, Path(tmp))
 
     canonical = identity.canonical_emails(repo)
 
     def is_candidate(email: str) -> bool:
         return email in canonical or identity.matches(email)
 
-    blame = blame_repo(repo, sources, is_candidate)
-    facts = commit_facts(repo, lambda p: p in source_set)
-    share = facts.largest_commit_added / blame.total_lines if blame.total_lines else None
+    blame = blame_repo(repo, counted, is_candidate)
+    blamed = {f.path for f in blame.files}
+    for note in blame.skipped:  # counted by pygount but not attributable: excluded, with reason
+        path = note.split(": ", 1)[0]
+        why = ex.TOO_LARGE if ("budget" in note or "exceeded" in note) else ex.UNPARSEABLE
+        excluded.append((path, raw.get(path, 0), why))
+
+    facts = commit_facts(repo, lambda p: p in blamed)
+    measured = bool(blame.files)
+    total = blame.counted("line_count") if measured else None
+    share = facts.largest_commit_added / total if total else None
 
     notes = blame.skipped[:MAX_NOTES]
     if len(blame.skipped) > MAX_NOTES:
-        notes.append(f"... and {len(blame.skipped) - MAX_NOTES} more files skipped")
+        notes.append(f"... and {len(blame.skipped) - MAX_NOTES} more files not attributable")
     if facts.clustered_reason:
         notes.append(f"committer_dates_clustered not evaluated: {facts.clustered_reason}")
-    ratio = blame.authored_ratio
+    if not measured:
+        notes.append("no countable source files after exclusions: line counts and ratio not measured")
+    ratio = blame.authored_ratio if measured else None
     others = dict(blame.other_authors())
     owner = (meta.get("owner") or {}).get("login")
     owned = (owner.lower() == identity.login.lower()) if owner else None
+
+    by_files = Counter(r for _p, _n, r in excluded)
+    by_lines: Counter = Counter()
+    for _p, n, r in excluded:
+        by_lines[r] += n
+    top_excluded = sorted(excluded, key=lambda e: (-e[1], e[0]))[:MAX_TOP_EXCLUDED]
+    excluded_paths = {p for p, _n, r in excluded if r in (ex.VENDORED_PATH, ex.GENERATED)}
 
     return RepoInfo(
         name=name,
         authored_ratio=round(ratio, 6) if ratio is not None else None,
         builds=None,
-        tests_present=has_tests([p for p, c in categories.items() if c not in ("vendored", "generated")]),
+        tests_present=has_tests([p for p, _s, _h in files if p not in excluded_paths]),
         commit_span_days=int(facts.author_date_span_days),
         language=meta.get("language"),
         is_fork=meta.get("fork"),
@@ -194,19 +286,29 @@ def analyze_local_repo(repo: Path, identity: IdentitySet, name: str, meta: dict 
         author_date_span_days=facts.author_date_span_days,
         committer_date_span_days=facts.committer_date_span_days,
         committer_dates_clustered=facts.committer_dates_clustered,
-        source_files=len(sources),
-        total_lines=blame.total_lines,
-        code_lines=blame.code_lines,
-        authored_lines=blame.authored_lines,
+        source_files=len(blame.files),
+        total_lines=total,
+        code_lines=blame.counted("code") if measured else None,
+        documentation_lines=blame.counted("documentation") if measured else None,
+        string_lines=blame.counted("string") if measured else None,
+        empty_lines=blame.counted("empty") if measured else None,
+        source_lines=blame.source_lines if measured else None,
+        authored_lines=blame.authored_lines if measured else None,
         notes=notes,
         files=[
-            FileAuthorship(path=f.path, total_lines=f.total_lines, code_lines=f.code_lines,
+            FileAuthorship(path=f.path, total_lines=f.count.line_count, code_lines=f.count.code,
+                           documentation_lines=f.count.documentation, string_lines=f.count.string,
+                           empty_lines=f.count.empty, source_lines=f.count.source_count,
                            authored_lines=f.authored_lines, authored_ranges=f.authored_ranges,
                            committer_emails=_redact_counts(f.committer_emails))
             for f in blame.files if f.authored_lines > 0
         ],
+        excluded_files_by_reason={r: by_files.get(r, 0) for r in ex.REASONS},
+        excluded_lines_by_reason={r: by_lines.get(r, 0) for r in ex.REASONS},
+        top_excluded_files=[ExcludedFile(path=p, lines=n, reason=r) for p, n, r in top_excluded],
+        skipped_files=skipped[:MAX_SKIPPED_FILES],
         unmatched_authors=unmatched_authors(others, facts.commits_by_author, facts.name_by_author),
-        likely_identity_gap=identity_gap(owned, meta.get("fork"), ratio, others, blame.code_lines),
+        likely_identity_gap=identity_gap(owned, meta.get("fork"), ratio, others, blame.source_lines),
     )
 
 

@@ -79,14 +79,34 @@ class Claims(BaseModel):
 
 class FileAuthorship(BaseModel):
     """Candidate authorship of one source file (only files with
-    authored_lines > 0 are recorded). Line numbers are 1-based, inclusive."""
+    authored_lines > 0 are recorded). Line numbers are 1-based, inclusive.
+    Line classes are pygount's: code, documentation (comments, docstrings),
+    string, empty; source = code + string."""
 
     path: str
-    total_lines: int  # raw lines, blank included
-    code_lines: int  # non-blank lines
-    authored_lines: int  # non-blank lines attributed to the candidate
-    authored_ranges: list[tuple[int, int]]  # merged across blank-only gaps
+    total_lines: int  # pygount line_count (every line)
+    code_lines: int  # pygount code_count
+    documentation_lines: int = 0  # pygount documentation_count
+    string_lines: int = 0  # pygount string_count
+    empty_lines: int = 0  # pygount empty_count
+    source_lines: int = 0  # code + string: the basis for authorship
+    authored_lines: int  # candidate-authored SOURCE lines
+    authored_ranges: list[tuple[int, int]]  # merged across gaps of non-source lines
     committer_emails: dict[str, int] = {}  # REDACTED committer email -> authored lines (attribution stays on author)
+
+
+class ExcludedFile(BaseModel):
+    path: str
+    lines: int  # raw lines (0 for binaries)
+    reason: str  # one of the excluded_*_by_reason keys
+
+
+class SkippedFile(BaseModel):
+    """A file pygount did not analyse (state != analyzed), with its reason."""
+
+    path: str
+    state: str  # pygount SourceState: duplicate, generated, empty, binary, unknown, error
+    state_info: Optional[str] = None
 
 
 class UnmatchedAuthor(BaseModel):
@@ -105,10 +125,12 @@ class UnmatchedAuthor(BaseModel):
 class RepoInfo(BaseModel):
     """Phase 3 facts about one repository. No field is a judgement.
 
-    ``authored_ratio`` = candidate non-blank lines / all non-blank lines in
-    source files. ``None`` always means "not measured", never zero: every
-    numeric field is None on a skipped repo (``skip_reason`` set), and the
-    ratio is None when a repo has no non-blank source lines (0/0).
+    ``authored_ratio`` = candidate-authored SOURCE lines / SOURCE lines, where
+    source = pygount code + string lines in countable files (comments and
+    blank lines are not evidence of engineering). ``None`` always means "not
+    measured", never zero: every numeric field is None on a skipped repo
+    (``skip_reason`` set), and every line count and the ratio are None when
+    no countable file survives exclusion.
     """
 
     name: str
@@ -125,13 +147,21 @@ class RepoInfo(BaseModel):
     author_date_span_days: Optional[float] = None
     committer_date_span_days: Optional[float] = None
     committer_dates_clustered: Optional[bool] = None  # history-rewrite signal; a fact, not proof. None = not evaluated
-    source_files: Optional[int] = None
-    total_lines: Optional[int] = None
-    code_lines: Optional[int] = None
-    authored_lines: Optional[int] = None
+    source_files: Optional[int] = None  # countable files (0 when everything was excluded)
+    total_lines: Optional[int] = None  # pygount line_count over countable files
+    code_lines: Optional[int] = None  # pygount code_count
+    documentation_lines: Optional[int] = None
+    string_lines: Optional[int] = None
+    empty_lines: Optional[int] = None
+    source_lines: Optional[int] = None  # code + string: the ratio's denominator
+    authored_lines: Optional[int] = None  # candidate-authored source lines
     skip_reason: Optional[str] = None
     notes: list[str] = []  # partial-analysis facts, e.g. files skipped over a cap
     files: list[FileAuthorship] = []
+    excluded_files_by_reason: dict[str, int] = {}  # every reason key, 0 included
+    excluded_lines_by_reason: dict[str, int] = {}
+    top_excluded_files: list[ExcludedFile] = []  # up to 10, most lines first
+    skipped_files: list[SkippedFile] = []  # pygount non-analysed files (capped)
     unmatched_authors: list[UnmatchedAuthor] = []  # analysed repos only; top 10 by authored_lines
     # Data shape of "same person, unlinked git identity": owned, not a fork,
     # 0% authored, one unmatched author > 80% of source lines. A fact, not a

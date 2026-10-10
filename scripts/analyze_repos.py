@@ -18,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend.evidence import analyze_github_detailed, config  # noqa: E402
 from backend.evidence.errors import EvidenceError, GitHubAuthError, GitHubNotFound, GitHubRateLimited  # noqa: E402
 
-COLS = [("repo", 28), ("language", 11), ("src files", 9), ("total ln", 9), ("code ln", 8), ("authored", 9),
-        ("auth %", 7), ("fork", 5), ("span d", 7), ("tests", 6), ("1-commit", 8), ("clustered", 9)]
+COLS = [("repo", 28), ("language", 11), ("src files", 9), ("total ln", 9), ("source ln", 9), ("authored", 9),
+        ("auth %", 7), ("fork", 5), ("span d", 7), ("has tests", 9), ("one-commit", 10), ("clustered", 9)]
 
 
 def _fmt(v, width: int) -> str:
@@ -53,6 +53,9 @@ def main(argv: list[str]) -> int:
         return 1
 
     print(f"user: {result.username}   authenticated: {'yes' if result.authenticated else 'no (60 req/h)'}")
+    print("source ln = pygount code + string lines in countable files; authored % = authored source / source ln")
+    if not result.repos:
+        print("(no public repositories owned by this user)")
     print(" ".join(_fmt(name, w) for name, w in COLS))
     print("-" * (sum(w for _, w in COLS) + len(COLS) - 1))
     skipped = []
@@ -61,7 +64,7 @@ def main(argv: list[str]) -> int:
             skipped.append(r)
             continue
         pct = round(100 * r.authored_ratio, 1) if r.authored_ratio is not None else None
-        row = [r.name, r.language or "-", r.source_files, r.total_lines, r.code_lines, r.authored_lines, pct,
+        row = [r.name, r.language or "-", r.source_files, r.total_lines, r.source_lines, r.authored_lines, pct,
                r.is_fork, r.commit_span_days, r.tests_present, r.single_commit_import, r.committer_dates_clustered]
         print(" ".join(_fmt(v, w) for v, (_, w) in zip(row, COLS)))
         if r.likely_identity_gap and r.unmatched_authors:
@@ -71,6 +74,10 @@ def main(argv: list[str]) -> int:
                   "identity. Verify before relying on this number.")
             if top.reason:
                 print(f"          cause: {top.reason}")
+        excl = [f"{k} {r.excluded_files_by_reason[k]}f/{r.excluded_lines_by_reason.get(k, 0)}ln"
+                for k in r.excluded_files_by_reason if r.excluded_files_by_reason[k]]
+        if excl:
+            print(f"    excluded: {', '.join(excl)}")
         for note in r.notes:
             print(f"    note: {note}")
     if skipped:

@@ -15,7 +15,7 @@ from backend.evidence.blame import merge_ranges, parse_line_porcelain
 from backend.evidence.clone import cloned_repo
 from backend.evidence.errors import (GitHubError, GitHubNetworkError, GitHubNotFound, GitHubRateLimited,
                                      GitTimeout)
-from backend.evidence.exclusions import GitAttributes, classify
+from backend.evidence.exclusions import GitAttributes, has_source_map, is_minified, path_reason
 from backend.evidence.github_client import GitHubClient
 from backend.evidence.gitutil import run_git
 from backend.evidence.identity import IdentitySet, build_identity_set, parse_noreply
@@ -111,8 +111,9 @@ def test_empty_repo_is_skipped_with_reason(git_fixtures, identity):
 def test_oversized_file_is_skipped_and_recorded(git_fixtures, identity, monkeypatch):
     monkeypatch.setattr(config, "MAX_BLAME_FILE_BYTES", 100)
     r = analyze_local_repo(git_fixtures["solo_repo"], identity, "solo_repo")
-    assert r.code_lines == 0
-    assert any("over MAX_BLAME_FILE_BYTES" in n for n in r.notes)
+    assert r.source_files == 0 and r.code_lines is None and r.authored_ratio is None  # nothing countable
+    assert r.excluded_files_by_reason["too_large"] == 2
+    assert r.excluded_lines_by_reason["too_large"] == 63  # raw lines of both files, still reported
 
 
 # --------------------------------------------------------------------------
@@ -121,9 +122,9 @@ def test_oversized_file_is_skipped_and_recorded(git_fixtures, identity, monkeypa
 
 
 def test_merge_ranges_bridges_blank_only_gaps():
-    assert merge_ranges([1, 2, 3, 5, 6, 9], blank={4}) == [(1, 6), (9, 9)]
-    assert merge_ranges([1, 3], blank=set()) == [(1, 1), (3, 3)]
-    assert merge_ranges([], blank={1}) == []
+    assert merge_ranges([1, 2, 3, 5, 6, 9], bridgeable={4}) == [(1, 6), (9, 9)]  # 4 = blank/comment
+    assert merge_ranges([1, 3], bridgeable=set()) == [(1, 1), (3, 3)]
+    assert merge_ranges([], bridgeable={1}) == []
 
 
 def test_parse_line_porcelain_reads_author_and_committer_per_line():
@@ -137,53 +138,96 @@ def test_parse_line_porcelain_reads_author_and_committer_per_line():
 
 
 # --------------------------------------------------------------------------
-# exclusions (table-driven)
+# exclusions: vendored Linguist data, two content heuristics, .gitattributes
 # --------------------------------------------------------------------------
 
 
+def test_linguist_data_loads_all_186_patterns():
+    from backend.evidence import exclusions as exc
+
+    assert len(exc.VENDOR_PATTERNS) == 168 and len(exc.DOCUMENTATION_PATTERNS) == 18
+
+
+def test_bad_linguist_pattern_fails_loudly(tmp_path):
+    from backend.evidence.exclusions import LinguistPatternError, load_patterns
+
+    (tmp_path / "bad.yml").write_text("- (^|/)ok/\n- (unclosed\n- '[z-a]'\n")
+    with pytest.raises(LinguistPatternError) as err:
+        load_patterns("bad.yml", tmp_path)
+    assert "(unclosed" in str(err.value) and "[z-a]" in str(err.value) and "2 pattern(s)" in str(err.value)
+
+
 @pytest.mark.parametrize("path,expected", [
-    ("src/app.py", "source"), ("main.go", "source"), ("CMakeLists.txt", "source"), ("requirements.txt", "source"),
-    ("node_modules/x/index.js", "vendored"), ("vendor/lib.go", "vendored"), ("venv/lib/x.py", "vendored"),
-    (".venv/x.py", "vendored"), ("lib/python3.11/site-packages/x.py", "vendored"), ("third_party/a.c", "vendored"),
-    ("package-lock.json", "generated"), ("yarn.lock", "generated"), ("poetry.lock", "generated"),
-    ("Cargo.lock", "generated"), ("go.sum", "generated"), ("static/app.min.js", "generated"),
-    ("css/site.min.css", "generated"), ("dist/bundle.js", "generated"), ("build/out.js", "generated"),
-    ("target/classes/A.java", "generated"), ("api/user_pb2.py", "generated"), ("api/user.pb.go", "generated"),
-    ("app/migrations/0001_initial.py", "generated"),
-    ("README.md", "documentation"), ("docs/index.rst", "documentation"), ("LICENSE", "documentation"),
-    ("CHANGELOG.md", "documentation"),
-    ("logo.png", "binary"), ("font.woff2", "binary"), ("model.onnx", "binary"), ("report.pdf", "binary"),
-    ("archive.zip", "binary"), ("icon.svg", "binary"),
+    ("node_modules/x/index.js", "vendored_path"), ("vendor/lib.go", "vendored_path"),
+    ("dist/bundle.js", "vendored_path"), ("third_party/miniz/miniz.c", "vendored_path"),
+    ("backend/mvnw", "vendored_path"), ("backend/mvnw.cmd", "vendored_path"), ("gradlew", "vendored_path"),
+    ("static/app.min.js", "vendored_path"), ("css/site.min.css", "vendored_path"),
+    ("README.md", "documentation_path"), ("docs/index.rst", "documentation_path"),
+    ("src/app.py", None), ("main.go", None), ("CMakeLists.txt", None),
 ])
-def test_classify_by_path(path, expected):
-    assert classify(path) == expected
+def test_linguist_path_rules(path, expected):
+    assert path_reason(path) == expected
 
 
-def test_classify_openapi_marker_and_git_binary_verdict():
-    assert classify("client/api.py", head=b"# coding: utf-8\n# Generated by: https://openapi-generator.tech\n") \
-        == "generated"
-    assert classify("data/blob", is_binary=True) == "binary"
+@pytest.mark.parametrize("path", [
+    # DOCUMENTED GAPS: Linguist's vendor/documentation data does not cover these.
+    # Lock files and protoc output are still excluded later by pygount (name list /
+    # "DO NOT EDIT" header); the rest are counted as source. See the Phase 3.5 report.
+    "venv/lib/x.py", ".venv/x.py", "lib/python3.11/site-packages/x.py", "build/out.js", "target/classes/A.java",
+    "app/migrations/0001_initial.py", "data/raw/podcast_8_raw.json", "api/user_pb2.py", "package-lock.json",
+])
+def test_paths_not_covered_by_linguist_path_data(path):
+    assert path_reason(path) is None
+
+
+@pytest.mark.parametrize("path,text,expected", [
+    ("a.js", ("x" * 111 + "\n") * 3, False),  # avg = 333 // 4 = 83 with the trailing "" line
+    ("a.js", "x" * 111, True),  # one line, avg 111 > 110
+    ("a.js", "x" * 110, False),  # avg exactly 110 is not > 110
+    ("a.css", "y" * 300 + "\n" + "y" * 300, True),
+    ("a.py", "z" * 500, False),  # only .js / .css
+])
+def test_is_minified(path, text, expected):
+    assert is_minified(path, text) is expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("var a = 1;\n//# sourceMappingURL=a.js.map\n", True),
+    ("var a = 1;\n//# sourceMappingURL=a.js.map", True),
+    ("var a = 1;\n//@ sourceMappingURL=a.js.map\n", True),
+    ("body{}\n/*# sourceMappingURL=a.css.map */\n", True),
+    ("eval(x)\n//# sourceURL=dyn.js\n", True),
+    ("//# sourceMappingURL=a.js.map\nvar a = 1;\nvar b = 2;\n", False),  # not in the last two lines
+    ("var a = 1; // mentions sourceMappingURL in a comment\n", False),
+])
+def test_has_source_map(text, expected):
+    assert has_source_map("a.js", text) is expected
+    assert has_source_map("a.py", text) is False
 
 
 @pytest.mark.parametrize("attrs,path,expected", [
     ("gen/** linguist-generated", "gen/api.py", "generated"),
-    ("*.py linguist-vendored", "src/a.py", "vendored"),
-    ("docs/** linguist-documentation", "docs/conf.py", "documentation"),
-    ("vendor/ours.py -linguist-vendored", "vendor/ours.py", "source"),
-    ("vendor/** !linguist-vendored", "vendor/x.go", "source"),
-    ("node_modules/** linguist-vendored=false", "node_modules/a.js", "source"),
-    ("*.js linguist-generated\nsrc/keep.js -linguist-generated", "src/keep.js", "source"),  # later line wins
-    ("*.js -linguist-generated", "app.min.js", "source"),
+    ("*.py linguist-vendored", "src/a.py", "vendored_path"),
+    ("docs/** linguist-documentation", "docs/conf.py", "documentation_path"),
+    ("vendor/ours.py -linguist-vendored", "vendor/ours.py", None),
+    ("vendor/** !linguist-vendored", "vendor/x.go", None),
+    ("node_modules/** linguist-vendored=false", "node_modules/a.js", None),
+    ("*.js linguist-generated\nsrc/keep.js -linguist-generated", "src/keep.js", None),  # later line wins
+    ("*.js -linguist-generated", "app.min.js", "vendored_path"),  # unmarking generated leaves vendored
 ])
 def test_gitattributes_overrides(attrs, path, expected):
-    assert classify(path, GitAttributes.parse(attrs)) == expected
+    assert path_reason(path, GitAttributes.parse(attrs)) == expected
 
 
-def test_vendored_fixture_every_file_classified(git_fixtures):
-    attrs = GitAttributes.parse((git_fixtures["vendored_repo"] / ".gitattributes").read_text())
-    for path, expected in M.CATEGORIES.items():
-        is_binary = path.endswith(".png")
-        assert classify(path, attrs, is_binary=is_binary) == expected, path
+def test_vendored_fixture_every_file_has_expected_reason(git_fixtures, identity):
+    r = analyze_local_repo(git_fixtures["vendored_repo"], identity, "vendored_repo")
+    reasons = {e.path: e.reason for e in r.top_excluded_files}
+    counted = {f.path for f in r.files}
+    for path, expected in M.REASONS.items():
+        if expected is None:
+            assert path in counted, path
+        else:
+            assert reasons.get(path) == expected, path
 
 
 # --------------------------------------------------------------------------
@@ -371,8 +415,9 @@ def test_repo_without_source_lines_has_ratio_none(tmp_path, identity):
     M.init(repo)
     M.commit(repo, {"README.md": M.code("readme", 5)}, M.CAND, "2024-01-01T10:00:00+00:00")
     r = analyze_local_repo(repo, identity, "docs_only")
-    assert r.skip_reason is None and r.code_lines == 0
-    assert r.authored_ratio is None  # 0/0 is "nothing to measure", not 0%
+    assert r.skip_reason is None and r.source_files == 0
+    assert r.authored_ratio is None and r.source_lines is None  # nothing countable: not measured, not 0%
+    assert r.excluded_files_by_reason["documentation_path"] == 1
 
 
 @pytest.mark.parametrize("paths,expected", [
@@ -528,3 +573,114 @@ def test_skipped_repo_via_api_reports_tests_present_none(git_fixtures, monkeypat
     client = _mock_client({f"/users/{M.LOGIN}": PROFILE, f"/users/{M.LOGIN}/repos": repos})
     [r] = analyze_github_detailed(M.LOGIN, client=client).repos
     assert r.skip_reason and r.tests_present is None and r.authored_ratio is None
+
+
+# --------------------------------------------------------------------------
+# Phase 3.5: exclusion fixture (real files on disk) and pygount counting
+# --------------------------------------------------------------------------
+
+EXCLUSION_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "exclusion_repo"
+
+
+@pytest.fixture
+def exclusion_repo(tmp_path):
+    import shutil
+
+    repo = tmp_path / "exclusion_repo"
+    M.init(repo)
+    shutil.copytree(EXCLUSION_FIXTURE, repo, dirs_exist_ok=True)
+    M.commit(repo, {}, M.CAND, "2024-01-01T10:00:00+00:00")
+    return repo
+
+
+def test_exclusion_fixture_counts_every_category_exactly(exclusion_repo, identity):
+    r = analyze_local_repo(exclusion_repo, identity, "exclusion_repo")
+    assert r.excluded_files_by_reason == {
+        "vendored_path": 2,  # node_modules/leftpad/index.js, vendor/lib.py
+        "documentation_path": 1,  # docs/guide.md
+        "generated": 0,
+        "minified": 1,  # static/bundle.js (average line length 112 > 110)
+        "source_map": 1,  # static/mapped.js
+        "duplicate": 1,  # src/app_copy.py, byte-identical to src/app.py
+        "unparseable": 0, "binary": 0, "empty": 0, "too_large": 0,
+    }
+    assert r.excluded_lines_by_reason == {
+        "vendored_path": 3 + 2, "documentation_path": 3, "generated": 0, "minified": 2, "source_map": 4,
+        "duplicate": 11, "unparseable": 0, "binary": 0, "empty": 0, "too_large": 0,
+    }
+    reasons = {e.path: e.reason for e in r.top_excluded_files}
+    assert reasons["src/app_copy.py"] == "duplicate" and "src/app.py" not in reasons  # first copy counts
+    # state_info names the original, repo-relative (never a local temp path)
+    assert [(s.path, s.state, s.state_info) for s in r.skipped_files] == [("src/app_copy.py", "duplicate", "src/app.py")]
+
+
+def test_exclusion_fixture_source_lines_use_code_plus_string(exclusion_repo, identity):
+    r = analyze_local_repo(exclusion_repo, identity, "exclusion_repo")
+    files = {f.path: f for f in r.files}
+    q = files["src/queries.py"]  # heavy docstring + embedded SQL
+    assert (q.code_lines, q.documentation_lines, q.string_lines, q.empty_lines) == (2, 7, 5, 2)
+    assert q.total_lines == 16 and q.source_lines == 7 and q.authored_lines == 7
+    a = files["src/app.py"]
+    assert (a.code_lines, a.documentation_lines, a.string_lines, a.empty_lines) == (6, 1, 0, 4)
+    assert a.source_lines == 6 and a.authored_lines == 6
+    # repo totals: only the two countable files
+    assert r.source_files == 2
+    assert (r.code_lines, r.documentation_lines, r.string_lines, r.empty_lines) == (8, 8, 5, 6)
+    assert r.total_lines == 27 and r.source_lines == 13 and r.authored_lines == 13 and r.authored_ratio == 1.0
+
+
+def test_authored_ranges_bridge_comments_and_docstrings(exclusion_repo, identity):
+    r = analyze_local_repo(exclusion_repo, identity, "exclusion_repo")
+    files = {f.path: f for f in r.files}
+    # queries.py source lines are 9 (def), 11 (return) and 12-16 (SQL); the docstring
+    # on line 10 is not authored source but sits inside the function, so it is bridged.
+    assert files["src/queries.py"].authored_ranges == [(9, 16)]
+    assert files["src/app.py"].authored_ranges == [(1, 11)]
+
+
+def test_comment_lines_are_not_credited_as_authored(tmp_path, identity):
+    repo = tmp_path / "comments"
+    M.init(repo)
+    M.commit(repo, {"a.py": b"x = 1\n"}, M.CAND, "2024-01-01T10:00:00+00:00")
+    M.commit(repo, {"a.py": b"x = 1\n# a long explanatory comment\n# and another one\n"}, M.BOB,
+             "2024-01-02T10:00:00+00:00")
+    r = analyze_local_repo(repo, identity, "comments")
+    assert r.source_lines == 1 and r.authored_lines == 1 and r.authored_ratio == 1.0  # Bob's comments: not code
+    assert r.documentation_lines == 2
+
+
+def test_pygount_generated_names_and_headers_are_excluded(tmp_path, identity):
+    repo = tmp_path / "gen"
+    M.init(repo)
+    M.commit(repo, {"package-lock.json": b'{\n  "lockfileVersion": 3\n}\n',
+                    "client/api.py": b"# NOTE: This class is auto generated by OpenAPI Generator.\n"
+                                     b"# Do not edit the class manually.\nX = 1\n",
+                    "src/app.py": b"x = 1\n"}, M.CAND, "2024-01-01T10:00:00+00:00")
+    r = analyze_local_repo(repo, identity, "gen")
+    assert r.excluded_files_by_reason["generated"] == 2 and r.source_files == 1
+    assert {s.path for s in r.skipped_files} == {"package-lock.json", "client/api.py"}
+
+
+def test_zero_countable_files_reports_none_not_zero(tmp_path, identity):
+    repo = tmp_path / "all_vendored"
+    M.init(repo)
+    M.commit(repo, {"node_modules/a/index.js": b"x = 1;\n", "README.md": b"# hi\n"}, M.CAND,
+             "2024-01-01T10:00:00+00:00")
+    r = analyze_local_repo(repo, identity, "all_vendored")
+    assert r.source_files == 0
+    for field in ("authored_ratio", "total_lines", "code_lines", "documentation_lines", "string_lines",
+                  "empty_lines", "source_lines", "authored_lines", "largest_commit_share"):
+        assert getattr(r, field) is None, field
+    assert r.excluded_files_by_reason["vendored_path"] == 1 and r.excluded_files_by_reason["documentation_path"] == 1
+
+
+def test_utf8_source_with_multibyte_characters_is_counted(tmp_path, identity):
+    # Regression: pygount's automatic encoding fell back to cp1252 and dropped
+    # UTF-8 files containing emoji as unparseable.
+    repo = tmp_path / "utf8"
+    M.init(repo)
+    M.commit(repo, {"app.py": "print('✅ done — ünïcode 🚀')\nx = 1\n".encode(),
+                    "legacy.py": "name = 'caf\xe9'\n".encode("cp1252")}, M.CAND, "2024-01-01T10:00:00+00:00")
+    r = analyze_local_repo(repo, identity, "utf8")
+    assert r.excluded_files_by_reason["unparseable"] == 0
+    assert r.source_files == 2 and r.source_lines == 3 and r.authored_ratio == 1.0
