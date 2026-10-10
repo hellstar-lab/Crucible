@@ -1,0 +1,114 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R /F2 3 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /Name /F2 /Subtype /Type1 /Type /Font
+>>
+endobj
+4 0 obj
+<<
+/A <<
+/S /URI /Type /Action /URI (https://evil.example.com/collect)
+>> /Border [ 0 0 0 ] /Rect [ 71 697 241.74 711 ] /Subtype /Link /Type /Annot
+>>
+endobj
+5 0 obj
+<<
+/A <<
+/S /URI /Type /Action /URI (https://www.linkedin.com/in/jane-doe)
+>> /Border [ 0 0 0 ] /Rect [ 71 667 191.602 681 ] /Subtype /Link /Type /Annot
+>>
+endobj
+6 0 obj
+<<
+/A <<
+/S /URI /Type /Action /URI (https://evil.example.com/x)
+>> /Border [ 0 0 0 ] /Rect [ 71 637 129.848 651 ] /Subtype /Link /Type /Annot
+>>
+endobj
+7 0 obj
+<<
+/A <<
+/S /URI /Type /Action /URI (https://bit.ly/3xYzAbC)
+>> /Border [ 0 0 0 ] /Rect [ 71 607 172.66 621 ] /Subtype /Link /Type /Annot
+>>
+endobj
+8 0 obj
+<<
+/A <<
+/S /URI /Type /Action /URI (mailto:jane@example.com)
+>> /Border [ 0 0 0 ] /Rect [ 71 577 170.361 591 ] /Subtype /Link /Type /Annot
+>>
+endobj
+9 0 obj
+<<
+/Annots [ 4 0 R 5 0 R 6 0 R 7 0 R 8 0 R ] /Contents 13 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 
+  /Trans <<
+
+>> /Type /Page
+>>
+endobj
+10 0 obj
+<<
+/PageMode /UseNone /Pages 12 0 R /Type /Catalog
+>>
+endobj
+11 0 obj
+<<
+/Author (Jane Doe \(synthetic\)) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (Fixture) /Trapped /False
+>>
+endobj
+12 0 obj
+<<
+/Count 1 /Kids [ 9 0 R ] /Type /Pages
+>>
+endobj
+13 0 obj
+<<
+/Filter [ /ASCII85Decode /FlateDecode ] /Length 244
+>>
+stream
+Gat&F]afWJ'SbS;X8#.AiMVLIBT+th#D_.96I?uo$"+s$D^bf0F<Dqk_`Kt.LVVA+bYA>GUMu7s`!=OQ![dt2j$53FI9fMWSbU[U845Y9^]P<RS.`rJ<t$u>[45;42G;BuF>[4t"u4]_nUFd"@,6'SIpS[F$+J9_SLN]%8LKmA)`t%oCcI@X\E*4s1+j$\jeU3-a0.pe9%@d]9!7;$jR9^eX\Co[4g8M$6rYJu`@hMJ)bc'8ec~>endstream
+endobj
+xref
+0 14
+0000000000 65535 f 
+0000000061 00000 n 
+0000000102 00000 n 
+0000000209 00000 n 
+0000000321 00000 n 
+0000000487 00000 n 
+0000000658 00000 n 
+0000000819 00000 n 
+0000000975 00000 n 
+0000001133 00000 n 
+0000001370 00000 n 
+0000001440 00000 n 
+0000001714 00000 n 
+0000001774 00000 n 
+trailer
+<<
+/ID 
+[<35c828bf195c04ac275dc47f6672a875><35c828bf195c04ac275dc47f6672a875>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 11 0 R
+/Root 10 0 R
+/Size 14
+>>
+startxref
+2109
+%%EOF

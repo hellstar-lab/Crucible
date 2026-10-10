@@ -39,3 +39,43 @@ FRAGMENT_MIN_LINE_HEIGHT = 2.0  # points; floor for that gap so microscopic text
 # Resource limits for untrusted uploads
 MAX_PAGES = 200
 
+
+# --- Phase 2C -------------------------------------------------------------
+# Work caps per document. Over a cap the result is PARTIAL with truncated=True, never silent.
+MAX_FILE_MB = 50
+MAX_SECONDS = 60.0
+
+# Geometry (offpage_text / cropbox_shrunk)
+OFFPAGE_TOLERANCE_PT = 1.0  # a char counts as outside only when beyond the box edge by more than this
+MAX_RECONSTRUCTED_CHARS = 2000
+
+# Document kind, per page
+KIND_TEXT_MIN_CHARS = 100  # text_pdf: at least this many chars on the page
+KIND_IMAGE_MAX_CHARS = 20  # image_only: fewer chars than this AND an image present
+SLIDE_MIN_BODY_SIZE = 14.0  # slide_deck: landscape page whose body text is at least this large...
+SLIDE_MAX_CHARS = 600  # ...with low text density
+
+# Headings
+HEADING_SIZE_RATIO = 1.15  # median char size above body_size * this
+HEADING_BOLD_MAX_CHARS = 80  # a bold line shorter than this is a heading
+HEADING_BOLD_MIN_FRACTION = 0.9  # fraction of the line's characters that must be bold
+RUNNING_LINE_MIN_PAGES = 3  # a line repeating in the top/bottom band of this many pages is a running header/footer
+RUNNING_LINE_MIN_FRACTION = 0.4
+RUNNING_BAND_FRACTION = 0.08
+
+# Tables
+TABLE_MIN_ROWS = 2
+TABLE_MIN_COLS = 2
+TABLE_MIN_NONEMPTY = 0.6  # fraction of non-empty cells
+
+# Text quality
+UNMAPPED_WARN_RATIO = 0.3
+
+# Skills lexicon matching (rapidfuzz)
+SKILL_FUZZY_CUTOFF = 90  # fuzz.ratio score; fuzzy matching applies only to terms at least this long
+SKILL_FUZZY_MIN_LEN = 6
+
+# DOCX
+DOCX_MIN_FONT_PT = 4.0  # run size at or below this is "tiny_font" (inclusive; Word's smallest UI size is 1pt, body text is 8-12pt)
+DOCX_MAX_UNCOMPRESSED_MB = 200  # sum of member sizes in the zip; over it nothing is parsed (zip bomb)
+DOCX_MAX_MEMBERS = 5000

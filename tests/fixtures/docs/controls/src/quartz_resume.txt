@@ -1,0 +1,13 @@
+Taylor Morgan
+Product Analyst
+taylor.morgan@example.com
+
+EXPERIENCE
+Analyst, Fabrikam Retail (2020 - 2023)
+  - Built weekly dashboards used by 40 store managers.
+
+EDUCATION
+B.A. Economics, Example College, 2019
+
+SKILLS
+SQL, Excel, Tableau, Python

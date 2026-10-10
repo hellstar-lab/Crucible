@@ -30,17 +30,20 @@ FORMAT_CHARS = frozenset(
 )
 
 
-@dataclass
+@dataclass(slots=True)
 class CharInfo:
     index: int  # index within the page's text page
     text: str
     page: int  # 1-based
-    bbox: BBox
+    bbox: BBox  # user space, unrotated, bottom-up: the same system as the page boxes
     font_size: float  # effective rendered size in points
     fill: RGBA | None
     stroke: RGBA | None
     render_mode: int  # -1 when pdfium cannot resolve the owning text object
     is_generated: bool  # pdfium-inserted space / line break, not in the content stream
+    font_name: str = ""  # PostScript name incl. any ABCDEF+ subset prefix; "" unless fonts were requested
+    unmapped: bool = False  # pdfium has no Unicode mapping for the glyph (text is unreliable)
+    rotated: bool = False  # glyph is not horizontal (margin stamps such as the arXiv sidebar)
 
     @property
     def inkless(self) -> bool:
@@ -71,13 +74,26 @@ def _effective_font_size(tp, i: int, matrix) -> float:
     return size
 
 
-def extract_page_chars(textpage: pdfium.PdfTextPage, page_no: int) -> list[CharInfo]:
-    """Collect text, box, font size, colours and render mode for every char on a page."""
+def _font_name(tp, i: int) -> str:
+    flags = ctypes.c_int(0)
+    n = pdfium_c.FPDFText_GetFontInfo(tp, i, None, 0, ctypes.byref(flags))
+    if n <= 0:
+        return ""
+    buf = ctypes.create_string_buffer(n)
+    pdfium_c.FPDFText_GetFontInfo(tp, i, buf, n, ctypes.byref(flags))
+    return buf.value.decode("utf-8", "replace")
+
+
+def extract_page_chars(textpage: pdfium.PdfTextPage, page_no: int, with_fonts: bool = False) -> list[CharInfo]:
+    """Collect text, box, font size, colours and render mode for every char on a page.
+    ``with_fonts`` also resolves each char's font name (cached per text object) and
+    whether pdfium could map it to Unicode."""
     tp = textpage.raw
     n = pdfium_c.FPDFText_CountChars(tp)
     chars: list[CharInfo] = []
     rect = pdfium_c.FS_RECTF()
     matrix = pdfium_c.FS_MATRIX()
+    font_cache: dict[int, str] = {}
     pending_high: int | None = None
     for i in range(n):
         cp = pdfium_c.FPDFText_GetUnicode(tp, i)
@@ -100,6 +116,17 @@ def extract_page_chars(textpage: pdfium.PdfTextPage, page_no: int) -> list[CharI
 
         obj = pdfium_c.FPDFText_GetTextObject(tp, i)
         mode = pdfium_c.FPDFTextObj_GetTextRenderMode(obj) if obj else -1
+        font = ""
+        unmapped = False
+        rotated = False
+        if with_fonts:
+            key = ctypes.cast(obj, ctypes.c_void_p).value if obj else 0
+            if key not in font_cache:
+                font_cache[key] = _font_name(tp, i)
+            font = font_cache[key]
+            unmapped = pdfium_c.FPDFText_HasUnicodeMapError(tp, i) == 1 or text == "\ufffd"
+            angle = abs(pdfium_c.FPDFText_GetCharAngle(tp, i)) % 3.141592653589793
+            rotated = 0.2 < angle < 3.141592653589793 - 0.2
 
         chars.append(
             CharInfo(
@@ -112,19 +139,22 @@ def extract_page_chars(textpage: pdfium.PdfTextPage, page_no: int) -> list[CharI
                 stroke=_color(pdfium_c.FPDFText_GetStrokeColor, tp, i),
                 render_mode=int(mode),
                 is_generated=pdfium_c.FPDFText_IsGenerated(tp, i) == 1,
+                font_name=font,
+                unmapped=unmapped,
+                rotated=rotated,
             )
         )
     return chars
 
 
-def extract_chars(pdf: pdfium.PdfDocument) -> list[CharInfo]:
+def extract_chars(pdf: pdfium.PdfDocument, with_fonts: bool = False) -> list[CharInfo]:
     """Return a CharInfo for every character on every page of an open document."""
     out: list[CharInfo] = []
     for page_index in range(len(pdf)):
         page = pdf[page_index]
         textpage = page.get_textpage()
         try:
-            out.extend(extract_page_chars(textpage, page_index + 1))
+            out.extend(extract_page_chars(textpage, page_index + 1, with_fonts))
         finally:
             textpage.close()
             page.close()
@@ -175,3 +205,23 @@ class PlumberLayer:
         if self._pdf is not None:
             self._pdf.close()
             self._pdf = None
+
+
+def count_page_objects(page: pdfium.PdfPage) -> tuple[int, int]:
+    """(images, paths) painted on a page, including inside form XObjects."""
+    counts = {"image": 0, "path": 0}
+
+    def walk(count: int, get) -> None:
+        for i in range(count):
+            obj = get(i)
+            kind = pdfium_c.FPDFPageObj_GetType(obj)
+            if kind == pdfium_c.FPDF_PAGEOBJ_IMAGE:
+                counts["image"] += 1
+            elif kind == pdfium_c.FPDF_PAGEOBJ_PATH:
+                counts["path"] += 1
+            elif kind == pdfium_c.FPDF_PAGEOBJ_FORM:
+                walk(pdfium_c.FPDFFormObj_CountObjects(obj),
+                     lambda j, form=obj: pdfium_c.FPDFFormObj_GetObject(form, j))
+
+    walk(pdfium_c.FPDFPage_CountObjects(page.raw), lambda i: pdfium_c.FPDFPage_GetObject(page.raw, i))
+    return counts["image"], counts["path"]

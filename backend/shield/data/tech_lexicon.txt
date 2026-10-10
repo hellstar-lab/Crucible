@@ -1,0 +1,360 @@
+# Technology lexicon for the resume skills match (Phase 2C). One entry per line:
+#     Canonical Name|alias|alias|...
+# A leading "!" marks an AMBIGUOUS term (an ordinary word or a bare letter). Ambiguous terms are counted only
+# inside a skills-like section, or on a line that also names at least three unambiguous technologies.
+# Canonical names for the technologies that backend/evidence/question_surface.py can verify against a repository
+# (its TECH table) use exactly the same spelling, so Phase 4 can join skills to dependency evidence.
+#
+# --- languages
+Python|python3|py3
+JavaScript|js|ecmascript|es6
+TypeScript|ts
+Java
+Kotlin
+!Go|golang
+Rust
+C++|cpp
+C#|csharp|c sharp
+!C
+!R
+Ruby
+PHP
+!Swift
+Scala
+Perl
+Haskell
+Elixir
+Erlang
+Clojure
+!Dart
+!Julia
+MATLAB
+Lua
+Bash|shell scripting
+PowerShell
+SQL
+PL/SQL|plsql
+T-SQL|tsql
+Objective-C
+Assembly
+Solidity
+Groovy
+COBOL
+Fortran
+VBA
+HTML|html5
+CSS|css3
+SASS|scss
+# --- web frameworks and front end
+React|react.js|reactjs
+Next.js|nextjs|next js
+Vue|vue.js|vuejs
+Nuxt|nuxt.js
+Angular|angularjs
+Svelte
+SolidJS
+Remix
+Gatsby
+jQuery
+Redux
+MobX
+Webpack
+Vite
+Babel
+Tailwind|tailwindcss|tailwind css
+Bootstrap
+Material UI|mui
+Chakra UI
+Three.js|threejs
+D3.js|d3
+Electron
+Storybook
+WebAssembly|wasm
+Express|express.js|expressjs
+Node.js|nodejs|node js
+NestJS|nest.js
+Koa
+Fastify
+Deno
+Bun
+FastAPI
+Flask
+Django
+Django REST Framework|drf
+Spring Boot|springboot
+!Spring
+Hibernate
+Micronaut
+Quarkus
+ASP.NET|asp.net core
+.NET|dotnet|.net core
+Laravel
+Symfony
+Ruby on Rails|rails
+Sinatra
+Phoenix
+Gin
+Echo
+Fiber
+Actix
+Rocket
+Tornado
+Pyramid
+Streamlit
+Gradio
+Flutter
+React Native
+Ionic
+Xamarin
+SwiftUI
+Jetpack Compose
+Android SDK|android
+iOS
+# --- data stores
+PostgreSQL|postgres|psql
+MySQL
+MariaDB
+SQLite
+Microsoft SQL Server|sql server|mssql
+Oracle Database|oracle db
+MongoDB|mongo
+Redis
+Cassandra
+DynamoDB
+Elasticsearch|elastic search
+OpenSearch
+Neo4j
+CouchDB
+Firestore
+Firebase
+Supabase
+Snowflake
+BigQuery
+Redshift
+ClickHouse
+InfluxDB
+TimescaleDB
+Pinecone
+Weaviate
+Milvus
+Chroma
+FAISS
+pgvector
+Memcached
+etcd
+Prisma
+SQLAlchemy
+Sequelize
+TypeORM
+Mongoose
+Alembic
+Flyway
+Liquibase
+# --- messaging and streaming
+Kafka|apache kafka
+RabbitMQ
+Celery
+ActiveMQ
+NATS
+Pulsar
+Kinesis
+Flink
+Spark|apache spark|pyspark
+Hadoop
+Airflow|apache airflow
+dbt
+Beam
+Storm
+Luigi
+Prefect
+Dagster
+SQS
+SNS
+# --- cloud and infrastructure
+AWS|amazon web services
+Azure|microsoft azure
+GCP|google cloud|google cloud platform
+Docker
+Kubernetes|k8s
+Helm
+Terraform
+Ansible
+Puppet
+Chef
+Pulumi
+CloudFormation
+Vagrant
+Nginx
+Apache HTTP Server|httpd
+HAProxy
+Envoy
+Istio
+Linkerd
+Traefik
+Prometheus
+Grafana
+Datadog
+New Relic
+Splunk
+Kibana
+Logstash
+ELK|elk stack
+OpenTelemetry
+Jaeger
+Sentry
+PagerDuty
+Jenkins
+GitHub Actions
+GitLab CI
+CircleCI
+Travis CI
+ArgoCD|argo cd
+Spinnaker
+Bazel
+Maven
+Gradle
+npm
+Yarn
+pnpm
+pip
+Poetry
+Cargo
+Linux
+Ubuntu
+Debian
+RHEL
+Unix
+Windows Server
+Vercel
+Netlify
+Heroku
+DigitalOcean
+Cloudflare
+Lambda|aws lambda
+EC2
+S3
+ECS
+EKS
+RDS
+CloudFront
+Fargate
+Cloud Run
+GKE
+AKS
+Vault|hashicorp vault
+Consul
+Nomad
+Git
+GitHub
+GitLab
+Bitbucket
+Jira
+Confluence
+Postman
+Swagger|openapi
+# --- APIs and protocols
+GraphQL
+gRPC
+REST|restful|rest api
+WebSocket|websockets
+Socket.IO|socketio
+JWT|json web token
+OAuth|oauth2
+OIDC|openid connect
+SAML
+Protobuf|protocol buffers
+Thrift
+SOAP
+MQTT
+WebRTC
+TCP/IP
+HTTP/2
+TLS
+Stripe
+Twilio
+SendGrid
+Auth0
+Okta
+Keycloak
+Monaco|monaco editor
+# --- data science and ML
+TensorFlow
+PyTorch|torch
+Keras
+scikit-learn|sklearn|scikit learn
+pandas
+NumPy
+SciPy
+Matplotlib
+Seaborn
+Plotly
+XGBoost
+LightGBM
+CatBoost
+Hugging Face|huggingface
+Transformers
+spaCy
+NLTK
+OpenCV
+ONNX
+TensorRT
+CUDA
+JAX
+MLflow
+Kubeflow
+Weights & Biases|wandb
+LangChain
+LlamaIndex
+OpenAI
+Anthropic
+LLM|large language models
+RAG|retrieval augmented generation
+Stable Diffusion
+Jupyter
+Tableau
+Power BI|powerbi
+Looker
+Excel|microsoft excel
+Qlik
+Metabase
+Superset
+Pytest
+JUnit
+Jest
+Mocha
+Cypress
+Playwright
+Selenium
+Puppeteer
+Vitest
+TestNG
+Cucumber
+Locust
+JMeter
+k6
+Mockito
+# --- security, misc
+Burp Suite
+Wireshark
+Metasploit
+Nmap
+SonarQube
+Snyk
+Trivy
+OWASP
+Figma
+Sketch
+Photoshop
+Illustrator
+Blender
+Unity
+Unreal Engine|unreal
+OpenGL
+Vulkan
+DirectX
+ROS
+Arduino
+Raspberry Pi
+Verilog
+VHDL
+FPGA

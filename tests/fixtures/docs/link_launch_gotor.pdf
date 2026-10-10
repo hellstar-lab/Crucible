@@ -1,0 +1,128 @@
+%PDF-1.3
+%‚„œ”
+1 0 obj
+<<
+/PageMode /UseNone
+/Pages 2 0 R
+/Type /Catalog
+>>
+endobj
+2 0 obj
+<<
+/Count 1
+/Kids [ 3 0 R ]
+/Type /Pages
+>>
+endobj
+3 0 obj
+<<
+/Contents 4 0 R
+/MediaBox [ 0 0 612 792 ]
+/Parent 2 0 R
+/Resources <<
+/Font 5 0 R
+/ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>>
+/Rotate 0
+/Trans <<
+>>
+/Type /Page
+/Annots [ 8 0 R 9 0 R 10 0 R ]
+>>
+endobj
+4 0 obj
+<<
+/Filter [ /ASCII85Decode /FlateDecode ]
+/Length 325
+>>
+stream
+GasbTc#1BP&;9L7`>mV^Ing*B7o2LO`$&.Y![_%_e(B[s#KYX9"ff"/WN'7k@C5W?B,QkRZ#Q':=E;>q#*sl0^p5?jhdFDNT/mqaa!go7fbO%ASiZsS\6H=^66T=[&jd:EkE!Im<k=TcaPMR<_&n-r-e[_0#N$@=?nImUjKAT)j*Y^CGhW@G1$/9SN7iSB17#Ui4To$C:t<$Qf5P72Z6](&.Vo@bL1!'J_FpXE4:)c$jSgCqCjO3.9AfBrW&-!\$Vb&@..5$H8:)/1:>S20qR"D0/u$hi[E-u]Y'X=!:##=9@QR+AU*;7$lb4r\nc9KsIpN~>
+endstream
+endobj
+5 0 obj
+<<
+/F1 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Name /F1
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+7 0 obj
+<<
+/Author (Jane Doe \050synthetic\051)
+/CreationDate (D\07220000101000000\05300\04700\047)
+/Creator (anonymous)
+/Keywords ()
+/ModDate (D\07220000101000000\05300\04700\047)
+/Producer (ReportLab PDF Library \055 \050opensource\051)
+/Subject (unspecified)
+/Title (Fixture)
+/Trapped /False
+>>
+endobj
+8 0 obj
+<<
+/Type /Annot
+/Subtype /Link
+/Rect [ 71 647 250 661 ]
+/Border [ 0 0 0 ]
+/A <<
+/S /Launch
+/F (calc\056exe)
+>>
+>>
+endobj
+9 0 obj
+<<
+/Type /Annot
+/Subtype /Link
+/Rect [ 71 617 200 631 ]
+/Border [ 0 0 0 ]
+/A <<
+/S /GoToR
+/F (other\056pdf)
+/D [ 0 /Fit ]
+>>
+>>
+endobj
+10 0 obj
+<<
+/Type /Annot
+/Subtype /Link
+/Rect [ 71 587 140 601 ]
+/Border [ 0 0 0 ]
+/A <<
+/S /Launch
+/F (setup\056exe)
+>>
+>>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000015 00000 n 
+0000000083 00000 n 
+0000000142 00000 n 
+0000000362 00000 n 
+0000000778 00000 n 
+0000000809 00000 n 
+0000000916 00000 n 
+0000001221 00000 n 
+0000001350 00000 n 
+0000001493 00000 n 
+trailer
+<<
+/Size 11
+/Root 1 0 R
+/Info 7 0 R
+/ID [ <4352554349424c452d444f432d46495854555245> <4352554349424c452d444f432d46495854555245> ]
+>>
+startxref
+1624
+%%EOF

@@ -15,3 +15,11 @@ reportlab
 # evidence (Phase 3.5): line classification and Linguist data loading
 pygount==3.2.0  # BSD-3-Clause; pinned: counting.py uses its line classifier (_line_parts)
 PyYAML
+# document analyzer (Phase 2C) — permissive licences only; pinned to the versions the tests ran against
+pypdf==6.20.0  # BSD-3-Clause: annotations, actions, name trees, metadata (never pikepdf unless pypdf cannot open a file)
+ftfy==6.3.1  # Apache-2.0: mojibake repair, applied AFTER hidden-text detection
+dateparser==1.4.3  # BSD-3-Clause: month-name dates only; apostrophe/bare years are parsed by hand (see resume.py)
+rapidfuzz==3.14.6  # MIT: fuzzy skill matching
+phonenumbers==9.0.41  # Apache-2.0: contact block
+python-docx==1.2.0  # MIT: DOCX runs, styles, tables, properties
+pytesseract==0.3.13  # Apache-2.0: OPTIONAL, imported only with --ocr; also needs the local `tesseract` binary

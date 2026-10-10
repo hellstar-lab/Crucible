@@ -4,6 +4,13 @@ Code and data included in this repository that was written by others.
 Dependencies installed from PyPI (see `requirements.txt`) are not
 repeated here.
 
+## Technology lexicon (document analyzer)
+
+`backend/shield/data/tech_lexicon.txt` is a hand-written list of technology names and aliases (one entry per
+line, `|` separates aliases, a leading `!` marks a term that is also an ordinary word, such as "Go" or "Rust",
+and is only counted in a skills-like context). It is original to this repository, not copied from a third-party
+list, and is used by `backend/shield/resume.py` for exact and rapidfuzz matching.
+
 ## GitHub Linguist exclusion data
 
 | | |

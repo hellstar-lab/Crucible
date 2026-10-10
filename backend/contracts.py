@@ -24,6 +24,24 @@ from pydantic import BaseModel
 # --------------------------------------------------------------------------
 
 
+Severity = Literal["info", "low", "medium", "high"]
+
+
+class SecurityFinding(BaseModel):
+    """One finding from any document detector, PDF or DOCX (a single shape so
+    downstream code never branches on format). ``evidence`` holds structured
+    facts only; ``reconstructed_text`` is the hidden/mismatched text, capped at
+    2000 characters. A finding is a FACT with a severity, never a verdict.
+    Severity "medium" and "high" roll up to status "suspicious"; "low" and
+    "info" are reported but do not change the status."""
+
+    detector: str
+    severity: Severity
+    page: Optional[int] = None  # 1-based; None for document-level findings
+    evidence: dict = {}
+    reconstructed_text: Optional[str] = None
+
+
 class HiddenFragment(BaseModel):
     """A run of text a machine can read but a human cannot see.
 
@@ -51,10 +69,14 @@ class ShieldSection(BaseModel):
     fragments (with their recovered text and detector reasons) are returned
     for human review; no severity judgement is made."""
 
-    status: Literal["clean", "hidden_text_found"]
+    status: Literal["clean", "suspicious", "hidden_text_found"]
     hidden_fragments: list[HiddenFragment]
     page_stats: dict
     degraded: bool = False  # experiment only (see HiddenFragment); always False when shipping
+    # Phase 2C (additive): box-aware geometry findings and fail-toward-suspicion bookkeeping
+    findings: list[SecurityFinding] = []
+    needs_review: bool = False  # a detector errored or the document was truncated: never "clean"
+    truncated: bool = False
 
 
 class Claim(BaseModel):
@@ -457,3 +479,176 @@ class AnalysisReport(BaseModel):
     stopped_reason: Optional[str] = None
     elapsed_s: float = 0.0
     exclusion_ruleset_version: str
+
+
+
+# --------------------------------------------------------------------------
+# Phase 2C: document analyzer (Shield -> structured evidence, zero model calls)
+#
+# Every unmeasured field is None. Not 0.0, not False, not "": None means
+# "not measured", and a page that needs OCR has every text-derived field None.
+# --------------------------------------------------------------------------
+
+
+class DocumentInfo(BaseModel):
+    path: str  # file name only
+    format: Literal["pdf", "docx"]
+    pages: Optional[int] = None  # pages analysed
+    pages_total: Optional[int] = None  # pages in the file (differs from ``pages`` when truncated)
+    encrypted: bool = False
+    per_page_kind: Optional[list[str]] = None  # text_pdf | image_only | slide_deck | sparse | blank, per page
+    per_page_stats: Optional[list[dict]] = None  # {page, chars, images, width, height, body_size}
+    has_form: Optional[bool] = None  # AcroForm with fields
+    resume_confidence: Optional[float] = None
+    truncated: bool = False  # a cap (pages, bytes, seconds) was hit: the result is partial
+    truncation_reasons: list[str] = []
+
+
+class Provenance(BaseModel):
+    producer: Optional[str] = None
+    creator: Optional[str] = None
+    author: Optional[str] = None
+    created: Optional[str] = None  # ISO 8601; None when the date string cannot be parsed
+    modified: Optional[str] = None
+    mod_minus_create_days: Optional[float] = None
+    date_order_invalid: Optional[bool] = None  # ModDate earlier than CreationDate (impossible)
+    xmp_created: Optional[str] = None
+    xmp_modified: Optional[str] = None
+    # DOCX only
+    last_modified_by: Optional[str] = None
+    revision: Optional[int] = None
+    total_editing_minutes: Optional[int] = None
+    creator_differs_from_last_modified_by: Optional[bool] = None
+
+
+class Heading(BaseModel):
+    text: str
+    level: int  # 1 = largest
+    page: int
+    size: Optional[float] = None
+    method: Literal["size", "bold", "numbering", "style"]
+
+
+class Section(BaseModel):
+    heading: Optional[str] = None  # None for text before the first heading
+    level: Optional[int] = None
+    page_start: int
+    page_end: int
+    char_start: int  # offsets into the cleaned full text
+    char_end: int
+    text: str
+
+
+class Table(BaseModel):
+    page: int
+    caption: Optional[str] = None
+    strategy: Literal["lines", "text_region", "docx"]
+    n_rows: int
+    n_cols: int
+    rows: list[list[str]]
+
+
+class LinkRef(BaseModel):
+    url: str
+    host: Optional[str] = None
+    kind: str  # github | gitlab | linkedin | kaggle | huggingface | devpost | email | other
+    sources: list[str]  # "annotation" and/or "text"
+    page: Optional[int] = None
+    display_text: Optional[str] = None
+    mismatch: bool = False
+    github_account: Optional[str] = None
+    github_target: Optional[str] = None  # "owner/repo": consumable by the Phase 3.6 resolver
+
+
+class NumericClaim(BaseModel):
+    value: str
+    unit: str
+    match: str
+    context_before: str  # verbatim, up to 60 characters
+    context_after: str
+    section: Optional[str] = None
+    page: Optional[int] = None
+
+
+class ReferencesBlock(BaseModel):
+    section_found: bool
+    entries: list[str]
+    dois: list[str]
+    arxiv_ids: list[str]
+
+
+class StructureBlock(BaseModel):
+    headings: list[Heading]
+    sections: list[Section]
+    tables: Optional[list[Table]] = None  # None when no page could be measured for tables
+    links: list[LinkRef]
+    numeric_claims: list[NumericClaim]
+    references: ReferencesBlock
+    body_size: Optional[float] = None
+    notes: list[str] = []
+
+
+class ContactBlock(BaseModel):
+    emails: list[str]
+    phones: list[str]
+    urls: list[str]
+
+
+class TimelineEntry(BaseModel):
+    raw: str
+    start: Optional[str] = None  # ISO date, earliest it could mean; None when unparseable (never invented)
+    end: Optional[str] = None  # ISO date, latest it could mean
+    start_precision: Optional[str] = None  # day | month | year | season
+    end_precision: Optional[str] = None
+    is_current: bool = False
+    section: Optional[str] = None
+    context: str = ""  # the line the range came from
+    confidence: float
+
+
+class Contradiction(BaseModel):
+    kind: Literal["overlapping_full_time_roles", "end_before_start", "credential_before_education",
+                  "multiple_present_roles", "experience_exceeds_span"]
+    detail: str
+    cites: list[str]  # the raw strings the contradiction comes from
+
+
+class SkillMention(BaseModel):
+    skill: str  # canonical name from the lexicon
+    matched: str  # text as written in the document
+    exact: bool
+    score: float
+    section: Optional[str] = None
+
+
+class ResumeBlock(BaseModel):
+    contact_block: ContactBlock
+    timeline: list[TimelineEntry]
+    timeline_contradictions: list[Contradiction]
+    skills_mentioned: list[SkillMention]
+
+
+class ExtractionQuality(BaseModel):
+    chars_total: Optional[int] = None  # None when every page needs OCR
+    chars_unmapped_ratio: Optional[float] = None  # > 0.3: downstream text is unreliable
+    mojibake_fixed: Optional[bool] = None
+    ocr_required_pages: list[int] = []
+    pages_with_no_text: list[int] = []
+
+
+class DocumentReport(BaseModel):
+    """Everything the analyzer found in one document. ``status`` is a roll-up of
+    the findings, never a verdict: clean | suspicious | hidden_text_found."""
+
+    document: DocumentInfo
+    status: Literal["clean", "suspicious", "hidden_text_found"]
+    needs_review: bool = False  # a detector errored or the work was truncated: never reported as clean
+    detector_errors: list[dict] = []
+    security_findings: list[SecurityFinding] = []
+    hidden_fragments: list[HiddenFragment] = []
+    provenance: Optional[Provenance] = None
+    font_inventory: Optional[list[dict]] = None  # PDF only: per page, fonts used / subset prefix / embedded
+    structure: Optional[StructureBlock] = None
+    resume: Optional[ResumeBlock] = None
+    extraction_quality: ExtractionQuality
+    warnings: list[str] = []

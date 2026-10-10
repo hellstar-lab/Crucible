@@ -4,19 +4,29 @@ Decides, for every character, whether a human could actually see it. Text a
 machine can read but a human cannot is "hidden"; later stages consume only
 ``visible_text``.
 
-Fully deterministic and offline: no network, no models. The result is two
-states: ``clean``, or ``hidden_text_found`` with every fragment's recovered
-text and the detector reasons that fired, for a human to judge. An LLM
-severity classifier was evaluated and removed from this path; see
-docs/classifier-experiment.md.
+Fully deterministic and offline: no network, no models. The status is a
+roll-up of findings, never a verdict:
 
-Public entry point: ``scan_pdf(path) -> ShieldResult``.
+  clean              nothing found
+  suspicious         a finding of severity medium/high that is not hidden text
+                     (e.g. text outside the page boxes, a mismatched link), or the
+                     scan was partial / a detector errored (fail toward suspicion)
+  hidden_text_found  hidden text found; each fragment's recovered text and the
+                     detector reasons that fired are returned for a human to judge
+
+An LLM severity classifier was evaluated and removed from this path; see
+docs/classifier-experiment.md. Full document analysis (links, attachments,
+structure, resume layer, DOCX) lives in ``backend.shield.analyze``.
+
+Public entry points: ``scan_pdf(path) -> ShieldResult`` and, for the analyzer,
+``scan_pdf_detailed(path)`` which also keeps per-page character data.
 """
 
 from __future__ import annotations
 
 import logging
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -24,19 +34,23 @@ from typing import Literal
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 
-from backend.contracts import HiddenFragment, ShieldSection
+from backend.contracts import HiddenFragment, SecurityFinding, ShieldSection
 
 from . import config, detectors
 from .errors import ShieldCorruptError, ShieldEncryptedError, ShieldError
-from .extract import CharInfo, PlumberLayer, extract_page_chars
+from .extract import CharInfo, PlumberLayer, count_page_objects, extract_page_chars
+from .geometry import Box, PageBoxes, detect_offpage, page_boxes
 from .metadata_scan import scan_metadata
 from .unicode_scan import UnicodeFinding, has_hidden_unicode, scan_text, strip_hidden_unicode
 from .visibility import measure_page, not_drawn
 
 __all__ = [
     "scan_pdf",
+    "scan_pdf_detailed",
     "ShieldResult",
+    "PageData",
     "status_for",
+    "rollup_status",
     "PageStats",
     "ShieldError",
     "ShieldEncryptedError",
@@ -44,8 +58,10 @@ __all__ = [
 ]
 
 log = logging.getLogger(__name__)
+# pdfminer (inside pdfplumber) logs raw content-stream tokens at DEBUG, i.e. the document's text. Keep it out of any log.
+logging.getLogger("pdfminer").setLevel(logging.WARNING)
 
-Status = Literal["clean", "hidden_text_found"]
+Status = Literal["clean", "suspicious", "hidden_text_found"]
 _RENDER_REASONS = {"not_drawn", "low_contrast"}
 _PDFIUM_ERR_PASSWORD = 4
 
@@ -64,11 +80,34 @@ class PageStats:
 
 
 @dataclass
+class PageData:
+    """Per-page material kept for the document analyzer (not part of the contract)."""
+
+    page: int
+    width: float  # effective page size in points (CropBox ∩ MediaBox, after /Rotate)
+    height: float
+    boxes: PageBoxes
+    rotation: int
+    chars: list[CharInfo]  # every char, in content-stream order
+    hidden: frozenset[int]  # CharInfo.index values judged hidden by the Phase 2A detectors
+    unmapped: int  # chars pdfium could not map to Unicode
+    images: int = 0  # image objects painted on the page
+    paths: int = 0  # path objects (rules, rectangles) painted on the page
+
+
+@dataclass
 class ShieldResult:
     visible_text: str
     hidden_fragments: list[HiddenFragment]
     status: Status
     page_stats: dict[int, PageStats] = field(default_factory=dict)
+    findings: list[SecurityFinding] = field(default_factory=list)  # geometry detectors (Phase 2C)
+    needs_review: bool = False  # a detector errored or the scan was partial: never "clean"
+    detector_errors: list[dict] = field(default_factory=list)
+    truncated: bool = False
+    truncation_reasons: list[str] = field(default_factory=list)
+    pages_total: int = 0
+    pages: list[PageData] = field(default_factory=list)  # only from scan_pdf_detailed
 
     def to_contract(self) -> ShieldSection:
         """The ``shield`` section of the Claims contract."""
@@ -76,6 +115,9 @@ class ShieldResult:
             status=self.status,
             hidden_fragments=self.hidden_fragments,
             page_stats={p: asdict(s) for p, s in self.page_stats.items()},
+            findings=self.findings,
+            needs_review=self.needs_review,
+            truncated=self.truncated,
         )
 
 
@@ -173,6 +215,16 @@ def _group_hidden(chars: list[CharInfo], hidden: dict[int, list[str]]) -> list[H
 # --------------------------------------------------------------------------
 
 
+def rollup_status(fragments: list[HiddenFragment], findings: list[SecurityFinding], needs_review: bool = False) -> Status:
+    """hidden_text_found if any hidden fragment; else suspicious if any finding of
+    severity medium/high or the result needs review; else clean."""
+    if fragments:
+        return "hidden_text_found"
+    if needs_review or any(f.severity in ("medium", "high") for f in findings):
+        return "suspicious"
+    return "clean"
+
+
 def status_for(fragments: list[HiddenFragment]) -> Status:
     """Two states, decided only by deterministic detection: any hidden
     fragment -> hidden_text_found, otherwise clean. Severity is left to the
@@ -231,15 +283,27 @@ def _unicode_fragments(
 
 
 def _scan_page(
-    pdf: pdfium.PdfDocument, page_index: int, plumber: PlumberLayer
-) -> tuple[list[HiddenFragment], str, PageStats]:
+    pdf: pdfium.PdfDocument, page_index: int, plumber: PlumberLayer, with_fonts: bool = False, keep: bool = False,
+    errors: list[dict] | None = None,
+) -> tuple[list[HiddenFragment], str, PageStats, list[SecurityFinding], PageData | None]:
     page = pdf[page_index]
     textpage = page.get_textpage()
+    errors = errors if errors is not None else []
     try:
         page_no = page_index + 1
-        chars = extract_page_chars(textpage, page_no)
-        measure = measure_page(page, chars)
-        page_box = tuple(page.get_cropbox())
+        chars = extract_page_chars(textpage, page_no, with_fonts)
+        try:
+            measure = measure_page(page, chars)
+        except Exception as exc:  # noqa: BLE001 - fail toward suspicion, never crash the scan
+            log.warning("render-diff failed on page %d: %s", page_no, exc)
+            errors.append({"detector": "render_diff", "page": page_no, "error": f"{type(exc).__name__}: {exc}"[:200]})
+            from .visibility import PageMeasure
+
+            measure = PageMeasure({}, 0.0)
+        # The visible region is CropBox ∩ MediaBox. pdfium's get_cropbox() is the RAW declared
+        # box, so an oversize CropBox used to make off-page text look on-page.
+        pb = page_boxes(page.get_mediabox(), page.get_cropbox())
+        page_box = pb.effective
 
         hidden: dict[int, list[str]] = {}
         for pos, c in enumerate(chars):
@@ -250,6 +314,11 @@ def _scan_page(
                 hidden[c.index] = reasons
 
         fragments = _group_hidden(chars, hidden) + _unicode_fragments(chars, plumber, page_index)
+        findings: list[SecurityFinding] = []
+        try:
+            findings = detect_offpage(page_no, chars, pb)
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"detector": "offpage_text", "page": page_no, "error": f"{type(exc).__name__}: {exc}"[:200]})
 
         visible = "".join(c.text for c in chars if c.index not in hidden)
         visible = strip_hidden_unicode(visible).replace("\r\n", "\n")
@@ -262,30 +331,52 @@ def _scan_page(
             fragments=len(fragments),
             render_ms=round(measure.render_ms, 1),
         )
-        return fragments, visible, stats
+        data = None
+        if keep:
+            w, h = page.get_size()
+            images, paths = count_page_objects(page)
+            data = PageData(page_no, float(w), float(h), pb, int(page.get_rotation()), chars, frozenset(hidden),
+                            sum(1 for c in chars if c.unmapped), images, paths)
+        return fragments, visible, stats, findings, data
     finally:
         textpage.close()
         page.close()
 
 
-def _scan(path: Path) -> ShieldResult:
+def _scan(path: Path, keep: bool = False, with_fonts: bool = False, max_seconds: float | None = None) -> ShieldResult:
+    size_mb = path.stat().st_size / 1_048_576 if path.is_file() else 0
+    if size_mb > config.MAX_FILE_MB:  # hostile-size input: examine nothing, and say so
+        reason = f"file is {size_mb:.0f} MB, over the {config.MAX_FILE_MB} MB cap; no page was examined"
+        return ShieldResult("", [], "suspicious", needs_review=True, truncated=True, truncation_reasons=[reason])
+    deadline = time.monotonic() + (max_seconds if max_seconds is not None else config.MAX_SECONDS)
     pdf = _open(path)
     plumber = PlumberLayer(path)
     try:
         n_pages = len(pdf)
         if n_pages == 0:
             raise ShieldCorruptError(f"{path.name} has no pages")
+        reasons: list[str] = []
+        limit = min(n_pages, config.MAX_PAGES)
         if n_pages > config.MAX_PAGES:
-            raise ShieldError(f"{path.name} has {n_pages} pages; limit is {config.MAX_PAGES}")
+            reasons.append(f"{n_pages} pages, analysed the first {config.MAX_PAGES} (cap)")
 
         fragments: list[HiddenFragment] = []
+        findings: list[SecurityFinding] = []
+        errors: list[dict] = []
         texts: list[str] = []
         stats: dict[int, PageStats] = {}
-        for i in range(n_pages):
-            page_frags, page_text, page_stats = _scan_page(pdf, i, plumber)
+        pages: list[PageData] = []
+        for i in range(limit):
+            if time.monotonic() > deadline:
+                reasons.append(f"time budget of {max_seconds or config.MAX_SECONDS:.0f}s reached after {i} of {limit} pages")
+                break
+            page_frags, page_text, page_stats, page_findings, data = _scan_page(pdf, i, plumber, with_fonts, keep, errors)
             fragments.extend(page_frags)
+            findings.extend(page_findings)
             texts.append(page_text)
             stats[page_stats.page] = page_stats
+            if data is not None:
+                pages.append(data)
 
         for m in scan_metadata(pdf, path):
             fragments.append(
@@ -301,31 +392,51 @@ def _scan(path: Path) -> ShieldResult:
         plumber.close()
         pdf.close()
 
+    needs_review = bool(errors) or bool(reasons)  # a partial or errored scan is never "clean"
     return ShieldResult(
         visible_text="\n\n".join(texts),
         hidden_fragments=fragments,
-        status=status_for(fragments),
+        status=rollup_status(fragments, findings, needs_review),
         page_stats=stats,
+        findings=findings,
+        needs_review=needs_review,
+        detector_errors=errors,
+        truncated=bool(reasons),
+        truncation_reasons=reasons,
+        pages_total=n_pages,
+        pages=pages,
     )
 
 
-def scan_pdf(path: str | Path) -> ShieldResult:
-    """Scan a resume PDF for hidden text. Deterministic and offline.
-
-    Raises ShieldEncryptedError / ShieldCorruptError for unreadable input and
-    ShieldError for anything else that goes wrong — never a raw crash.
-    """
+def _guarded(path: Path, **kw) -> ShieldResult:
     path = Path(path)
     with _PDFIUM_LOCK:
         try:
-            result = _scan(path)
+            result = _scan(path, **kw)
         except ShieldError:
             raise
         except Exception as exc:  # noqa: BLE001 - convert any parser failure into a ShieldError
             log.exception("shield scan failed for %s", path.name)
             raise ShieldError(f"failed to scan {path.name}: {exc}") from exc
     log.info(
-        "shield scan %s: status=%s pages=%d fragments=%d",
-        path.name, result.status, len(result.page_stats), len(result.hidden_fragments),
+        "shield scan %s: status=%s pages=%d fragments=%d findings=%d truncated=%s",
+        path.name, result.status, len(result.page_stats), len(result.hidden_fragments), len(result.findings),
+        result.truncated,
     )
     return result
+
+
+def scan_pdf_detailed(path: str | Path, *, with_fonts: bool = True, max_seconds: float | None = None) -> ShieldResult:
+    """Like ``scan_pdf`` but keeps per-page character data (``result.pages``) for the analyzer."""
+    return _guarded(Path(path), keep=True, with_fonts=with_fonts, max_seconds=max_seconds)
+
+
+def scan_pdf(path: str | Path) -> ShieldResult:
+    """Scan a resume PDF for hidden text. Deterministic and offline.
+
+    Raises ShieldEncryptedError / ShieldCorruptError for unreadable input and
+    ShieldError for anything else that goes wrong — never a raw crash. Over a cap
+    (pages, bytes, seconds) the result is partial with ``truncated=True`` and
+    ``needs_review=True``, never a silent half-answer.
+    """
+    return _guarded(Path(path))
