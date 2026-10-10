@@ -468,11 +468,14 @@ def test_unknown_user_raises_not_found():
 
 
 def test_evidence_package_never_imports_the_model_router():
+    import re
+
+    # Real import statements only: the technology lexicon may legitimately *name* OpenAI.
+    forbidden = re.compile(r"^\s*(?:from\s+(?:backend\.llm|backend\s+import\s+llm|openai)\b|"
+                           r"import\s+(?:openai|backend\.llm)\b)", re.M)
     pkg = Path(__file__).resolve().parent.parent / "backend" / "evidence"
     for src in pkg.glob("*.py"):
-        text = src.read_text()
-        for forbidden in ("backend.llm", "from backend import llm", "import llm", "openai"):
-            assert forbidden not in text, f"{src.name} references {forbidden}"
+        assert not forbidden.search(src.read_text()), f"{src.name} imports the model router or a model SDK"
 
 
 # --------------------------------------------------------------------------

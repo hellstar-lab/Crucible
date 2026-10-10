@@ -15,6 +15,14 @@ class GitHubAuthError(GitHubError):
     """GITHUB_TOKEN was rejected (401): expired, revoked or mistyped."""
 
 
+class GitHubForbidden(GitHubError):
+    """403 (not rate limiting) or 451: the repository exists but access is denied."""
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
+
 class GitHubNotFound(GitHubError):
     """The user or repository does not exist (or is no longer public)."""
 

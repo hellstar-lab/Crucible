@@ -32,3 +32,6 @@ tests/fixtures/git_repos/
 
 # Phase 3.5 exclusion fixture: these vendored files must be committed
 !tests/fixtures/exclusion_repo/node_modules/
+
+# analysis cache (Phase 3.6)
+.cache/

@@ -58,10 +58,12 @@ def clustered(author_times: list[int], committer_times: list[int]) -> tuple[bool
     return (c_span / a_span) < config.CLUSTER_SPAN_FRACTION, None
 
 
-def commit_facts(repo: Path, is_source) -> CommitFacts:
+def commit_facts(repo: Path, is_source, pathspec: str | None = None) -> CommitFacts:
     """Facts from ``git log`` on HEAD. ``is_source(path)`` limits the
-    largest-commit measurement to files that count toward authorship."""
-    log_out = run_git(["log", "--format=%at %ct %aE %aN"], cwd=repo, timeout=120).decode("utf-8", "replace")
+    largest-commit measurement to files that count toward authorship;
+    ``pathspec`` restricts history to a scoped subdirectory."""
+    scope = ["--", pathspec] if pathspec else []
+    log_out = run_git(["log", "--format=%at %ct %aE %aN", *scope], cwd=repo, timeout=120).decode("utf-8", "replace")
     a_times, c_times = [], []
     commits_by_author: Counter = Counter()
     names: dict[str, Counter] = {}
@@ -76,7 +78,7 @@ def commit_facts(repo: Path, is_source) -> CommitFacts:
         names.setdefault(email, Counter())[parts[3].strip() if len(parts) > 3 else ""] += 1
     authors = set(commits_by_author)
 
-    numstat = run_git(["log", "--no-renames", "--numstat", "-z", "--format=%x01%H"], cwd=repo, timeout=120)
+    numstat = run_git(["log", "--no-renames", "--numstat", "-z", "--format=%x01%H", *scope], cwd=repo, timeout=120)
     largest = current = 0
     for chunk in numstat.split(b"\x00"):
         for record in chunk.split(b"\n"):

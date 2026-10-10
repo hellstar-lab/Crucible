@@ -34,6 +34,7 @@ class BlameLine:
     author_email: str
     committer_email: str
     blank: bool
+    sha: str = ""  # commit that last touched the line
 
 
 @dataclass
@@ -91,11 +92,11 @@ def parse_line_porcelain(out: bytes) -> list[BlameLine]:
     """Parse ``git blame --line-porcelain`` output into one record per line."""
     lines: list[BlameLine] = []
     number = 0
-    author = committer = ""
+    author = committer = sha = ""
     for raw in out.split(b"\n"):
         if raw.startswith(b"\t"):
             text = raw[1:].decode("utf-8", errors="replace")
-            lines.append(BlameLine(number, author, committer, not text.strip()))
+            lines.append(BlameLine(number, author, committer, not text.strip(), sha))
             continue
         if raw.startswith(b"author-mail "):
             author = raw[12:].decode("utf-8", errors="replace").strip().strip("<>").lower()
@@ -105,6 +106,7 @@ def parse_line_porcelain(out: bytes) -> list[BlameLine]:
             head = raw.split(b" ")
             if len(head) >= 3 and len(head[0]) in (40, 64) and all(c in b"0123456789abcdef" for c in head[0]):
                 number = int(head[2])
+                sha = head[0].decode()
     return lines
 
 

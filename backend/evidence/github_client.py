@@ -16,7 +16,7 @@ from typing import Any, Iterator
 import httpx
 
 from . import config
-from .errors import GitHubAuthError, GitHubError, GitHubNetworkError, GitHubNotFound, GitHubRateLimited
+from .errors import GitHubAuthError, GitHubError, GitHubForbidden, GitHubNetworkError, GitHubNotFound, GitHubRateLimited
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +60,8 @@ class GitHubClient:
             self.rate_limit_remaining = int(resp.headers["x-ratelimit-remaining"])
         if "x-ratelimit-reset" in resp.headers:
             self.rate_limit_reset = int(resp.headers["x-ratelimit-reset"])
+        log.info("GitHub %s %s -> %d; X-RateLimit-Remaining=%s", resp.request.method, resp.request.url.path,
+                 resp.status_code, self.rate_limit_remaining)
 
         if resp.status_code == 401:
             raise GitHubAuthError("GITHUB_TOKEN was rejected by GitHub (401); it is expired, revoked or "
@@ -74,8 +76,11 @@ class GitHubClient:
                 reset = int(time.time()) + int(resp.headers["retry-after"])
             raise GitHubRateLimited("GitHub API rate limit exhausted", reset_at=reset,
                                     remaining=self.rate_limit_remaining)
+        if resp.status_code in (403, 451):
+            raise GitHubForbidden(f"access denied ({resp.status_code}) for {resp.request.url.path}: "
+                                  f"{_message(resp)}", resp.status_code)
         if resp.status_code >= 400 and resp.status_code != 409:
-            raise GitHubError(f"GitHub API {resp.status_code} for {resp.request.url.path}")
+            raise GitHubError(f"GitHub API {resp.status_code} for {resp.request.url.path}: {_message(resp)}")
         return resp
 
     def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
@@ -106,8 +111,75 @@ class GitHubClient:
         return self._get(f"/repos/{owner}/{repo}")
 
     def list_commits(self, owner: str, repo: str, author: str | None = None,
-                     max_pages: int = config.COMMITS_API_MAX_PAGES) -> list[dict]:
-        """Commits on the default branch. ``author`` filters to commits GitHub
-        has linked to that login."""
-        params = {"author": author} if author else None
+                     max_pages: int = config.COMMITS_API_MAX_PAGES, sha: str | None = None) -> list[dict]:
+        """Commits on the default branch (or ``sha``). ``author`` filters to
+        commits GitHub has linked to that login (or matching that email)."""
+        params = {k: v for k, v in (("author", author), ("sha", sha)) if v} or None
         return list(self._paginate(f"/repos/{owner}/{repo}/commits", params, max_pages=max_pages))
+
+    def get_repo_meta(self, owner: str, repo: str) -> tuple[dict, str | None]:
+        """Repository metadata, following 301 Moved Permanently (renames and
+        transfers). Returns (metadata, redirected_from or None)."""
+        resp = self._request(f"/repos/{owner}/{repo}")
+        redirected_from = None
+        hops = 0
+        while resp.status_code in (301, 302, 307, 308) and hops < 3:
+            location = resp.headers.get("location") or (resp.json() or {}).get("url")
+            if not location:
+                raise GitHubError(f"redirect without a location for {owner}/{repo}")
+            redirected_from = f"{owner}/{repo}"
+            resp = self._request(location)
+            hops += 1
+        meta = resp.json()
+        if redirected_from and meta.get("full_name", "").lower() == redirected_from.lower():
+            redirected_from = None  # case-only difference, not a rename
+        return meta, redirected_from
+
+    def list_branches(self, owner: str, repo: str, max_pages: int = 10) -> list[str]:
+        return [b["name"] for b in self._paginate(f"/repos/{owner}/{repo}/branches", max_pages=max_pages)]
+
+    def compare(self, owner: str, repo: str, base: str, head: str, max_pages: int = 10) -> dict:
+        """Paginated compare. ``files`` appears only on the first page; commits
+        are collected across pages. Adds ``commits_complete`` and
+        ``files_truncated`` so callers never mistake a capped list for a full one."""
+        url = f"/repos/{owner}/{repo}/compare/{base}...{head}"
+        first = self._request(url, {"per_page": 100, "page": 1}).json()
+        commits = list(first.get("commits") or [])
+        total = first.get("total_commits") or 0
+        page = 1
+        while len(commits) < total and page < max_pages:
+            page += 1
+            more = self._request(url, {"per_page": 100, "page": page}).json().get("commits") or []
+            if not more:
+                break
+            commits.extend(more)
+        first["commits"] = commits
+        first["commits_complete"] = len(commits) >= total
+        first["files_truncated"] = len(first.get("files") or []) >= config.COMPARE_FILES_CAP
+        return first
+
+    def get_commit(self, owner: str, repo: str, sha: str) -> dict:
+        return self._get(f"/repos/{owner}/{repo}/commits/{sha}")
+
+    def get_tree(self, owner: str, repo: str, ref: str) -> dict:
+        return self._get(f"/repos/{owner}/{repo}/git/trees/{ref}", {"recursive": "1"})
+
+    def get_raw(self, owner: str, repo: str, path: str, ref: str | None = None) -> str:
+        """A file's raw text via the contents API (used only in degraded mode)."""
+        resp = self._http.get(f"/repos/{owner}/{repo}/contents/{path}", params={"ref": ref} if ref else None,
+                              headers={"Accept": "application/vnd.github.raw+json"})
+        self.calls_made += 1
+        if "x-ratelimit-remaining" in resp.headers:
+            self.rate_limit_remaining = int(resp.headers["x-ratelimit-remaining"])
+        if resp.status_code == 404:
+            raise GitHubNotFound(f"not found: {path}")
+        if resp.status_code >= 400:
+            raise GitHubError(f"GitHub API {resp.status_code} for contents/{path}")
+        return resp.text
+
+
+def _message(resp: httpx.Response) -> str:
+    try:
+        return str((resp.json() or {}).get("message", ""))[:200]
+    except ValueError:
+        return ""

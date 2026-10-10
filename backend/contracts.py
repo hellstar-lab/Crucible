@@ -231,3 +231,229 @@ class FinalReport(BaseModel):
     red_flags: list[str]
     bias_self_check: dict
     cost: dict
+
+
+# --------------------------------------------------------------------------
+# Phase 3.6: target-repository mode (two layers + question surface)
+# --------------------------------------------------------------------------
+
+TargetStatus = Literal[
+    "resolved", "not_found", "access_denied", "empty_repo", "archived_ok", "too_large", "clone_failed",
+    "timeout", "invalid_input", "rate_limited", "duplicate",
+]
+
+
+class HistoryFacts(BaseModel):
+    commit_count: int
+    distinct_author_count: int  # canonical (mailmapped) author emails
+    first_commit: Optional[str] = None  # ISO 8601, author date
+    last_commit: Optional[str] = None
+    span_days: float
+    single_commit_import: Optional[bool] = None
+    committed_in_one_session: bool  # every commit's author date within one hour
+    committer_dates_clustered: Optional[bool] = None
+
+
+class Structure(BaseModel):
+    top_level_dirs: list[str] = []
+    entry_points: list[str] = []
+    test_dirs: list[str] = []
+    test_files: list[str] = []
+    ci_files: list[str] = []
+    container_files: list[str] = []
+    migration_dirs: list[str] = []
+    config_files: list[str] = []
+
+
+class Dependency(BaseModel):
+    manifest_path: str
+    ecosystem: str
+    name: str
+    version_spec: Optional[str] = None
+    is_direct: bool = True
+
+
+class Manifest(BaseModel):
+    manifest_path: str
+    ecosystem: str
+    dependency_count: int = 0
+    parse_error: Optional[str] = None  # an unparseable manifest is recorded, never dropped
+
+
+class ReadmeClaim(BaseModel):
+    text: str
+    kind: Literal["sentence", "bullet"]
+    line: int
+
+
+class RepoFacts(BaseModel):
+    """Facts computed WITHOUT any identity. Present whenever status is
+    resolved / archived_ok (clone-based), and partially (API-only fields)
+    for too_large repos analysed in degraded mode."""
+
+    full_name: str
+    redirected_from: Optional[str] = None
+    default_branch: Optional[str] = None
+    ref_analyzed: Optional[str] = None
+    head_sha: Optional[str] = None
+    ref_requested: Optional[str] = None  # None = the default branch was requested
+    scoped_path: Optional[str] = None
+    visibility: Optional[str] = None
+    archived: Optional[bool] = None
+    size_kb: Optional[int] = None  # KiB of the packed git repository (GitHub API "size")
+    created_at: Optional[str] = None
+    pushed_at: Optional[str] = None
+    is_fork: Optional[bool] = None
+    parent_full_name: Optional[str] = None
+    source_full_name: Optional[str] = None
+    fork_ahead_by: Optional[int] = None
+    fork_behind_by: Optional[int] = None
+    fork_total_commits: Optional[int] = None
+    files_truncated: Optional[bool] = None
+    history: Optional[HistoryFacts] = None
+    languages: Optional[dict[str, int]] = None  # language -> source lines, post-exclusion (pygount)
+    source_files: Optional[int] = None
+    total_source_lines: Optional[int] = None
+    excluded_files_by_reason: dict[str, int] = {}
+    excluded_lines_by_reason: dict[str, int] = {}
+    top_excluded_files: list[ExcludedFile] = []
+    structure: Optional[Structure] = None
+    dependencies: list[Dependency] = []
+    manifests: list[Manifest] = []
+    readme_path: Optional[str] = None
+    readme_claims: list[ReadmeClaim] = []
+
+
+class HotFile(BaseModel):
+    path: str
+    authored_lines: int
+    total_lines: int  # source lines in the file
+    ratio: float
+
+
+class CommitInfo(BaseModel):
+    sha: str
+    authored_date: str
+    message_head: str  # first line, at most 100 characters
+    files_changed: Optional[int] = None
+    insertions: Optional[int] = None
+    deletions: Optional[int] = None
+
+
+class Authorship(BaseModel):
+    """Identity-dependent attribution.
+
+    RENDERING RULE (binding for every consumer): when
+    ``authored_ratio_meaningful`` is False, a percentage must never be shown
+    on its own. Render ``authorship_confidence_reason`` alongside it, because
+    blame attributes every line to the committer by construction when there
+    is no history to compare against.
+    """
+
+    mode: Literal["blame", "api_commits_only"]
+    identity_used: dict[str, list[str]]  # {"emails": [...], "logins": [...]}
+    authored_source_lines: Optional[int] = None
+    total_source_lines: Optional[int] = None
+    authored_ratio: Optional[float] = None
+    authored_ratio_whole_repo: Optional[float] = None  # forks only; MISLEADING on a fork: includes upstream code
+    authored_ratio_fork_delta: Optional[float] = None  # forks only; lines from commits ahead of the parent
+    fork_delta_source_lines: Optional[int] = None
+    fork_delta_reason: Optional[str] = None
+    authored_ratio_meaningful: bool
+    authorship_confidence: Literal["none", "low", "medium", "high"]
+    authorship_confidence_reason: str
+    unmatched_authors: list[UnmatchedAuthor] = []
+    likely_identity_gap: Optional[bool] = None
+    hot_files: list[HotFile] = []
+    commits: list[CommitInfo] = []
+    # api_commits_only (degraded) mode
+    commit_count: Optional[int] = None
+    first_commit: Optional[str] = None
+    last_commit: Optional[str] = None
+    files_touched: list[str] = []
+    files_touched_truncated: Optional[bool] = None
+    commit_message_heads: list[str] = []
+
+
+class Anchor(BaseModel):
+    kind: Literal["authored_function", "hot_file", "entry_point", "unverified_authorship"]
+    path: str
+    start_line: Optional[int] = None
+    end_line: Optional[int] = None
+    why: str
+
+
+class AuthoredFunction(BaseModel):
+    path: str
+    name: str
+    start_line: int  # tree-sitter boundary
+    end_line: int
+    ccn: Optional[int] = None  # lizard cyclomatic complexity
+    nloc: Optional[int] = None
+    params: Optional[int] = None
+    authored_line_ratio: float  # candidate-authored source lines / source lines in the function
+    lizard_start_line: Optional[int] = None
+    lizard_end_line: Optional[int] = None
+    boundaries_agree: Optional[bool] = None  # None when lizard found no matching function
+
+
+class BugTarget(AuthoredFunction):
+    eligible: bool
+    reason: str
+
+
+class ClaimCheck(BaseModel):
+    claim: str
+    technologies: list[str] = []
+    evidence_for: list[str] = []
+    evidence_against: list[str] = []
+    verdict: Literal["supported", "unsupported", "indeterminate"]
+
+
+class QuestionSurface(BaseModel):
+    """Structured input for Phase 4. Anchors reference ONLY candidate-authored
+    code; on an unverifiable repo they are kind="unverified_authorship"."""
+
+    anchors: list[Anchor] = []
+    authored_functions: list[AuthoredFunction] = []
+    boundary_disagreements: list[AuthoredFunction] = []
+    bug_targets: list[BugTarget] = []
+    claim_vs_code: list[ClaimCheck] = []
+    coverage_gaps: list[str] = []
+
+
+class TargetReport(BaseModel):
+    raw_input: str
+    target: dict  # backend.evidence.resolve.Target as a dict
+    status: TargetStatus
+    http_status: Optional[int] = None
+    message: Optional[str] = None
+    mode: Optional[Literal["blame", "api_commits_only"]] = None  # which measurement this report is
+    ref_requested: Optional[str] = None  # what the input asked for (None = default branch)
+    ref_analyzed: Optional[str] = None  # what was actually analysed (None = nothing was analysed)
+    repo_facts: Optional[RepoFacts] = None
+    authorship: Optional[Authorship] = None
+    identity_unresolved_reason: Optional[str] = None
+    question_surface: Optional[QuestionSurface] = None
+    notes: list[str] = []
+    cache_hit: bool = False
+
+
+class InputSpec(BaseModel):
+    user: Optional[str] = None
+    extra_emails_count: int = 0  # emails themselves are not echoed
+    # identity precedence: --email (explicit) > positional username > none
+    identity_source: Optional[Literal["email", "user"]] = None
+    inputs: list[dict] = []  # {raw, kind, resolved_to, warnings}
+    run_mode: str  # human-readable explanation of what ran
+    duplicates: list[dict] = []  # {raw, duplicate_of}
+
+
+class AnalysisReport(BaseModel):
+    input_spec: InputSpec
+    targets: list[TargetReport]
+    api_calls: int = 0
+    rate_limit_remaining: Optional[int] = None
+    stopped_reason: Optional[str] = None
+    elapsed_s: float = 0.0
+    exclusion_ruleset_version: str

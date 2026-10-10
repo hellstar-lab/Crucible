@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import re
 import shutil
 import stat
 import tempfile
@@ -37,17 +38,28 @@ def dir_mb(path: Path) -> float:
     return total / 1_048_576
 
 
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
 @contextlib.contextmanager
-def cloned_repo(url: str, *, allow_local: bool = False) -> Iterator[Path]:
+def cloned_repo(url: str, *, allow_local: bool = False, ref: str | None = None,
+                timeout: float | None = None) -> Iterator[Path]:
     """Yield the path of a full-history bare clone of ``url``; the temp
     directory is removed afterwards, including on failure or timeout.
+    ``ref`` is a branch, tag or full commit SHA; HEAD is moved to it.
     ``allow_local`` permits file paths / file:// (tests only)."""
     tmp = Path(tempfile.mkdtemp(prefix="crucible-clone-"))
     dest = tmp / "repo.git"
     try:
         extra = ("-c", "protocol.file.allow=" + ("always" if allow_local else "never"))
-        run_git(["clone", "--bare", "--quiet", "--no-tags", "--single-branch", url, str(dest)],
-                timeout=config.CLONE_TIMEOUT_S, extra_config=extra)
+        branch = ["--branch", ref] if ref and not _SHA_RE.match(ref) else []
+        if ref and ref.startswith("-"):
+            raise GitError(f"invalid ref {ref!r}")
+        run_git(["clone", "--bare", "--quiet", "--no-tags", "--single-branch", *branch, "--", url, str(dest)],
+                timeout=timeout or config.CLONE_TIMEOUT_S, extra_config=extra)
+        if ref and _SHA_RE.match(ref):
+            run_git(["cat-file", "-e", f"{ref}^{{commit}}"], cwd=dest, timeout=30)
+            run_git(["update-ref", "--no-deref", "HEAD", ref], cwd=dest, timeout=30)
         if run_git(["rev-parse", "--is-shallow-repository"], cwd=dest, timeout=30).strip() != b"false":
             raise GitError("clone is shallow; blame would be meaningless")
         yield dest

@@ -73,3 +73,11 @@ def git_fixtures(tmp_path_factory):
     import make_git_fixtures
 
     return make_git_fixtures.build_all(tmp_path_factory.mktemp("git_repos"))
+
+
+@pytest.fixture(autouse=True)
+def _isolated_evidence_cache(monkeypatch, tmp_path_factory):
+    """Tests never read or write the real .cache/ directory."""
+    from backend.evidence import cache
+
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path_factory.mktemp("evidence_cache"))
