@@ -1,0 +1,746 @@
+{
+  "measurement": "pre-phase-3.5 baseline",
+  "username": "hellstar-lab",
+  "code_commit": "688c280aa42bb7c47f28fab619df6fbfa392f2aa",
+  "generated_at": "2026-10-10T05:49:21+00:00",
+  "counting": "raw lines (total_lines) and non-blank lines (code_lines); authored = non-blank",
+  "repos": [
+    {
+      "name": "sentinel",
+      "skip_reason": null,
+      "total_lines": 3930,
+      "code_lines": 3541,
+      "authored_lines": 0,
+      "authored_ratio": 0.0,
+      "source_files": 56,
+      "top_files_by_lines": [
+        {
+          "path": "src/verify/style.ts",
+          "lines": 572
+        },
+        {
+          "path": "src/verify/hallucination.ts",
+          "lines": 361
+        },
+        {
+          "path": "src/verify/security.ts",
+          "lines": 339
+        },
+        {
+          "path": "src/dashboard/page.ts",
+          "lines": 270
+        },
+        {
+          "path": "src/mcp/server.ts",
+          "lines": 236
+        },
+        {
+          "path": "src/storage/db.ts",
+          "lines": 205
+        },
+        {
+          "path": "src/cli/commands/hook.ts",
+          "lines": 166
+        },
+        {
+          "path": "src/cli/commands/evalRun.ts",
+          "lines": 160
+        },
+        {
+          "path": "src/verify/taskMatch.ts",
+          "lines": 141
+        },
+        {
+          "path": "src/cli/commands/connect.ts",
+          "lines": 135
+        },
+        {
+          "path": "src/cli/index.ts",
+          "lines": 130
+        },
+        {
+          "path": "src/config/sentinelrc.ts",
+          "lines": 121
+        },
+        {
+          "path": "src/providers/ollama.ts",
+          "lines": 121
+        },
+        {
+          "path": "src/providers/anthropic.ts",
+          "lines": 88
+        },
+        {
+          "path": "src/mcp/projectRoot.ts",
+          "lines": 74
+        }
+      ]
+    },
+    {
+      "name": "Meeting-Summarizer",
+      "skip_reason": null,
+      "total_lines": 33764,
+      "code_lines": 33007,
+      "authored_lines": 0,
+      "authored_ratio": 0.0,
+      "source_files": 49,
+      "top_files_by_lines": [
+        {
+          "path": "data/raw/podcast_8_raw.json",
+          "lines": 3974
+        },
+        {
+          "path": "data/raw/podcast_14_raw.json",
+          "lines": 3464
+        },
+        {
+          "path": "data/raw/podcast_7_raw.json",
+          "lines": 3008
+        },
+        {
+          "path": "data/raw/messy_stress_test.json",
+          "lines": 3002
+        },
+        {
+          "path": "data/raw/podcast_2_raw.json",
+          "lines": 2939
+        },
+        {
+          "path": "data/raw/podcast_3_raw.json",
+          "lines": 2300
+        },
+        {
+          "path": "data/raw/podcast_5_raw.json",
+          "lines": 1994
+        },
+        {
+          "path": "data/raw/podcast_15_raw.json",
+          "lines": 1967
+        },
+        {
+          "path": "data/raw/podcast_9_raw.json",
+          "lines": 1898
+        },
+        {
+          "path": "src/pipeline/continual_pipeline.py",
+          "lines": 1733
+        },
+        {
+          "path": "data/raw/podcast_10_raw.json",
+          "lines": 1364
+        },
+        {
+          "path": "data/raw/podcast_12_raw.json",
+          "lines": 902
+        },
+        {
+          "path": "data/raw/podcast_4_raw.json",
+          "lines": 791
+        },
+        {
+          "path": "data/raw/podcast_11_raw.json",
+          "lines": 548
+        },
+        {
+          "path": "data/raw/podcast_13_raw.json",
+          "lines": 422
+        }
+      ]
+    },
+    {
+      "name": "LIVECODINGPLATFORM",
+      "skip_reason": null,
+      "total_lines": 7910,
+      "code_lines": 6791,
+      "authored_lines": 6791,
+      "authored_ratio": 1.0,
+      "source_files": 113,
+      "top_files_by_lines": [
+        {
+          "path": "frontend/src/styles/components.css",
+          "lines": 769
+        },
+        {
+          "path": "frontend/src/styles/App.css",
+          "lines": 567
+        },
+        {
+          "path": "backend/mvnw",
+          "lines": 295
+        },
+        {
+          "path": "backend/src/main/java/com/vornics/live_coding_platform/websocket/TerminalHandler.java",
+          "lines": 255
+        },
+        {
+          "path": "backend/src/main/java/com/vornics/live_coding_platform/websocket/WebSocketHandler.java",
+          "lines": 227
+        },
+        {
+          "path": "frontend/src/components/TerminalPanel.tsx",
+          "lines": 192
+        },
+        {
+          "path": "backend/mvnw.cmd",
+          "lines": 189
+        },
+        {
+          "path": "frontend/src/components/Header.tsx",
+          "lines": 179
+        },
+        {
+          "path": "frontend/src/pages/LoginPage.tsx",
+          "lines": 171
+        },
+        {
+          "path": "backend/pom.xml",
+          "lines": 162
+        },
+        {
+          "path": "frontend/src/pages/DashboardPage.tsx",
+          "lines": 158
+        },
+        {
+          "path": "backend/src/test/java/com/vornics/live_coding_platform/JwtTokenProviderTest.java",
+          "lines": 155
+        },
+        {
+          "path": "docker/docker-compose.prod.yml",
+          "lines": 144
+        },
+        {
+          "path": "frontend/src/hooks/useWebSocket.ts",
+          "lines": 142
+        },
+        {
+          "path": "backend/src/main/java/com/vornics/live_coding_platform/execution/Judge0Service.java",
+          "lines": 132
+        }
+      ]
+    },
+    {
+      "name": "Sorting_Visulizer",
+      "skip_reason": null,
+      "total_lines": 3465,
+      "code_lines": 3088,
+      "authored_lines": 3088,
+      "authored_ratio": 1.0,
+      "source_files": 34,
+      "top_files_by_lines": [
+        {
+          "path": "components/3d/SortingStage.jsx",
+          "lines": 1108
+        },
+        {
+          "path": "backend/src/main/java/com/sortviz/backend/service/SortService.java",
+          "lines": 219
+        },
+        {
+          "path": "components/3d/SortingBars.jsx",
+          "lines": 212
+        },
+        {
+          "path": "app/page.tsx",
+          "lines": 196
+        },
+        {
+          "path": "components/AlgorithmsSection.tsx",
+          "lines": 192
+        },
+        {
+          "path": "hooks/useAmbientMusic.ts",
+          "lines": 164
+        },
+        {
+          "path": "components/StatsSection.tsx",
+          "lines": 159
+        },
+        {
+          "path": "components/MusicPlayer.tsx",
+          "lines": 154
+        },
+        {
+          "path": "components/HeroText.tsx",
+          "lines": 145
+        },
+        {
+          "path": "components/ScrollCanvas.tsx",
+          "lines": 114
+        },
+        {
+          "path": "components/3d/useBubbleSort.js",
+          "lines": 109
+        },
+        {
+          "path": "components/FeaturesSection.tsx",
+          "lines": 108
+        },
+        {
+          "path": "backend/src/main/java/com/sortviz/backend/controller/SortController.java",
+          "lines": 65
+        },
+        {
+          "path": "backend/src/main/java/com/sortviz/backend/model/SortStep.java",
+          "lines": 61
+        },
+        {
+          "path": "backend/pom.xml",
+          "lines": 60
+        }
+      ]
+    },
+    {
+      "name": "siddhi-admin",
+      "skip_reason": null,
+      "total_lines": 8405,
+      "code_lines": 7668,
+      "authored_lines": 0,
+      "authored_ratio": 0.0,
+      "source_files": 59,
+      "top_files_by_lines": [
+        {
+          "path": "src/dashboard.css",
+          "lines": 2001
+        },
+        {
+          "path": "API.json",
+          "lines": 785
+        },
+        {
+          "path": "src/pages/Orders.tsx",
+          "lines": 638
+        },
+        {
+          "path": "src/pages/Menu.tsx",
+          "lines": 553
+        },
+        {
+          "path": "src/pages/Coupons.tsx",
+          "lines": 465
+        },
+        {
+          "path": "src/pages/Settings.tsx",
+          "lines": 431
+        },
+        {
+          "path": "src/pages/Dashboard.tsx",
+          "lines": 329
+        },
+        {
+          "path": "src/pages/Tables.tsx",
+          "lines": 300
+        },
+        {
+          "path": "src/pages/Categories.tsx",
+          "lines": 255
+        },
+        {
+          "path": "src/pages/Payments.tsx",
+          "lines": 250
+        },
+        {
+          "path": "src/pages/Notifications.tsx",
+          "lines": 227
+        },
+        {
+          "path": "src/pages/Customers.tsx",
+          "lines": 179
+        },
+        {
+          "path": "src/types/index.ts",
+          "lines": 176
+        },
+        {
+          "path": "src/components/Layout/Sidebar.tsx",
+          "lines": 143
+        },
+        {
+          "path": "src/pages/CustomerDetail.tsx",
+          "lines": 118
+        }
+      ]
+    },
+    {
+      "name": "Siddhi-website",
+      "skip_reason": null,
+      "total_lines": 3487,
+      "code_lines": 3196,
+      "authored_lines": 0,
+      "authored_ratio": 0.0,
+      "source_files": 40,
+      "top_files_by_lines": [
+        {
+          "path": "components/CheckoutModal.tsx",
+          "lines": 831
+        },
+        {
+          "path": "components/MenuSectionWithCart.tsx",
+          "lines": 351
+        },
+        {
+          "path": "components/OrderTypeModal.tsx",
+          "lines": 238
+        },
+        {
+          "path": "components/ContactSection.tsx",
+          "lines": 202
+        },
+        {
+          "path": "lib/api.ts",
+          "lines": 198
+        },
+        {
+          "path": "components/CartDrawer.tsx",
+          "lines": 147
+        },
+        {
+          "path": "app/admin/qr/page.tsx",
+          "lines": 126
+        },
+        {
+          "path": "app/layout.tsx",
+          "lines": 119
+        },
+        {
+          "path": "components/Navbar.tsx",
+          "lines": 112
+        },
+        {
+          "path": "components/HeroSection.tsx",
+          "lines": 93
+        },
+        {
+          "path": "lib/cartStore.ts",
+          "lines": 91
+        },
+        {
+          "path": "components/AddToCartButton.tsx",
+          "lines": 73
+        },
+        {
+          "path": "components/AboutSectionClient.tsx",
+          "lines": 71
+        },
+        {
+          "path": "components/SpecialOffersCards.tsx",
+          "lines": 69
+        },
+        {
+          "path": "lib/menuData.ts",
+          "lines": 67
+        }
+      ]
+    },
+    {
+      "name": "temp23",
+      "skip_reason": null,
+      "total_lines": 1805,
+      "code_lines": 1576,
+      "authored_lines": 0,
+      "authored_ratio": 0.0,
+      "source_files": 15,
+      "top_files_by_lines": [
+        {
+          "path": "index.html",
+          "lines": 945
+        },
+        {
+          "path": "preloadFrames.js",
+          "lines": 134
+        },
+        {
+          "path": "cursor.js",
+          "lines": 100
+        },
+        {
+          "path": "overlays.js",
+          "lines": 96
+        },
+        {
+          "path": "canvas.js",
+          "lines": 88
+        },
+        {
+          "path": "panel.js",
+          "lines": 78
+        },
+        {
+          "path": "scrollEngine.js",
+          "lines": 76
+        },
+        {
+          "path": "callouts.js",
+          "lines": 61
+        },
+        {
+          "path": "main.js",
+          "lines": 51
+        },
+        {
+          "path": "final.js",
+          "lines": 50
+        },
+        {
+          "path": "hero.js",
+          "lines": 50
+        },
+        {
+          "path": "mobile.js",
+          "lines": 36
+        },
+        {
+          "path": "loader.js",
+          "lines": 20
+        },
+        {
+          "path": "render.yaml",
+          "lines": 12
+        },
+        {
+          "path": ".gitignore",
+          "lines": 8
+        }
+      ]
+    },
+    {
+      "name": "SAAMS-BACKEND",
+      "skip_reason": null,
+      "total_lines": 16298,
+      "code_lines": 14108,
+      "authored_lines": 0,
+      "authored_ratio": 0.0,
+      "source_files": 77,
+      "top_files_by_lines": [
+        {
+          "path": "controllers/attendanceController.js",
+          "lines": 1480
+        },
+        {
+          "path": "controllers/classController.js",
+          "lines": 1267
+        },
+        {
+          "path": "controllers/sessionController.js",
+          "lines": 1173
+        },
+        {
+          "path": "utils/excelGenerator.js",
+          "lines": 1106
+        },
+        {
+          "path": "controllers/authController.js",
+          "lines": 713
+        },
+        {
+          "path": "controllers/superAdminController.js",
+          "lines": 669
+        },
+        {
+          "path": "utils/pdfGenerator.js",
+          "lines": 651
+        },
+        {
+          "path": "scripts/seedDemo.js",
+          "lines": 636
+        },
+        {
+          "path": "controllers/hodController.js",
+          "lines": 576
+        },
+        {
+          "path": "firestore.indexes.json",
+          "lines": 549
+        },
+        {
+          "path": "controllers/disputeController.js",
+          "lines": 482
+        },
+        {
+          "path": "controllers/departmentController.js",
+          "lines": 380
+        },
+        {
+          "path": "test-attendance.js",
+          "lines": 286
+        },
+        {
+          "path": "scripts/runMigration.js",
+          "lines": 284
+        },
+        {
+          "path": "utils/notificationService.js",
+          "lines": 281
+        }
+      ]
+    },
+    {
+      "name": "cozy-cafe-",
+      "skip_reason": null,
+      "total_lines": 2964,
+      "code_lines": 2595,
+      "authored_lines": 0,
+      "authored_ratio": 0.0,
+      "source_files": 23,
+      "top_files_by_lines": [
+        {
+          "path": "js/scene-interior.js",
+          "lines": 516
+        },
+        {
+          "path": "js/scroll-animations.js",
+          "lines": 324
+        },
+        {
+          "path": "index.html",
+          "lines": 303
+        },
+        {
+          "path": "css/sections/location.css",
+          "lines": 257
+        },
+        {
+          "path": "js/scene-hero.js",
+          "lines": 215
+        },
+        {
+          "path": "js/main.js",
+          "lines": 211
+        },
+        {
+          "path": "css/sections/hero.css",
+          "lines": 209
+        },
+        {
+          "path": "css/sections/menu.css",
+          "lines": 201
+        },
+        {
+          "path": "js/marquee.js",
+          "lines": 131
+        },
+        {
+          "path": "css/sections/about.css",
+          "lines": 109
+        },
+        {
+          "path": "js/loader.js",
+          "lines": 104
+        },
+        {
+          "path": "css/sections/footer.css",
+          "lines": 80
+        },
+        {
+          "path": "js/cursor.js",
+          "lines": 57
+        },
+        {
+          "path": "css/sections/cafe-scene.css",
+          "lines": 56
+        },
+        {
+          "path": "css/sections/interior.css",
+          "lines": 52
+        }
+      ]
+    },
+    {
+      "name": "Advance_File_Compressor",
+      "skip_reason": null,
+      "total_lines": 20223,
+      "code_lines": 17120,
+      "authored_lines": 17120,
+      "authored_ratio": 1.0,
+      "source_files": 79,
+      "top_files_by_lines": [
+        {
+          "path": "src/compressor.c",
+          "lines": 1355
+        },
+        {
+          "path": "include/decompressor.h",
+          "lines": 734
+        },
+        {
+          "path": "src/img_lossless.h",
+          "lines": 715
+        },
+        {
+          "path": "src/gui.c",
+          "lines": 652
+        },
+        {
+          "path": "src/file_repair_tool.c",
+          "lines": 614
+        },
+        {
+          "path": "src/decompressor_main.c",
+          "lines": 612
+        },
+        {
+          "path": "src/decompressor_main_fixed.c",
+          "lines": 576
+        },
+        {
+          "path": "src/utils.c",
+          "lines": 544
+        },
+        {
+          "path": "src/comprehensive_tester.c",
+          "lines": 538
+        },
+        {
+          "path": "src/parser.c",
+          "lines": 538
+        },
+        {
+          "path": "src/hardcore_compression.c",
+          "lines": 521
+        },
+        {
+          "path": "src/gui/job_thread.c",
+          "lines": 507
+        },
+        {
+          "path": "src/file_io_fixed.c",
+          "lines": 501
+        },
+        {
+          "path": "src/file_io.c",
+          "lines": 496
+        },
+        {
+          "path": "src/file_analyzer.c",
+          "lines": 490
+        }
+      ]
+    },
+    {
+      "name": "Sof_Event_Extractor",
+      "skip_reason": "beyond max_repos (10)",
+      "total_lines": null,
+      "code_lines": null,
+      "authored_lines": null,
+      "authored_ratio": null,
+      "source_files": null
+    },
+    {
+      "name": "Automatic_Certificate_Generator",
+      "skip_reason": "beyond max_repos (10)",
+      "total_lines": null,
+      "code_lines": null,
+      "authored_lines": null,
+      "authored_ratio": null,
+      "source_files": null
+    },
+    {
+      "name": "ai-policy-execution-platform",
+      "skip_reason": "beyond max_repos (10)",
+      "total_lines": null,
+      "code_lines": null,
+      "authored_lines": null,
+      "authored_ratio": null,
+      "source_files": null
+    }
+  ]
+}
