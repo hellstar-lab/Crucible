@@ -428,7 +428,7 @@ def test_claim_vs_code_mechanical_verdicts():
             "imports": {}, "files_in_scope": ["Dockerfile", "package.json"]}
     out = {c.claim[:12]: c for c in check_claims(snap)}
     assert out["Built with R"].verdict == "unsupported" and "Redis" in out["Built with R"].evidence_against[0]
-    assert out["A small tool"].verdict == "indeterminate"
+    assert out["A small tool"].verdict == "unclear"
     assert out["The API is s"].verdict == "supported"
 
 

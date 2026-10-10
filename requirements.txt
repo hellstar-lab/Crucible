@@ -23,3 +23,10 @@ rapidfuzz==3.14.6  # MIT: fuzzy skill matching
 phonenumbers==9.0.41  # Apache-2.0: contact block
 python-docx==1.2.0  # MIT: DOCX runs, styles, tables, properties
 pytesseract==0.3.13  # Apache-2.0: OPTIONAL, imported only with --ocr; also needs the local `tesseract` binary
+# claim extraction (Phase 4A-plus): local NLI for Stage 3 resolution equivalence and semantic entropy
+# (backend/claims/nli.py, model cross-encoder/nli-deberta-v3-base, Apache-2.0, pinned revision). OPTIONAL at runtime:
+# without them the Stage 3 ensemble falls back to strict text equality (more refusals, never more guesses).
+torch==2.14.1  # BSD-3-Clause
+transformers==5.19.0  # Apache-2.0
+sentencepiece==0.2.2  # Apache-2.0 (DeBERTa-v3 tokenizer)
+protobuf==7.36.2  # BSD-3-Clause

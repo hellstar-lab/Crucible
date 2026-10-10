@@ -79,7 +79,7 @@ def _glob(path: str, pattern: str) -> bool:
 
 def check_claims(snap: dict) -> list[ClaimCheck]:
     """Mechanical: a claim naming a technology is 'unsupported' when no
-    dependency, import or config file references it; 'indeterminate' when it
+    dependency, import or config file references it; 'unclear' when it
     names nothing checkable. No guessing about intent."""
     deps = snap.get("dependencies", [])
     imports = snap.get("imports", {})
@@ -88,7 +88,7 @@ def check_claims(snap: dict) -> list[ClaimCheck]:
     for claim in snap.get("readme_claims", []):
         named = [t for t, rx in _TECH_RE.items() if rx.search(claim["text"])]
         if not named:
-            out.append(ClaimCheck(claim=claim["text"], verdict="indeterminate",
+            out.append(ClaimCheck(claim=claim["text"], verdict="unclear",
                                   evidence_against=["names no technology this check can verify"]))
             continue
         evidence_for, against = [], []

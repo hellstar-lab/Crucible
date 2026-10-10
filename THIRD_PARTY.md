@@ -11,6 +11,12 @@ line, `|` separates aliases, a leading `!` marks a term that is also an ordinary
 and is only counted in a skills-like context). It is original to this repository, not copied from a third-party
 list, and is used by `backend/shield/resume.py` for exact and rapidfuzz matching.
 
+## NLI model (claim extraction)
+
+`backend/claims/nli.py` downloads and runs `cross-encoder/nli-deberta-v3-base` (Apache-2.0) at revision
+`6c749ce3425cd33b46d187e45b92bbf96ee12ec7` into the local Hugging Face cache. It is not vendored into this
+repository. It is used for Stage 3 resolution equivalence and for semantic entropy over sampled resolutions.
+
 ## GitHub Linguist exclusion data
 
 | | |

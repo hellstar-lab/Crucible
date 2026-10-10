@@ -38,6 +38,7 @@ from backend import llm  # noqa: E402
 # fixture of any scope runs. Only tests marked ``live`` get it back.
 _LIVE_KEY = os.environ.pop("NEBIUS_API_KEY", None)
 _LIVE_GITHUB_TOKEN = os.environ.pop("GITHUB_TOKEN", None)
+os.environ.pop("CRUCIBLE_NONCE_KEY", None)  # tests choose the nonce mode explicitly (monkeypatch); default: random
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -10,6 +10,34 @@ Pipeline order:
     Challenge       — a validated bug planted in one of their functions
     SessionLog      — what the candidate / AI stranger did while solving it
     FinalReport     — evidence for a human interviewer; never hire/reject
+
+ENUM DESIGN RULE (measured, not guessed: docs/nebius-capabilities.md, FEEDBACK.md #7)
+
+Under a strict enum the GENERATED value is not the model's answer. Measured with logprobs (sequence probability of
+each value, summed over its tokenisations):
+  * Prefix lock-in: told the honest verdict is "unclear" but offered only supported | unsupported |
+    insufficient_evidence, all three tiers start the value with the token "un" at p=1.0, and the only allowed value
+    continuing "un" is "unsupported". The abstention was suppressed by a shared prefix, not by vocabulary.
+  * The generated value can be the minority: offered "unclear", nano generated it at p=0.302 while "unsupported" held
+    0.696 (shared first token "un" 0.62 beat "uns" 0.38; then "clear" 0.48 beat "supported" 0.33).
+  * Abstention can be present and invisible: ultra put 0.454 on "insufficient_evidence" and generated "unsupported".
+An earlier version of this rule ("name the abstain value in the model's own vocabulary") was drawn from generated
+values alone and was wrong.
+
+So: every model-filled enum gives its values DISTINCT FIRST CHARACTERS (the judgement verdict is
+supported | contradicted | no_evidence | inconclusive); llm.call re-ranks enum fields over full sequence
+probabilities and records the distribution (shares among grammar-allowed tokens, not unconstrained preference); and
+every prompt defines every label without hinting which applies. A constrained enum still returns some allowed value
+with no error ("Passionate about clean code" was typed "metric" by an enum with no fitting value), so an enum that
+does not cover the space manufactures an answer.
+
+Add an abstain value only when the enum does not already cover the space. Adding one to a complete partition
+creates coercion in the opposite direction. (Measured, Phase 4A: with "unclear" offered next to
+cannot_be_disambiguated, nano chose "unclear" for "Improved it by 40%" while writing cannot_be_disambiguated's
+exact reasoning. The 4A stage enums are complete partitions and carry no abstain value.)
+
+"inconclusive" exists ONLY in the 4C judgement enum. Every stage-outcome enum is a complete partition and gets no
+abstain value.
 """
 
 from __future__ import annotations
@@ -17,7 +45,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+class CrucibleModel(BaseModel):
+    """Base of every Crucible contract. ``extra="forbid"`` makes the GENERATED JSON schema carry
+    ``"additionalProperties": false``. Measured (T4): Nebius strict mode enforces that keyword, but only when
+    the schema contains it, and pydantic leaves it out by default, so without this base the protection T4
+    verified would be absent from our own schemas. It also rejects unknown keys when validating."""
+
+    model_config = ConfigDict(extra="forbid")
 
 # --------------------------------------------------------------------------
 # Claims (step 2: shield + claim extraction)
@@ -27,7 +64,7 @@ from pydantic import BaseModel
 Severity = Literal["info", "low", "medium", "high"]
 
 
-class SecurityFinding(BaseModel):
+class SecurityFinding(CrucibleModel):
     """One finding from any document detector, PDF or DOCX (a single shape so
     downstream code never branches on format). ``evidence`` holds structured
     facts only; ``reconstructed_text`` is the hidden/mismatched text, capped at
@@ -42,7 +79,7 @@ class SecurityFinding(BaseModel):
     reconstructed_text: Optional[str] = None
 
 
-class HiddenFragment(BaseModel):
+class HiddenFragment(CrucibleModel):
     """A run of text a machine can read but a human cannot see.
 
     ``page`` is 1-based; 0 means the fragment came from document metadata
@@ -64,7 +101,7 @@ class HiddenFragment(BaseModel):
     classification_failed: bool = False
 
 
-class ShieldSection(BaseModel):
+class ShieldSection(CrucibleModel):
     """Deterministic, offline detection result. ``hidden_text_found`` means
     fragments (with their recovered text and detector reasons) are returned
     for human review; no severity judgement is made."""
@@ -79,16 +116,16 @@ class ShieldSection(BaseModel):
     truncated: bool = False
 
 
-class Claim(BaseModel):
+class Claim(CrucibleModel):
     id: str
-    type: Literal["skill", "project", "experience", "education"]
+    type: Literal["skill", "project", "experience", "education", "other"]  # "other": none of these (G8 audit)
     subject: str
     assertion: str
     strength: Optional[str]
     source_line: Optional[int]
 
 
-class Claims(BaseModel):
+class Claims(CrucibleModel):
     candidate_id: str
     shield: ShieldSection
     claims: list[Claim]
@@ -99,7 +136,7 @@ class Claims(BaseModel):
 # --------------------------------------------------------------------------
 
 
-class FileAuthorship(BaseModel):
+class FileAuthorship(CrucibleModel):
     """Candidate authorship of one source file (only files with
     authored_lines > 0 are recorded). Line numbers are 1-based, inclusive.
     Line classes are pygount's: code, documentation (comments, docstrings),
@@ -117,13 +154,13 @@ class FileAuthorship(BaseModel):
     committer_emails: dict[str, int] = {}  # REDACTED committer email -> authored lines (attribution stays on author)
 
 
-class ExcludedFile(BaseModel):
+class ExcludedFile(CrucibleModel):
     path: str
     lines: int  # raw lines (0 for binaries)
     reason: str  # one of the excluded_*_by_reason keys
 
 
-class SkippedFile(BaseModel):
+class SkippedFile(CrucibleModel):
     """A file pygount did not analyse (state != analyzed), with its reason."""
 
     path: str
@@ -131,7 +168,7 @@ class SkippedFile(BaseModel):
     state_info: Optional[str] = None
 
 
-class UnmatchedAuthor(BaseModel):
+class UnmatchedAuthor(CrucibleModel):
     """An author of surviving source lines who did not match the candidate's
     identity set. The email is redacted (first 3 characters + domain): enough
     for the candidate to recognise their own address, never a full email of a
@@ -144,7 +181,7 @@ class UnmatchedAuthor(BaseModel):
     reason: Optional[str] = None  # e.g. "user.email not configured on the committing machine"
 
 
-class RepoInfo(BaseModel):
+class RepoInfo(CrucibleModel):
     """Phase 3 facts about one repository. No field is a judgement.
 
     ``authored_ratio`` = candidate-authored SOURCE lines / SOURCE lines, where
@@ -191,15 +228,16 @@ class RepoInfo(BaseModel):
     likely_identity_gap: Optional[bool] = None
 
 
-class Finding(BaseModel):
+class Finding(CrucibleModel):
     claim_id: str
-    status: Literal["verified", "partial", "no_evidence"]
+    # no_evidence = searched and found nothing; unclear = cannot determine (split per the G8 audit)
+    status: Literal["verified", "partial", "no_evidence", "unclear"]
     confidence: float
     justification: str
     citations: list[str]
 
 
-class EvidenceReport(BaseModel):
+class EvidenceReport(CrucibleModel):
     candidate_id: str
     repositories: list[RepoInfo]
     findings: list[Finding]
@@ -210,7 +248,7 @@ class EvidenceReport(BaseModel):
 # --------------------------------------------------------------------------
 
 
-class Challenge(BaseModel):
+class Challenge(CrucibleModel):
     challenge_id: str
     repo: str
     snapshot_uri: str
@@ -228,7 +266,7 @@ class Challenge(BaseModel):
 # --------------------------------------------------------------------------
 
 
-class SessionLog(BaseModel):
+class SessionLog(CrucibleModel):
     session_id: str
     challenge_id: str
     actor: Literal["candidate", "ai_stranger"]
@@ -242,7 +280,7 @@ class SessionLog(BaseModel):
 # --------------------------------------------------------------------------
 
 
-class FinalReport(BaseModel):
+class FinalReport(CrucibleModel):
     candidate_id: str
     generated_at: datetime
     analyzer_version: str
@@ -265,7 +303,7 @@ TargetStatus = Literal[
 ]
 
 
-class HistoryFacts(BaseModel):
+class HistoryFacts(CrucibleModel):
     commit_count: int
     distinct_author_count: int  # canonical (mailmapped) author emails
     first_commit: Optional[str] = None  # ISO 8601, author date
@@ -276,7 +314,7 @@ class HistoryFacts(BaseModel):
     committer_dates_clustered: Optional[bool] = None
 
 
-class Structure(BaseModel):
+class Structure(CrucibleModel):
     top_level_dirs: list[str] = []
     entry_points: list[str] = []
     test_dirs: list[str] = []
@@ -287,7 +325,7 @@ class Structure(BaseModel):
     config_files: list[str] = []
 
 
-class Dependency(BaseModel):
+class Dependency(CrucibleModel):
     manifest_path: str
     ecosystem: str
     name: str
@@ -295,20 +333,20 @@ class Dependency(BaseModel):
     is_direct: bool = True
 
 
-class Manifest(BaseModel):
+class Manifest(CrucibleModel):
     manifest_path: str
     ecosystem: str
     dependency_count: int = 0
     parse_error: Optional[str] = None  # an unparseable manifest is recorded, never dropped
 
 
-class ReadmeClaim(BaseModel):
+class ReadmeClaim(CrucibleModel):
     text: str
     kind: Literal["sentence", "bullet"]
     line: int
 
 
-class RepoFacts(BaseModel):
+class RepoFacts(CrucibleModel):
     """Facts computed WITHOUT any identity. Present whenever status is
     resolved / archived_ok (clone-based), and partially (API-only fields)
     for too_large repos analysed in degraded mode."""
@@ -346,14 +384,14 @@ class RepoFacts(BaseModel):
     readme_claims: list[ReadmeClaim] = []
 
 
-class HotFile(BaseModel):
+class HotFile(CrucibleModel):
     path: str
     authored_lines: int
     total_lines: int  # source lines in the file
     ratio: float
 
 
-class CommitInfo(BaseModel):
+class CommitInfo(CrucibleModel):
     sha: str
     authored_date: str
     message_head: str  # first line, at most 100 characters
@@ -362,7 +400,7 @@ class CommitInfo(BaseModel):
     deletions: Optional[int] = None
 
 
-class Authorship(BaseModel):
+class Authorship(CrucibleModel):
     """Identity-dependent attribution.
 
     RENDERING RULE (binding for every consumer): when
@@ -397,7 +435,7 @@ class Authorship(BaseModel):
     commit_message_heads: list[str] = []
 
 
-class Anchor(BaseModel):
+class Anchor(CrucibleModel):
     kind: Literal["authored_function", "hot_file", "entry_point", "unverified_authorship"]
     path: str
     start_line: Optional[int] = None
@@ -405,7 +443,7 @@ class Anchor(BaseModel):
     why: str
 
 
-class AuthoredFunction(BaseModel):
+class AuthoredFunction(CrucibleModel):
     path: str
     name: str
     start_line: int  # tree-sitter boundary
@@ -424,15 +462,15 @@ class BugTarget(AuthoredFunction):
     reason: str
 
 
-class ClaimCheck(BaseModel):
+class ClaimCheck(CrucibleModel):
     claim: str
     technologies: list[str] = []
     evidence_for: list[str] = []
     evidence_against: list[str] = []
-    verdict: Literal["supported", "unsupported", "indeterminate"]
+    verdict: Literal["supported", "unsupported", "unclear"]  # "unclear" (was "indeterminate"): the abstain word models use (G5)
 
 
-class QuestionSurface(BaseModel):
+class QuestionSurface(CrucibleModel):
     """Structured input for Phase 4. Anchors reference ONLY candidate-authored
     code; on an unverifiable repo they are kind="unverified_authorship"."""
 
@@ -444,7 +482,7 @@ class QuestionSurface(BaseModel):
     coverage_gaps: list[str] = []
 
 
-class TargetReport(BaseModel):
+class TargetReport(CrucibleModel):
     raw_input: str
     target: dict  # backend.evidence.resolve.Target as a dict
     status: TargetStatus
@@ -461,7 +499,7 @@ class TargetReport(BaseModel):
     cache_hit: bool = False
 
 
-class InputSpec(BaseModel):
+class InputSpec(CrucibleModel):
     user: Optional[str] = None
     extra_emails_count: int = 0  # emails themselves are not echoed
     # identity precedence: --email (explicit) > positional username > none
@@ -471,7 +509,7 @@ class InputSpec(BaseModel):
     duplicates: list[dict] = []  # {raw, duplicate_of}
 
 
-class AnalysisReport(BaseModel):
+class AnalysisReport(CrucibleModel):
     input_spec: InputSpec
     targets: list[TargetReport]
     api_calls: int = 0
@@ -490,7 +528,7 @@ class AnalysisReport(BaseModel):
 # --------------------------------------------------------------------------
 
 
-class DocumentInfo(BaseModel):
+class DocumentInfo(CrucibleModel):
     path: str  # file name only
     format: Literal["pdf", "docx"]
     pages: Optional[int] = None  # pages analysed
@@ -504,7 +542,7 @@ class DocumentInfo(BaseModel):
     truncation_reasons: list[str] = []
 
 
-class Provenance(BaseModel):
+class Provenance(CrucibleModel):
     producer: Optional[str] = None
     creator: Optional[str] = None
     author: Optional[str] = None
@@ -521,7 +559,7 @@ class Provenance(BaseModel):
     creator_differs_from_last_modified_by: Optional[bool] = None
 
 
-class Heading(BaseModel):
+class Heading(CrucibleModel):
     text: str
     level: int  # 1 = largest
     page: int
@@ -529,7 +567,7 @@ class Heading(BaseModel):
     method: Literal["size", "bold", "numbering", "style"]
 
 
-class Section(BaseModel):
+class Section(CrucibleModel):
     heading: Optional[str] = None  # None for text before the first heading
     level: Optional[int] = None
     page_start: int
@@ -539,7 +577,7 @@ class Section(BaseModel):
     text: str
 
 
-class Table(BaseModel):
+class Table(CrucibleModel):
     page: int
     caption: Optional[str] = None
     strategy: Literal["lines", "text_region", "docx"]
@@ -548,7 +586,7 @@ class Table(BaseModel):
     rows: list[list[str]]
 
 
-class LinkRef(BaseModel):
+class LinkRef(CrucibleModel):
     url: str
     host: Optional[str] = None
     kind: str  # github | gitlab | linkedin | kaggle | huggingface | devpost | email | other
@@ -560,7 +598,7 @@ class LinkRef(BaseModel):
     github_target: Optional[str] = None  # "owner/repo": consumable by the Phase 3.6 resolver
 
 
-class NumericClaim(BaseModel):
+class NumericClaim(CrucibleModel):
     value: str
     unit: str
     match: str
@@ -570,14 +608,14 @@ class NumericClaim(BaseModel):
     page: Optional[int] = None
 
 
-class ReferencesBlock(BaseModel):
+class ReferencesBlock(CrucibleModel):
     section_found: bool
     entries: list[str]
     dois: list[str]
     arxiv_ids: list[str]
 
 
-class StructureBlock(BaseModel):
+class StructureBlock(CrucibleModel):
     headings: list[Heading]
     sections: list[Section]
     tables: Optional[list[Table]] = None  # None when no page could be measured for tables
@@ -588,13 +626,13 @@ class StructureBlock(BaseModel):
     notes: list[str] = []
 
 
-class ContactBlock(BaseModel):
+class ContactBlock(CrucibleModel):
     emails: list[str]
     phones: list[str]
     urls: list[str]
 
 
-class TimelineEntry(BaseModel):
+class TimelineEntry(CrucibleModel):
     raw: str
     start: Optional[str] = None  # ISO date, earliest it could mean; None when unparseable (never invented)
     end: Optional[str] = None  # ISO date, latest it could mean
@@ -606,14 +644,14 @@ class TimelineEntry(BaseModel):
     confidence: float
 
 
-class Contradiction(BaseModel):
+class Contradiction(CrucibleModel):
     kind: Literal["overlapping_full_time_roles", "end_before_start", "credential_before_education",
                   "multiple_present_roles", "experience_exceeds_span"]
     detail: str
     cites: list[str]  # the raw strings the contradiction comes from
 
 
-class SkillMention(BaseModel):
+class SkillMention(CrucibleModel):
     skill: str  # canonical name from the lexicon
     matched: str  # text as written in the document
     exact: bool
@@ -621,14 +659,14 @@ class SkillMention(BaseModel):
     section: Optional[str] = None
 
 
-class ResumeBlock(BaseModel):
+class ResumeBlock(CrucibleModel):
     contact_block: ContactBlock
     timeline: list[TimelineEntry]
     timeline_contradictions: list[Contradiction]
     skills_mentioned: list[SkillMention]
 
 
-class ExtractionQuality(BaseModel):
+class ExtractionQuality(CrucibleModel):
     chars_total: Optional[int] = None  # None when every page needs OCR
     chars_unmapped_ratio: Optional[float] = None  # > 0.3: downstream text is unreliable
     mojibake_fixed: Optional[bool] = None
@@ -636,7 +674,7 @@ class ExtractionQuality(BaseModel):
     pages_with_no_text: list[int] = []
 
 
-class DocumentReport(BaseModel):
+class DocumentReport(CrucibleModel):
     """Everything the analyzer found in one document. ``status`` is a roll-up of
     the findings, never a verdict: clean | suspicious | hidden_text_found."""
 
@@ -652,3 +690,109 @@ class DocumentReport(BaseModel):
     resume: Optional[ResumeBlock] = None
     extraction_quality: ExtractionQuality
     warnings: list[str] = []
+
+
+# --------------------------------------------------------------------------
+# Phase 4A: claim extraction (Claimify stages 1-4 + checkability routing). Extraction only: no verdicts.
+# --------------------------------------------------------------------------
+
+ClaimKind = Literal["technology_use", "ownership", "artifact_exists", "scale", "timeline", "metric", "role_or_team",
+                    "outcome", "other"]
+Checkability = Literal["yes", "no", "conditional", "weak"]
+ExclusionStage = Literal["shield", "split", "selection", "disambiguation", "decomposition", "support", "budget"]
+
+
+class StageDecision(CrucibleModel):
+    """One stage decision. In 4A there is no evidence_sufficient override (that is the 4C judgement contract), so
+    evidence_sufficient / sufficiency_reason / disagreement stay at their unmeasured defaults; tier "pre-gate" means
+    Stage 3 resolved the unit deterministically without a call."""
+    stage: Literal["selection", "disambiguation", "decomposition"]
+    tier: str
+    evidence_sufficient: Optional[bool] = None
+    sufficiency_reason: Optional[str] = None
+    model_verdict: Optional[str] = None  # what the model wrote
+    verdict: str  # the stage outcome (4A has no override; the 4C judgement override yields "inconclusive")
+    reason: Optional[str] = None
+    disagreement: bool = False  # model wrote a non-unclear verdict alongside evidence_sufficient=False
+    key_order: Optional[list[str]] = None  # top-level keys in the order the raw reply listed them
+    prompt_hash: Optional[str] = None
+    cost_usd: Optional[float] = None
+    reply_sha256: Optional[str] = None  # hash of the raw reply text: byte-identity across runs
+    # P2-1: sequence probability of every enum value (shares among grammar-allowed tokens; None = not measured)
+    value_distribution: Optional[dict] = None
+    greedy_disagreement: bool = False  # re-ranking over values changed the generated answer
+    samples: Optional[list[dict]] = None  # P2-3 Stage 3 ensemble: every sampled resolution (auditable disagreement)
+
+
+class ClaimUnit(CrucibleModel):
+    unit_id: str
+    text: str
+    source_span: tuple[int, int]  # [start, end) into ClaimExtraction.document_text
+    source_section: Optional[str] = None
+    heading_path: list[str] = []
+    kind: Literal["bullet", "sentence", "entry_heading", "line"]
+    bullet_id: Optional[str] = None  # sentences of one bullet share it
+    parent_bullet_id: Optional[str] = None  # set on a sub-bullet
+    decisions: list[StageDecision] = []
+    selected_text: Optional[str] = None  # Stage 2 output (the verifiable part when "mixed")
+    dropped_text: Optional[str] = None  # what Stage 2 removed
+    clarified_text: Optional[str] = None  # Stage 3 output
+
+
+class ExcludedUnit(CrucibleModel):
+    unit_id: str
+    source_span: tuple[int, int]
+    source_section: Optional[str] = None
+    stage: ExclusionStage
+    reason_code: Literal["no_verifiable_claims", "cannot_be_disambiguated", "model_refused", "unparseable_response",
+                         "fabricated_quantity", "fabricated_entity", "injection_suspected", "qualifier_dropped", "shield_payload",
+                         "rubric_leak", "ungrounded_qualifier",
+                         "contact_info", "cost_cap", "model_unavailable"]
+    detail: str
+
+
+class ExtractedClaim(CrucibleModel):
+    claim_id: str
+    unit_id: str
+    text: str
+    qualifiers: list[str] = []
+    source_span: tuple[int, int]  # the unit's span: every claim traces to document text
+    source_section: Optional[str] = None
+    kind: ClaimKind
+    secondary_kinds: list[ClaimKind] = []
+    checkable_from_code: Checkability
+    evidence_kind: Optional[str] = None  # which repo field would settle it; None when nothing in a repo can
+    why_not_checkable: Optional[str] = None  # set whenever checkable_from_code is "no"
+    checkability_note: Optional[str] = None  # for "weak" / "conditional"
+    support_ratio: Optional[float] = None  # diagnostic only, never a gate
+    decomposition_tier: str
+
+
+class ShieldGate(CrucibleModel):
+    applied: bool  # the document carried findings or hidden fragments, so extraction ran on cleaned text only
+    document_status: Literal["clean", "suspicious", "hidden_text_found"]
+    needs_review: bool = False
+    detectors: list[str] = []  # security finding detectors present
+    hidden_fragments: int = 0
+    units_removed: int = 0  # units that still contained a hidden-fragment string (defence in depth)
+
+
+class ClaimExtraction(CrucibleModel):
+    """Phase 4A output. Facts about what the resume asserts and how each assertion could be checked. No verdicts."""
+    document: str
+    document_text: Optional[str] = None  # the cleaned text every source_span indexes into; None when nothing was extracted
+    shield: ShieldGate
+    units: Optional[list[ClaimUnit]] = None  # None = not extracted (e.g. no text layer), never [] for "did not look"
+    claims: Optional[list[ExtractedClaim]] = None
+    excluded: Optional[list[ExcludedUnit]] = None
+    counters: dict[str, int] = {}
+    tiers: dict[str, str] = {}
+    calls: int = 0
+    cost_usd: Optional[float] = None
+    cost_cap_usd: float
+    truncated: bool = False
+    truncation_reason: Optional[str] = None
+    not_extracted_reason: Optional[str] = None
+    # judgements where the model wrote a non-"inconclusive" verdict next to evidence_sufficient=false / all judgements
+    sufficiency_disagreement_rate: Optional[float] = None
+    key_order_follows_schema_rate: Optional[float] = None  # replies whose top-level keys came in schema order
