@@ -894,7 +894,13 @@ class ClaimVerdict(CrucibleModel):
     citation_downgraded: bool = False  # supported/contradicted without a resolvable citation -> inconclusive
     scope: Optional[str] = None  # the claim's scope (F1): contradicted needs specific_artifact/project + same object
     scope_target: Optional[str] = None
+    scope_match_rule: Optional[str] = None  # G2 audit: which strict rule matched (or why it did not)
+    scope_match_score: Optional[float] = None  # G2 audit: 100 for a whole-word match; best fuzzy near-miss otherwise
     samples: Optional[list[dict]] = None  # F2 ensemble: every sampled judgement, so a disagreement is auditable
+    # Phase 4D grounding: c_index / c_path / c_lines / c_authored -> pass | fail | not_applicable | unavailable
+    grounding_checks: Optional[dict[str, str]] = None  # None = not grounded (no supported/contradicted content label)
+    grounding_passed: Optional[bool] = None
+    pre_grounding_verdict: Optional[str] = None  # set when grounding downgraded the verdict
     agreement: Optional[str] = None  # e.g. "3/3" of the final-verdict samples that agreed
     # model bookkeeping
     model_tier: Optional[str] = None
@@ -917,3 +923,60 @@ class ClaimVerdicts(CrucibleModel):
     cost_cap_usd: float
     counters: dict[str, int] = {}
     greedy_disagreement_rate: Optional[float] = None
+
+
+
+# --------------------------------------------------------------------------
+# Phase 4D: the report a human reads. Assembled from earlier stages; nothing is computed for the first time here.
+# (Named ClaimEvidenceReport because EvidenceReport is the frozen Phase 3 contract, whose Finding carries a confidence
+# float that the no-scores rule forbids.)
+# --------------------------------------------------------------------------
+
+
+class ReportRow(CrucibleModel):
+    claim_id: str
+    claim_text: str
+    claim_kind: Optional[str] = None
+    verdict: FinalVerdict  # 4C, after 4D grounding
+    reason: str  # 4C or 4D
+    citation: Optional[dict] = None  # {repo, path, start_line, end_line} of the cited 4B EvidenceItem
+    authored_by_candidate: Optional[bool] = None  # 4B, for the cited item
+    authored_ratio: Optional[float] = None  # 4B (3.5 blame), for the cited file
+    authorship_caveat: Optional[str] = None  # 4B
+    authorship_confidence: Optional[str] = None  # 3.6, carried by 4B
+    authorship_confidence_reason: Optional[str] = None  # 3.6, for the cited item's repo (H0c: repeated on every row)
+    likely_identity_gap: Optional[bool] = None  # 3.6, for the cited item's repo
+    authorship_note: Optional[str] = None  # 4C matrix
+    content_reason: Optional[str] = None  # 4C: the model's one-sentence reading of the evidence (content only)
+    matrix_row: Optional[str] = None  # 4C: which rule decided the verdict ("gate:..." = decided by code, no model call)
+    agreement: Optional[str] = None  # 4C: final-tier samples agreeing on the verdict, e.g. "3/3"
+    model_tier: Optional[str] = None  # 4C: the tier whose samples decided
+    escalated: Optional[bool] = None  # 4C
+    escalation_reason: Optional[str] = None  # 4C
+    scope: Optional[str] = None  # 4A Stage 5
+    scope_target: Optional[str] = None  # 4A Stage 5
+    scope_match_rule: Optional[str] = None  # 4C contradiction gate audit
+    prompt_hash: Optional[str] = None  # 4C, for reproducing the judgement request
+    grounding_passed: Optional[bool] = None  # 4D
+    grounding_checks: Optional[dict[str, str]] = None  # 4D
+    pre_grounding_verdict: Optional[str] = None  # 4D: the 4C verdict before a grounding downgrade
+    sources: dict[str, str] = {}  # field -> producing stage
+
+
+class ReportHeader(CrucibleModel):
+    analysed: list[dict] = []  # 3.6 repo_facts: repo, ref, head_sha, scope, source files and lines, languages
+    excluded: list[dict] = []  # 3.5 via 3.6: excluded files and lines by reason, per repo
+    authorship: list[dict] = []  # 3.6: per repo authored ratio WITH its confidence and reason (rendering rule)
+    shield: Optional[dict] = None  # 2C via the 4A Shield gate: status, detectors, hidden fragments
+    not_checkable: list[dict] = []  # 4B: claims not searched, with the verbatim skip_reason
+    grounding_failures: Optional[dict[str, int]] = None  # 4D: every check with its count; None = grounding not run
+    excluded_units: list[dict] = []  # 4A: resume text left out of extraction, with the reason code
+    provenance: dict = {}  # 4A/4C run accounting: model requests, cost, escalations, greedy_disagreement rate; None = not measured
+    stage_versions: dict[str, Optional[str]] = {}
+
+
+class ClaimEvidenceReport(CrucibleModel):
+    """One row per claim, plus a header saying what was analysed, excluded and not checkable. No scores, no ranking,
+    no hire/reject signal."""
+    header: ReportHeader
+    rows: list[ReportRow]

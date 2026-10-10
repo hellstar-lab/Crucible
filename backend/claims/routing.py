@@ -126,5 +126,8 @@ def scope_of(claim_text: str, kind: str, unit_text: str | None = None, section: 
         if m:
             words = [w for w in m.group(1).split() if w.lower() not in _GENERIC]
             if words:
-                return "specific_artifact", " ".join(words)
+                # The whole component phrase ("ledger reconciliation"). The contradiction gate (backend/verdicts/matrix.py)
+                # checks provenance and accepts a whole-word / path-component match on ANY of its content words; it does
+                # not guess which word names the object from word order.
+                return "specific_artifact", " ".join(w.strip("-").lower() for w in words)
     return "none", None

@@ -50,7 +50,6 @@ SINGLE_COMMIT_REASON = ("authorship_confidence is none: blame attributed every l
 SCOPE_REASON = "evidence is not about the same scope as the claim"
 HISTORY_COUNT_REASON = ("a repository's history or size cannot contradict a claim: Crucible sees a partial sample of "
                         "repositories, and absence in that sample is not evidence of absence")
-SAME_OBJECT_CUTOFF = 85  # rapidfuzz ratio, scope target word vs cited path / function token
 _TOK = re.compile(r"[a-z0-9]+")
 
 
@@ -58,31 +57,87 @@ def _tokens(s: str | None) -> list[str]:
     return _TOK.findall((s or "").lower().replace("_", " "))
 
 
-def same_object(cited, scope: str | None, target: str | None) -> bool:
-    """Does the cited evidence item belong to the artifact or project the claim names?"""
+_TARGET_STOP = frozenset("the and for with from into module service library package component engine layer client pipeline "
+                         "api system tool job worker scheduler parser cli script".split())
+
+
+def _components(path: str) -> list[str]:
+    p = PurePosixPath(path)
+    return [x.lower() for x in p.parts[:-1]] + [p.stem.lower(), p.name.lower()]
+
+
+def _words(s: str | None) -> list[str]:
+    """Whole words of a path or identifier: split on / . _ - space and camelCase boundaries."""
+    s = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", s or "")
+    return [w for w in re.split(r"[\s/._\-]+", s.lower()) if w]
+
+
+def scope_match(cited, scope: str | None, target: str | None) -> tuple[bool, str, float | None]:
+    """(match, rule, audit score). STRICT (Phase 4D G2): the scope target must appear in the cited item as a WHOLE path
+    component or a WHOLE word of its path or function name; no fuzzy score ever qualifies. The rapidfuzz score of the
+    best near-miss is recorded for audit only.
+
+    Asymmetry, on purpose: retrieval may be generous, contradiction must be strict. A missed contradiction is
+    recoverable; a false contradiction about a real person is not.
+
+    For an OWNERSHIP claim, the contradiction also needs PROVENANCE (_contradiction_allowed): the cited item must come
+    from r_ownership, the 4B rule that identified the artifact, and then ANY content word of scope_target may match.
+    This replaced a first-distinctive-word heuristic (Phase 4H H0a), which read the object off word order and fails on
+    "payment reconciliation service" (reconciler.py), "user authentication module" (auth.py) and "data migration
+    script" (migrate.py). Identification is 4B's job and it already did it; 4C checks provenance, not word order.
+    Note the whole-word requirement still blocks those three examples ("reconciliation" is not a whole word of
+    reconciler.py): a missed contradiction, on the safe side."""
     if cited is None or not target or scope not in ("specific_artifact", "project"):
-        return False
+        return False, "no_target_or_scope", None
     path = getattr(cited, "path", None) or ""
-    repo = (getattr(cited, "repo_full_name", "") or "").split("/")[-1]
-    if scope == "specific_artifact" and ("/" in target or "." in target):  # a file named in the claim
-        t = target.lower().lstrip("./")
-        return path.lower() == t or path.lower().endswith("/" + t) or PurePosixPath(path).name.lower() == PurePosixPath(t).name
+    fn = re.search(r"function (\S+)", getattr(cited, "match_detail", None) or "")
+    func_words = _words(fn.group(1)) if fn else []
+    t = target.lower().strip()
+    if scope == "specific_artifact" and ("/" in t or "." in t):  # a file named in the claim
+        tt = t.lstrip("./")
+        ok = path.lower() == tt or path.lower().endswith("/" + tt)
+        return ok, "file_path" if ok else "file_path_mismatch", 100.0 if ok else None
     if scope == "project":
         norm = lambda x: re.sub(r"[^a-z0-9]", "", x.lower())  # noqa: E731
-        return norm(target) in (norm(repo), *(norm(p) for p in PurePosixPath(path).parts[:-1]))
-    # a component named in words ("ledger reconciliation"): at least one distinctive target word (generic words are
-    # already removed by scope_of) must match a token of the cited item's path or function (match_detail names it)
-    have = _tokens(path) + _tokens(getattr(cited, "match_detail", None))
-    words = [w for w in _tokens(target) if len(w) >= 4] or _tokens(target)
-    return any(fuzz.ratio(w, h) >= SAME_OBJECT_CUTOFF for w in words for h in have)
+        repo = (getattr(cited, "repo_full_name", "") or "").split("/")[-1]
+        if norm(t) == norm(repo):
+            return True, "project_repo_name", 100.0
+        if any(norm(t) == norm(c) for c in PurePosixPath(path).parts[:-1]):
+            return True, "project_path_component", 100.0
+        return False, "project_mismatch", None
+    words = [w for w in _words(t) if len(w) >= 3 and w not in _TARGET_STOP]
+    if not words:
+        return False, "empty_target", None
+    comps, pwords = _components(path), _words(path)
+    for w in words:  # ANY content word of the target, as a WHOLE path component or WHOLE word; never a fuzzy score
+        if w in comps:
+            return True, f"whole_path_component:{w}", 100.0
+        if w in pwords:
+            return True, f"whole_word_in_path:{w}", 100.0
+        if w in func_words:
+            return True, f"whole_word_in_function:{w}", 100.0
+    best = max((fuzz.ratio(w, h) for w in words for h in pwords + func_words), default=None)
+    return False, "no_whole_word_match", best
 
 
-def _contradiction_allowed(cited, scope: str | None, target: str | None) -> tuple[bool, str, str]:
+def same_object(cited, scope: str | None, target: str | None) -> bool:
+    return scope_match(cited, scope, target)[0]
+
+
+PROVENANCE_REASON = ("an ownership claim can only be contradicted by evidence that retrieval identified as that artifact "
+                     "(rule r_ownership); this citation came from a different rule")
+
+
+def _contradiction_allowed(cited, scope: str | None, target: str | None,
+                           claim_kind: str | None = None) -> tuple[bool, str, str, str, float | None]:
     if getattr(cited, "kind", None) in ("history", "count"):
-        return False, HISTORY_COUNT_REASON, "gate:history_or_count_cannot_contradict"
-    if scope not in ("specific_artifact", "project") or not same_object(cited, scope, target):
-        return False, SCOPE_REASON, "gate:scope"
-    return True, "", ""
+        return False, HISTORY_COUNT_REASON, "gate:history_or_count_cannot_contradict", "history_or_count", None
+    ok, rule, score = scope_match(cited, scope, target)  # first, so the matched word is recorded whatever happens next
+    if not ok:
+        return False, SCOPE_REASON, "gate:scope", rule, score
+    if claim_kind == "ownership" and getattr(cited, "rule", None) != "r_ownership":
+        return False, PROVENANCE_REASON, "gate:provenance", rule, score
+    return True, "", "", f"{cited.rule}:{rule}" if claim_kind == "ownership" else rule, score
 
 
 @dataclass
@@ -92,6 +147,8 @@ class Outcome:
     row: str
     gates: list[str] = field(default_factory=list)
     authorship_note: str | None = None
+    scope_match_rule: str | None = None  # recorded whenever the scope gate was evaluated (G2 audit)
+    scope_match_score: float | None = None
 
 
 def decide(content: str, claim_kind: str | None, cited, scope: str | None = None, scope_target: str | None = None) -> Outcome:
@@ -99,9 +156,10 @@ def decide(content: str, claim_kind: str | None, cited, scope: str | None = None
     (decided by 4B). Every path that would end in "contradicted" goes through the scope rule first."""
     out = _decide(content, claim_kind, cited)
     if out.verdict == "contradicted":
-        ok, reason, gate = _contradiction_allowed(cited, scope, scope_target)
+        ok, reason, gate, rule, score = _contradiction_allowed(cited, scope, scope_target, claim_kind)
         if not ok:
-            return Outcome("inconclusive", reason, f"{out.row}->{gate}", out.gates + [gate], out.authorship_note)
+            return Outcome("inconclusive", reason, f"{out.row}->{gate}", out.gates + [gate], out.authorship_note, rule, score)
+        out.scope_match_rule, out.scope_match_score = rule, score
     return out
 
 

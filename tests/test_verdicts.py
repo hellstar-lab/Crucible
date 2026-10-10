@@ -165,6 +165,7 @@ def test_unanimous_contradiction_on_the_same_object_escalates_to_ultra(scenarios
     fake.answers = [("contradicted", idx, 0.9, False), ("contradicted", idx, 0.9, False)]
     v, calls, _ = verdicts.verdict_for(c, es)
     assert v.scope == "specific_artifact" and v.scope_target == "ledger reconciliation"
+    assert v.scope_match_rule in ("r_ownership:whole_path_component:ledger", "r_ownership:whole_word_in_function:ledger") and v.scope_match_score == 100.0
     assert v.verdict == "contradicted" and calls == 2 and v.escalated and v.model_tier == "ultra"
     assert [t for t, _p, _n in fake.calls] == ["super", "ultra"] and v.escalation_reason == "unanimous verdict contradicted"
     assert len(v.samples) == 6  # 3 Super + 3 Ultra, all recorded
@@ -201,10 +202,15 @@ def test_prompt_payload_carries_no_authorship_fields(scenarios, fake):
         assert "<<<UNTRUSTED_" in p and p.count("<<<UNTRUSTED_") == 2  # the claim and the repository evidence
 
 
+AUDIT_ONLY = {"scope_match_score"}  # scores a STRING match (scope target vs cited path), never the candidate
+
+
 def test_the_verdict_contract_has_no_scores():
     def walk(schema):
         props = schema.get("properties", {})
         for k, v in props.items():
+            if k in AUDIT_ONLY:
+                continue
             assert "score" not in k and "rank" not in k, k
         for d in schema.get("$defs", {}).values():
             for k in d.get("properties", {}):
@@ -283,17 +289,40 @@ def test_scope_none_or_career_claims_can_never_be_contradicted():
     item = EvidenceItem(repo_full_name="o/r", path="src/x.py", kind="import", rule="r_import", authored_by_candidate=True)
     for scope in ("none", "career"):
         assert matrix.decide("contradicted", "technology_use", item, scope, None).verdict == "inconclusive"
-    assert matrix.decide("contradicted", "ownership", item, "specific_artifact", "src/x.py").verdict == "contradicted"
-    assert matrix.decide("contradicted", "ownership", item, "specific_artifact", "src/y.py").verdict == "inconclusive"
+    # H0a: an ownership contradiction also needs r_ownership provenance, so the matching case uses such an item
+    owned = item.model_copy(update={"kind": "file", "rule": "r_ownership"})
+    assert matrix.decide("contradicted", "ownership", owned, "specific_artifact", "src/x.py").verdict == "contradicted"
+    assert matrix.decide("contradicted", "ownership", owned, "specific_artifact", "src/y.py").verdict == "inconclusive"
+    assert matrix.decide("contradicted", "ownership", item, "specific_artifact", "src/x.py").verdict == "inconclusive"
 
 
-def test_ensemble_disagreement_is_inconclusive_and_every_sample_is_recorded(scenarios, fake):
+
+def test_super_disagreement_escalates_and_ultra_disagreement_is_inconclusive_with_both_sample_sets(scenarios, fake):
+    """H0b: disagreement escalates instead of abstaining; only Ultra disagreeing too makes it inconclusive."""
     es = ev(scenarios, "clean_small", REDIS)
     i = first_index(es, "r_import")
-    fake.answers = [[("supported", i, 0.996, False), ("no_evidence", None, 0.997, False), ("inconclusive", None, 0.876, False)]]
+    sup = [("supported", i, 0.996, False), ("no_evidence", None, 0.997, False), ("inconclusive", None, 0.876, False)]
+    fake.answers = [sup, [("supported", i, 0.9, False), ("supported", i, 0.9, False), ("no_evidence", None, 0.9, False)]]
     from collections import Counter
     counters = Counter()
     v, calls, _ = verdicts.verdict_for(REDIS, es, counters)
-    assert v.verdict == "inconclusive" and v.reason == "verdicts disagreed" and calls == 1
-    assert [s["content_supported"] for s in v.samples] == ["supported", "no_evidence", "inconclusive"]
-    assert v.agreement == "1/3" and counters["ensemble_disagreements"] == 1 and not v.escalated  # no escalation without unanimity
+    assert [t for t, _p, _n in fake.calls] == ["super", "ultra"] and calls == 2 and v.escalated
+    assert v.verdict == "inconclusive" and v.reason.startswith("verdicts disagreed (Super and Ultra")
+    assert [(s["tier"], s["content_supported"]) for s in v.samples] == [
+        ("super", "supported"), ("super", "no_evidence"), ("super", "inconclusive"),
+        ("ultra", "supported"), ("ultra", "supported"), ("ultra", "no_evidence")]
+    assert v.escalation_reason.startswith("Super samples disagreed") and v.agreement == "2/3"  # Ultra's 2/3 is NOT a majority win
+    assert counters["ensemble_disagreements"] == 1 and counters["escalations_on_disagreement"] == 1
+    assert counters["disagreements_resolved_by_ultra"] == 0
+
+
+def test_super_disagreement_resolved_by_a_unanimous_ultra(scenarios, fake):
+    es = ev(scenarios, "clean_small", REDIS)
+    i = first_index(es, "r_import")
+    fake.answers = [[("supported", i, 0.95, False), ("supported", i, 0.95, False), ("no_evidence", None, 0.9, False)],
+                    ("supported", i, 0.97, False)]
+    from collections import Counter
+    counters = Counter()
+    v, calls, _ = verdicts.verdict_for(REDIS, es, counters)
+    assert v.verdict == "supported" and v.model_tier == "ultra" and calls == 2 and len(v.samples) == 6
+    assert counters["disagreements_resolved_by_ultra"] == 1 and counters.get("ensemble_disagreements", 0) == 0

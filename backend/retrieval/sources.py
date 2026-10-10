@@ -135,6 +135,24 @@ class RepoView:
             return any(a for _s, a in span), ratio, gap
         return (ratio or 0) > 0, ratio, gap
 
+    def line_flags(self, path: str) -> list[tuple[bool, bool]] | None:
+        """Per line (is_source, authored_by_candidate) from blame, or None (not countable, no identity, or the identity
+        was not reproduced). Used by 4D's c_authored check."""
+        flags = (self._file_auth() or {}).get(path)
+        return flags if (flags and self._identity_ok) else None
+
+    def line_count(self, path: str) -> int | None:
+        """Lines in the file at head_sha: from the snapshot when the file was counted, else from the checkout."""
+        entry = self.counted.get(path)
+        if entry is not None:
+            return len(entry["marks"])
+        t = self.text(path)
+        return None if t is None else len(t.splitlines())
+
+    def in_snapshot(self, path: str) -> bool | None:
+        """Does the path exist in the analysed tree (scope applied)? None when there is no snapshot to ask."""
+        return None if not self.snap else path in set(self.snap.get("files_in_scope", []))
+
     # ---- verbatim text ---------------------------------------------------------------------------------------
     def text(self, path: str) -> str | None:
         if path in self._texts:

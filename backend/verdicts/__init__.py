@@ -13,11 +13,12 @@ Order of decisions, all in code:
   3. no evidence items but a populated search -> no_evidence. No model call: there is nothing for a model to read, and
      4B's invariant already says this is "we looked and found nothing".
   4. otherwise ONE Super request with n=3 samples at temperature 0.7 (F2). Each sample gets the citation check (5) and
-     the matrix (6) on its own; only if all 3 FINAL verdicts agree is that the verdict, otherwise inconclusive,
-     "verdicts disagreed", with all 3 recorded. Measured: one claim returned inconclusive 0.996, no_evidence 0.997 and
-     supported 0.876 across three runs (confident, unstable, invisible to a within-run margin). After unanimity, an
-     Ultra ensemble (same rule) is asked when the verdict is contradicted or a sample's chosen-label probability is
-     below ESCALATION_MIN_TOP_PROB. Every escalation is recorded.
+     the matrix (6) on its own. Super unanimous -> that verdict. Super NOT unanimous -> ONE Ultra request, n=3 (H0b);
+     Ultra unanimous -> Ultra's verdict; Ultra not unanimous either -> inconclusive, "verdicts disagreed", with both
+     sample sets recorded. Not a majority vote: 2-of-3 is exactly the instability the ensemble exists to expose. Ultra
+     is also asked after a unanimous Super verdict that is contradicted or whose lowest chosen-label probability is
+     below ESCALATION_MIN_TOP_PROB. Measured (G5): Super unanimity alone turned 3 of 6 ownership runs inconclusive.
+     Every escalation and its reason is recorded.
   5. supported / contradicted without a citation that resolves to an item -> inconclusive (counted).
   6. the verdict matrix with the CITED item's authorship fields and the claim's SCOPE (F1: a contradiction needs the
      evidence and the claim to be about the same object).
@@ -102,8 +103,8 @@ def _record(judged, tier) -> list[dict]:
 
 
 def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None = None) -> tuple[ClaimVerdict, int, float | None]:
-    """(verdict, model requests made, cost). Pure code for gates 1-3; otherwise one Super ensemble request (n=3) and,
-    only after unanimity, at most one Ultra ensemble request."""
+    """(verdict, model requests made, cost). Pure code for gates 1-3; otherwise one Super ensemble request (n=3) and at
+    most one Ultra ensemble request (on disagreement, contradiction or low probability)."""
     counters = counters if counters is not None else Counter()
     base = _base(claim, es)
     scope, target = _scope(claim)
@@ -129,18 +130,25 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
     calls, cost = 1, j["cost_usd"] or 0.0
     samples = _record(judged, j["tier"])
     escalated, why = False, None
-    if unanimous:
+    if not unanimous:  # H0b: disagreement escalates; it is not an abstention and not a majority vote
+        why = "Super samples disagreed (" + ", ".join(x["outcome"].verdict for x in judged) + ")"
+    else:
         final = judged[0]["outcome"].verdict
         low = min((x["top_prob"] for x in judged if x["top_prob"] is not None), default=None)
-        if final == "contradicted" or (low is not None and low < config.ESCALATION_MIN_TOP_PROB):
-            why = ("unanimous verdict contradicted" if final == "contradicted"
-                   else f"lowest sample probability of the chosen label {low:.3f} < {config.ESCALATION_MIN_TOP_PROB}")
-            j, judged, unanimous = _round(base["claim_text"], es, config.ESCALATION_TIER, kind, scope, target, counters, run_tag)
-            calls += 1
-            cost += j["cost_usd"] or 0.0
-            samples += _record(judged, j["tier"])
-            escalated = True
-            counters["escalations"] += 1
+        if final == "contradicted":
+            why = "unanimous verdict contradicted"
+        elif low is not None and low < config.ESCALATION_MIN_TOP_PROB:
+            why = f"lowest sample probability of the chosen label {low:.3f} < {config.ESCALATION_MIN_TOP_PROB}"
+    if why:
+        j, judged, unanimous = _round(base["claim_text"], es, config.ESCALATION_TIER, kind, scope, target, counters, run_tag)
+        calls += 1
+        cost += j["cost_usd"] or 0.0
+        samples += _record(judged, j["tier"])
+        escalated = True
+        counters["escalations"] += 1
+        counters["escalations_on_disagreement" if why.startswith("Super samples disagreed") else "escalations_on_check"] += 1
+        if unanimous and why.startswith("Super samples disagreed"):
+            counters["disagreements_resolved_by_ultra"] += 1
     counters["judgements"] += 1
     agreement = f"{max((sum(1 for x in judged if x['outcome'].verdict == v) for v in {x['outcome'].verdict for x in judged}), default=0)}/{len(judged)}"
     common = dict(model_tier=j["tier"], escalated=escalated, escalation_reason=why, samples=samples, agreement=agreement,
@@ -148,12 +156,15 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
                   greedy_disagreement=any(x["greedy_disagreement"] for x in judged))
     if not unanimous:
         counters["ensemble_disagreements"] += 1
-        return ClaimVerdict(**base, verdict="inconclusive", reason="verdicts disagreed", matrix_row="ensemble:disagreed",
+        tiers = "Super and Ultra" if escalated else "the samples"
+        return ClaimVerdict(**base, verdict="inconclusive", reason=f"verdicts disagreed ({tiers}; every sample is recorded)",
+                            matrix_row="ensemble:disagreed",
                             gates=["gate:ensemble_disagreed"], **common), calls, cost
     x = judged[0]
     out = x["outcome"]
     return ClaimVerdict(**base, verdict=out.verdict, reason=out.reason, matrix_row=out.row, gates=out.gates,
-                        authorship_note=out.authorship_note, evidence_summary=x["evidence_summary"], content_reason=x["content_reason"],
+                        authorship_note=out.authorship_note, scope_match_rule=out.scope_match_rule,
+                        scope_match_score=out.scope_match_score, evidence_summary=x["evidence_summary"], content_reason=x["content_reason"],
                         content_supported=x["label"] if x["label"] in ("supported", "contradicted", "no_evidence", "inconclusive") else None,
                         cited_item_index=x["cited_item_index"], cited_item=x["cited"], citation_downgraded=out.row == "citation_downgraded",
                         value_distribution=None, **common), calls, cost
