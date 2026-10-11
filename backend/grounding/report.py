@@ -10,6 +10,8 @@ lines are omitted.
 
 from __future__ import annotations
 
+import re
+
 from backend.contracts import ClaimEvidenceReport, ReportHeader, ReportRow
 
 from . import CHECKS
@@ -32,6 +34,12 @@ REPRODUCIBILITY_NOTE = ("Verdicts come from sampled model judgements: the platfo
 PROVENANCE_COUNTERS = ("samples", "escalations", "escalations_on_disagreement", "disagreements_resolved_by_ultra",
                        "escalations_on_check", "ensemble_disagreements", "contradictions_confirmed",
                        "contradictions_not_confirmed", "citation_downgraded")
+
+
+def repos_named(text: str, full_names: list[str]) -> list[str]:
+    """M1 retrieval target: the analysed repositories whose name appears as a whole word in a reference."""
+    words = {w.lower() for w in re.findall(r"[A-Za-z0-9_.-]+", text or "")}
+    return sorted(f for f in full_names if f.split("/")[-1].lower() in words)
 
 
 def fmt_ratio(r) -> str:
@@ -128,6 +136,10 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
              for c in claims}  # I2d: from the CLAIM, never from a verdict that may not exist
     not_checkable = [{"claim_id": es.claim_id, "claim_text": texts.get(es.claim_id), "kind": es.claim_kind,
                       "skip_reason": es.skip_reason, "source": "4B"} for es in evidence_sets if not es.retrieval_performed]
+    full_names = [t.repo_facts.full_name for t in target_reports if t.repo_facts]
+    references = [{"unit_id": r.unit_id, "text": r.text, "section": r.source_section, "kind": r.kind,
+                   "names_analysed_repos": repos_named(r.text, full_names), "source": "4A (M1: a reference, not a claim)"}
+                  for r in (getattr(extraction, "references", None) or [])]
     doc_text = getattr(extraction, "document_text", None) or ""
     excluded_units = []
     for u in (getattr(extraction, "excluded", None) or []):
@@ -137,7 +149,8 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
         excluded_units.append({"unit_id": u.unit_id, "category": cat, "text": text, "section": u.source_section,
                                "stage": u.stage, "reason_code": u.reason_code, "detail": u.detail, "source": "4A"})
     versions = {"retrieval": next((es.retrieval_version for es in evidence_sets), None)}
-    header = ReportHeader(candidate=dict(candidate) if candidate else None, identity_check=identity_check, analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
+    header = ReportHeader(candidate=dict(candidate) if candidate else None, identity_check=identity_check, references=references,
+                          analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
                           grounding_failures=(None if grounding_failures is None else
                                               {c: grounding_failures.get(c, 0) for c in CHECKS}), excluded_units=excluded_units,
                           provenance=_provenance(run, extraction, run_label), stage_versions=versions)

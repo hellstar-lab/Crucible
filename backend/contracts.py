@@ -775,7 +775,7 @@ class ExcludedUnit(CrucibleModel):
     reason_code: Literal["no_verifiable_claims", "cannot_be_disambiguated", "model_refused", "unparseable_response",
                          "fabricated_quantity", "fabricated_entity", "injection_suspected", "qualifier_dropped", "shield_payload",
                          "rubric_leak", "ungrounded_qualifier",
-                         "contact_info", "cost_cap", "model_unavailable", "list_cap"]
+                         "contact_info", "cost_cap", "model_unavailable", "list_cap", "fabricated_assertion"]
     detail: str
 
 
@@ -828,6 +828,18 @@ class ShieldGate(CrucibleModel):
     items: list[ShieldItem] = []  # I2c: every hidden fragment and security finding, with location and span
 
 
+class ProjectReference(CrucibleModel):
+    """Phase 4M M1: a project / entry heading or entry line ("Crucible, hiring-evidence system"). Never a claim, never
+    verified, never given a verb: listing a project implies involvement only by convention, and supplying that
+    unstated assumption is exactly what this pipeline refuses to do elsewhere. Used as context for the units beneath
+    it and as a retrieval target (does an analysed repository carry its name?)."""
+    unit_id: str
+    text: str
+    source_span: tuple[int, int]
+    source_section: Optional[str] = None
+    kind: Literal["entry_heading", "entry_line"]
+
+
 class ClaimExtraction(CrucibleModel):
     """Phase 4A output. Facts about what the resume asserts and how each assertion could be checked. No verdicts."""
     document: str
@@ -836,6 +848,7 @@ class ClaimExtraction(CrucibleModel):
     units: Optional[list[ClaimUnit]] = None  # None = not extracted (e.g. no text layer), never [] for "did not look"
     claims: Optional[list[ExtractedClaim]] = None
     excluded: Optional[list[ExcludedUnit]] = None
+    references: list[ProjectReference] = []  # M1: entry headings / lines, not claims
     counters: dict[str, int] = {}
     tiers: dict[str, str] = {}
     calls: int = 0
@@ -1021,6 +1034,7 @@ class ReportRow(CrucibleModel):
 class ReportHeader(CrucibleModel):
     candidate: Optional[dict] = None  # I2b: what the operator supplied: {github_user, reference}; emails never appear
     identity_check: Optional[dict] = None  # J2: the resume's GitHub links vs the operator's --user / --repo
+    references: list[dict] = []  # M1: project / entry headings (not claims), with the analysed repositories they name
     analysed: list[dict] = []  # 3.6 repo_facts: repo, ref, head_sha, scope, source files and lines, languages
     excluded: list[dict] = []  # 3.5 via 3.6: excluded files and lines by reason, per repo
     authorship: list[dict] = []  # 3.6: per repo authored ratio WITH its confidence and reason (rendering rule)

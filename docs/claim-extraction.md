@@ -91,6 +91,28 @@ The Stage 4 PROMPT states the same rule with structurally identical examples usi
 event bus, Docker layer caching, Loki/Grafana, cache hit rate on the search path). Two of the examples above are eval
 rows (w1, w4), and an eval row quoted in the prompt measures memorisation, not the rule.
 
+## Evaluation: superseded plan (recorded 2026-10-11, Phase 4M)
+
+**This plan was superseded; it is not pending work.** The 20-row frozen extraction set (`tests/eval/extraction_set.jsonl`:
+5 worked rows, 15 never labelled) was never labelled and `tests/eval/FROZEN.sha256` was never created, so
+`eval_extraction.py` and the Stage 4 tier comparison below never ran.
+
+What carried the quality load instead:
+- the adversarial document corpus (`tests/fixtures/docs/MANIFEST.json`: 31 documents, ground truth fixed by
+  construction, plus 3 tool controls);
+- the live end-to-end runs (Phases 4G5, 4I, 4J, 4K, 4L, 4M). These found the bugs this repository records:
+  - the bare date range contradicted 3 of 3;
+  - dropped skills lists;
+  - an education date reaching a model;
+  - the verdict tied to which item was cited;
+  - a team-size claim dropped at Stage 2;
+  - a fabricated "Built a …" ownership claim from a project heading.
+
+The Stage 2 rubric has since changed twice (L2 factual-assertion wording; M1 entry headings never reach it), and
+Stages 2 and 4 are now partly deterministic (skills lists J1, references M1, the verbless-source guard M2). The set
+would need relabelling against the current rubrics before any comparison; the two sections below describe the
+protocol as built, for that case.
+
 ## Evaluation runs
 
 The platform is not deterministic at temperature 0 (FEEDBACK.md #10). `eval_extraction.py` runs every row
@@ -169,3 +191,21 @@ Round 2 (2026-10-11, after S1-S6):
   typed check ignores common words by design.
 - **Prompt-example leakage:** a resolved referent copied from a rubric example ("the command-line tool for log
   search") is not caught by any check.
+
+## Phase 4M: references and the verbless-source guard
+
+- **M1 (`entries.py`): references, not claims.** A heading or entry line under Projects / Experience / Education is a
+  project reference: no model call, never a claim, never verified, never given a verb. It stays context for the units
+  beneath it and is a retrieval target (the report says whether an analysed repository carries its name).
+  - Why: listing a project implies involvement only by convention, and supplying that assumption is what this
+    pipeline refuses to do elsewhere.
+  - Exception: job-title lines stay role_or_team claims, because they assert a held role.
+- **M2 (`verbs.py`): the verbless-source guard, a backstop after the existing guards.** If the unit states no verb
+  and a Stage 4 claim does, the unit is excluded as `fabricated_assertion` and listed under "could not process".
+  - Verbs are stemmed ("redesigning" -> "Redesigned" is the same verb).
+  - It checks verb PRESENCE only, never a claim-to-source verb match: that breaks paraphrase, the reason
+    claim_support_ratio was abandoned (a real paraphrase measured 0.707, below both fabrications).
+  - Lexicon-based, no new dependency. In a source, an -ing word is a verb only if it starts the unit or takes an
+    object ("Redis caching layer" stays verbless); hyphenated compounds are never verbs; noun-like base forms
+    ("Senior Engineer", "release pipeline") are verbs only as a unit's first word.
+  - Known limit, on the safe side: "Release pipeline for mobile apps" reads as an imperative, so the guard misses it.

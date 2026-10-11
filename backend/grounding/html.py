@@ -353,6 +353,16 @@ class Page:
         for v in VERDICT_SHAPES:
             out.append(f'<span class="verdict-badge v-{v}">{VERDICT_SHAPES[v]}{E(v.replace("_", " "))}</span>')
         out.append("</div>")
+        refs = self.get("header", "references") or []
+        if refs:
+            out.append('<p class="small"><strong>References</strong> <span class="muted">(project and entry headings: not '
+                       'claims, not verified, shown as the resume states them)</span></p><ul class="small">')
+            for i, r in enumerate(refs):
+                b = ("header", "references", i)
+                names = (f'names the analysed repository <span class="mono">{self.val(b + ("names_analysed_repos",))}</span>'
+                         if r.get("names_analysed_repos") else "no analysed repository has this name")
+                out.append(f'<li>{self.val(b + ("text",))} <span class="muted">· {names}</span></li>')
+            out.append("</ul>")
         if not rows:
             out.append(f"<p>{NOT_MEASURED}: the report has no claim rows.</p></section>")
             return "".join(out)

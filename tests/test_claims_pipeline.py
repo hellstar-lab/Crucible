@@ -251,7 +251,8 @@ def test_every_claim_traces_to_its_unit_span(fake):
         else:
             assert c.source_span == spans[c.unit_id]
     every = {u.unit_id for u in out.units}
-    assert {c.unit_id for c in out.claims} | {e.unit_id for e in out.excluded} == every  # every unit is accounted for
+    # every unit is accounted for: a claim, an exclusion, or (M1) a reference
+    assert {c.unit_id for c in out.claims} | {e.unit_id for e in out.excluded} | {r.unit_id for r in out.references} == every
 
 
 def test_no_text_layer_means_none_not_empty(fake):
@@ -369,7 +370,8 @@ def test_bare_date_range_claim_from_decomposition_is_dropped(fake):
     unit = "B.Sc. Computer Science, University of Example 2014 - 2018"
     fake.script[("claim_decomposition", unit)] = J("decomposed", claims=[{"text": "B.Sc. Computer Science", "qualifiers": []},
                                                                           {"text": "2014 - 2018", "qualifiers": []}])
-    out = run_text(unit)
+    # (under EXPERIENCE / EDUCATION this verbless entry line is a reference since 4M M1; the date rule is about Stage 4)
+    out = pipeline.extract_from_text(unit, headings=["CERTIFICATIONS"], decomposition_tier="nano")
     assert [c.text for c in out.claims] == ["B.Sc. Computer Science"] and out.counters["bare_date_claims_dropped"] == 1
     assert out.units[0].dropped_claims == ["2014 - 2018"]
 

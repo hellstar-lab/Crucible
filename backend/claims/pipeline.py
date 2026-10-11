@@ -35,10 +35,10 @@ from collections import Counter
 from pathlib import Path
 
 from backend import llm
-from backend.contracts import (ClaimExtraction, ClaimUnit, DocumentReport, ExcludedUnit, ExtractedClaim, ShieldGate, ShieldItem,
-                               StageDecision, SHIELD_SPAN_CAP)
+from backend.contracts import (ClaimExtraction, ClaimUnit, DocumentReport, ExcludedUnit, ExtractedClaim, ProjectReference, ShieldGate,
+                               ShieldItem, StageDecision, SHIELD_SPAN_CAP)
 
-from . import config, guards, routing, skills, stages, support
+from . import config, entries, guards, routing, skills, stages, support, verbs
 from .split import Unit, split_structure
 
 log = logging.getLogger(__name__)
@@ -185,6 +185,7 @@ class _Run:
         self.stage3_n = config.STAGE3_ENSEMBLE_N  # P2-3: 1 = single call, >1 = ensemble with unanimity
         self.reason_first = config.REASON_FIRST  # C2: reason before verdict by default (verdict-first kept for A/B)
         self.claims: list[ExtractedClaim] = []
+        self.references: list[ProjectReference] = []  # M1
         self.excluded: list[ExcludedUnit] = []
         self.units: list[ClaimUnit] = []
         self.truncated, self.truncation_reason = False, None
@@ -293,6 +294,14 @@ class _Run:
             items = skills.split_items(self.text, u.start, u.end)
             if items is not None:
                 return self.skills_list(u, cu, items)
+        ref = entries.reference_kind(u.text, u.kind, u.section, u.heading_path)
+        if ref is not None:  # M1: a project / entry heading is a reference: context and a retrieval target, never a claim
+            self.counters["references"] += 1
+            cu.decisions.append(StageDecision(stage="selection", tier="deterministic", verdict="reference",
+                                              reason="project / entry heading: a reference, not a claim; no model call"))
+            self.references.append(ProjectReference(unit_id=u.unit_id, text=u.text, source_span=(u.start, u.end),
+                                                    source_section=u.section, kind=ref))
+            return None
         try:
             # Stage 2: selection
             r = self.stage(stages.select, cu, u.text, context, self.tiers["selection"])
@@ -349,6 +358,14 @@ class _Run:
                 if not self.derivable(u, cu, c["text"] + " " + " ".join(c.get("qualifiers") or []), source, "decomposition",
                                       support_source=unit_source):
                     return None  # rule 3: the whole unit is excluded
+
+            # M2 backstop: a unit that states no verb cannot yield a claim that asserts one ("Crucible, hiring-evidence
+            # system" -> "Built a Crucible ..."). Verb PRESENCE only, stemmed: not a verb match (that breaks paraphrase).
+            fab = [c["text"] for c in raw_claims if verbs.fabricated_assertion(u.text, c["text"])]
+            if fab:
+                self.counters["fabricated_assertion"] += 1
+                return self.exclude(u, "decomposition", "fabricated_assertion",
+                                    f"the unit states no verb, but the claim {fab[0]!r} asserts one")
             kept = []
             for c in list(raw_claims):
                 if is_bare_date_range(c["text"]):  # F3: a date range produced by decomposition is a field value too
@@ -390,11 +407,12 @@ def _finish(run: _Run, document: str, gate_info: ShieldGate, extra_excluded: lis
     for k in ("model_refused", "sentinel_normalized", "injection_suspected", "fabricated_quantity", "fabricated_entity",
               "qualifier_dropped", "stage3_pregate_skips", "rubric_leak", "ungrounded_qualifier", "stage3_escalations",
               "greedy_disagreement", "stage3_ensemble_disagreements", "bare_date_units", "bare_date_claims_dropped",
-              "skills_units", "skills_claims", "skills_items_over_cap"):
+              "skills_units", "skills_claims", "skills_items_over_cap", "references", "fabricated_assertion"):
         counters.setdefault(k, 0)
     counters["model_decisions"] = run.decisions
     return ClaimExtraction(
         document=document, document_text=run.text, shield=gate_info, units=run.units, claims=run.claims, excluded=run.excluded,
+        references=run.references,
         counters=counters, tiers=run.tiers, calls=run.calls, cost_usd=round(run.cost, 8) if run.cost_known else None,
         cost_cap_usd=run.cap, truncated=run.truncated, truncation_reason=run.truncation_reason,
         sufficiency_disagreement_rate=None,  # the judgement contract (and its override) is 4C only; not measured in 4A
