@@ -330,3 +330,270 @@ Redefine the baseline as a tool-using stranger with the human's exact affordance
   mutants and after each Q3 read.
 - Final `git status --short` shows no tracked file modified. Untracked: only `scripts/spike/` (throwaway) and this
   document.
+
+---
+
+# Phase 5, round 2: Q2′ / Q3′ re-measure, then the gated build (2026-10-11)
+
+| Part | Result |
+|---|---|
+| Part 1, Q2′ | **Gate passes** on Crucible: about 630 clean, non-telegraphing, plausible candidates (95% interval 270–1,370) against a gate of 15. There is a concentration risk. |
+| Part 2 | **Built:** the `bugpool/` offline pool generator plus the session refusal path. Crucible's pool holds 15 validated candidates. |
+| Part 3, Q3′ | **Parity harness built.** A tool-using stranger (Super, 15 tool calls) found the planted line in **2 of 10**. Files opened is the discriminator. |
+
+`backend/` is untouched (0 diff lines). Every mutation was reverted, and the real working tree was never mutated: the
+pool generator and the agent work in throwaway git worktrees. Everything ran in the spike venv only.
+
+## Part 1, Q2′: re-measure with behaviour tests and an operator whitelist
+
+### 1. What each test touches
+
+This comes from the coverage-context DB. Tests are keyed `path::function`, so parametrized ids collapse:
+**414 test functions**.
+
+| Measure | min | median | p75 | p90 | max |
+|---|---|---|---|---|---|
+| distinct `backend/` modules touched | 1 | 3.5 | 12 | 18 | 31 |
+| statements covered | 1 | 146 | 399 | 801 | 1,687 |
+
+Histogram of modules touched:
+
+| Modules | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19+ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Tests | 154 | 34 | 19 | 6 | 5 | 6 | 28 | 9 | 7 | 15 | 20 | 14 | 3 | 8 | 17 | 17 | 9 | 26 | 17 |
+
+The distribution is bimodal. The chord ("kneedle") knee of the sorted curve falls at **3**, which would select 226
+tests, but that point is inside the unit-test mass. The tests at 3 are `test_reference_kind` and
+`test_kind_and_route`, which are function-level.
+
+**Threshold chosen: 7 or more modules = behaviour test. It selects 190 of 414 tests.** That is the edge of the second
+population, after the 4–6 valley. Examples: `test_2pt_black_injection_is_caught`,
+`test_scan_pdf_makes_zero_model_calls_on_every_fixture`, `test_fixture_matches_manifest`. This departs deliberately
+from the literal knee, which sits inside the first mode.
+
+### 2. Restricted candidates
+
+**Whitelist** (cosmic-ray names): comparison swaps within `== != < <= > >=`, `Is`↔`IsNot`, `True`↔`False`, `AddNot`,
+`UnaryOperator_Delete_Not`, `And`↔`Or`, `Break`↔`Continue`, `NumberReplacer`. cosmic-ray's NumberReplacer applies
+exactly +1 and −1 (its `OFFSETS`), so it already satisfies the {−1, 0, +1} deltas; a 0 delta is not a mutation.
+Cross-family comparisons such as `Is`→`Gt` are excluded, because they only raise TypeError.
+
+| Step | Candidates |
+|---|---|
+| raw | 23,899 |
+| whitelist | 10,261 |
+| authored (`blame.py`) | 9,461 |
+| not excluded | 9,420 |
+| **covered by at least one behaviour test** | **7,565**, on 2,181 lines in 59 files |
+
+By family: comparison swap 2,650 · number ±1 2,262 · not inserted 1,199 · and/or 747 · is/is not 267 ·
+not removed 226 · boolean 137 · break/continue 77.
+
+### 3. Sample of 60 (seed 11), each run against its covering tests only
+
+| Outcome | Count |
+|---|---|
+| survivor | 32 |
+| noisy kill (2+ test functions fail) | 16 |
+| **clean** | **6** |
+| telegraphed | 6 |
+| exception at the mutated line | 0 |
+| broken | 0 |
+
+The whitelist removed both the TypeError swaps and the cosmic-ray `**` defect: no exception-at-site, no broken.
+
+All six "telegraphed" calls hold up on reading:
+- `401`→`400` dies with "GitHub API 401 …";
+- `n <= 1`→`n < 1` dies on `'one commit'`;
+- `group(1)`→`group(2)` is killed by `test_bound_names`.
+
+### 4. Yield, and an honest read of the diffs
+
+Six clean kills came from the 60. Each, with a verdict on whether a tired human would write it:
+
+```
+pdf_security.py:219   comparison swap
+-        if seen > MAX_ATTACHMENTS or not isinstance(fs, DictionaryObject):
++        if seen <= MAX_ATTACHMENTS or not isinstance(fs, DictionaryObject):
+```
+Plausible: an inverted cap. Killed by `test_fixture_matches_manifest` with a downstream `IndexError: list index out of
+range` raised in the eval harness, which does not point at the code.
+
+```
+structure.py:507   break <-> continue
+-            continue
++            break
+```
+Plausible. Message: "text-only link: got []". That names the *links* feature, not `build_links`.
+
+```
+structure.py:245   comparison swap
+-    if len(widths) != 1 or next(iter(widths)) < config.TABLE_MIN_COLS:
++    if len(widths) == 1 or next(iter(widths)) < config.TABLE_MIN_COLS:
+```
+Plausible. Message: "tables: got []", which names a feature.
+
+```
+lines.py:157   comparison swap
+-        if clusters and abs(ymid - centre) <= LINE_TOLERANCE_EM * max(size, sz):
++        if clusters and abs(ymid - centre) > LINE_TOLERANCE_EM * max(size, sz):
+```
+Plausible. Downstream IndexError.
+
+```
+lines.py:180   not inserted
+-                if gap > max(SEGMENT_GAP_EM * med, SEGMENT_GAP_MIN_PT):
++                if not gap > max(SEGMENT_GAP_EM * med, SEGMENT_GAP_MIN_PT):
+```
+Plausible in meaning, unnatural in form: a human writes `<=`, not `not … >`.
+
+```
+lines.py:134   number +/-1
+-            ... < max(c.font_size, 1) * 0.8
++            ... < max(c.font_size, 1) * -0.19999999999999996
+```
+**Machine noise.** NumberReplacer on a float leaves floating-point garbage. The pool generator now excludes floats.
+
+Only 6 clean kills exist in the sample, so 8 diffs are not available; all 6 are shown.
+
+**Yield: 5 of 60 are clean, non-telegraphing and plausible (8.3%). Over the 7,565 restricted candidates that is
+≈ 630, with a Wilson 95% interval of 270–1,370.** Two of the five hint at a feature ("links", "tables"). Counting
+only the three with no hint at all: 3/60 ≈ 380 (130–1,040).
+
+**GATE: PASS** (≥ 15 per repo), on Crucible.
+
+**Caveat, measured:** every one of the 5 is in the PDF layout code (`backend/shield/`), and all 5 are killed by the
+**same test function**, `test_fixture_matches_manifest`. A golden-fixture test that checks a whole document's output
+is what makes non-telegraphing kills possible here. A candidate repository without that kind of test may not pass
+this gate.
+
+## Part 2: the pool generator (`bugpool/`)
+
+`bugpool/` is a top-level package, not under `backend/`. It imports `backend.evidence` read-only (blame, counting,
+exclusions). It needs cosmic-ray and pytest-cov, so it runs in the spike venv. Its tests are in `bugpool/tests/`,
+outside the main suite's `testpaths`, and skip when cosmic-ray is absent.
+
+```
+<spike-venv>/bin/python -m bugpool generate --repo . --email abhinavbansal2120@gmail.com --out pool.json --target 15 --max-validations 250
+```
+
+It is an **offline batch job**, run in a temporary `git worktree` at HEAD, so the real tree is never touched. In order:
+1. Build the coverage map.
+2. Enumerate candidates with `cosmic-ray init` (nothing executed).
+3. Filter: whitelist; integer literals only for ±1; authored (`blame.py`); not excluded; behaviour-covered.
+4. Validate one candidate per line, in seeded order, until the target is reached or the validation cap hit.
+5. Write the pool file.
+
+Each pool candidate carries:
+- the file and line (and end line), the diff, and the original and mutated lines;
+- the operator and its family;
+- the **killing test** (`path::function`) and its message;
+- the covering tests and the behaviour tests;
+- the checks it passed: `clean_kill`, `exception_at_site: false`, `telegraph_hits: []`, and plausibility (a
+  whitelisted family; integer literals only).
+
+**Refusal path.** If the repository has no tests, no behaviour test, no authored line covered by one, or no candidate
+validates, the pool is `status: "empty"` with the reason recorded. `bugpool.session.plant()` then returns
+`{"planted": false, "message": "insufficient coverage to plant a validated bug in authored code", ...}` and plants
+nothing. Tested on a fixture repo with no tests: the pool is empty, plant refuses, and the tree and worktree list are
+unchanged. Also tested on a fixture with only one-module unit tests: empty, with reason "no behaviour test".
+
+**Second tier.** The characterization-test fallback is **not built**. It is recorded in every pool
+(`"second_tier": "planned second tier, not built: ..."`). The seam is `generate_pool(second_tier=callable)`: the
+callable is invoked only when the pool would otherwise be empty.
+
+**Q1 fix: line → test is stored as `path::function`, never a parametrized node id.**
+- On Crucible, the map was built three consecutive times in a worktree. All three were identical: 863 tests, 6,136
+  lines mapped, 414 test keys.
+- That check also exposed one more defect. `tests/test_claims_skills.py::test_split_items[Python; Go | Rust • C++…]`
+  has a `|` inside its parameter id, so splitting the coverage context on the first `|` left `test_split_items[Python;
+  Go `. The map was still stable, because that parameter is deterministic, but the key was not a runnable selector.
+- **Fixed:** `test_key` now strips the phase suffix from the right and drops everything from the first `[` of the last
+  segment. A regression test pins it.
+- The Crucible pool below was generated before the fix. Its only exposure was a `skills.py` candidate covered by that
+  test, which would have been classified broken. None is in the pool.
+
+**Crucible's pool**, generated before the fix:
+- `status: ok`, **15 candidates**;
+- 164 validations: 15 clean, 73 survivor, 53 noisy, 22 telegraphed, 1 exception at site;
+- 2,266 s (37.8 min), including the coverage run;
+- killing tests: `test_fixture_matches_manifest` × **11**, the report-page fixture test × 2, a retrieval test × 1, a
+  target test × 1;
+- files: `shield/lines.py` 4, `structure.py` 2, `fonts.py` 2, `grounding/html.py` 2, and 1 each in `docx_scan.py`,
+  `doc_kind.py`, `pdf_security.py`, `retrieval/rules.py` and `evidence/question_surface.py`.
+
+Plausibility of the 15, read honestly:
+- **About 12 read as a tired human's bug:** inverted `is`/`is not` guards, flipped bounds, wrong tuple indices
+  (`prev[1][2]`→`prev[1][3]`, `prev[2]`→`prev[1]`).
+- **2 are machine noise:** `runs[-1].bold == bold`→`>`, and `>`→`!=` on a float gap.
+- **2 are right in meaning but unnatural in spelling:** `not x is None`. A human writes `x is not None`, so the odd
+  spelling itself could give the line away.
+
+The automated checks cannot see that last point. Many manifest-test messages also still name a *feature*
+("tables: got …", "has_form: got False"), though never the symbol.
+
+## Part 3, Q3′: the parity harness (`scripts/spike/q3b_agent.py`)
+
+The AI Stranger is now a **tool-using agent with exactly a human's affordances**:
+- `list_files`, `read_file` (250 numbered lines per call), `run_tests` (any pytest selector, or the whole suite), and
+  `answer`;
+- the failure output comes back from `run_tests`;
+- nothing else: no search tool and no traceback beyond what pytest prints.
+
+The rest of the setup:
+- **Budget:** 15 tool calls, then a forced answer. Super only, through the existing router (task `stranger_agent`).
+- **Isolation:** each candidate gets a throwaway worktree at the pool's commit, with the bug planted by
+  `bugpool.session.plant`. The tools refuse dotfiles, `.env*` and anything outside the worktree.
+- **Hit rule:** the answer must name the mutated file and a line within the mutated span.
+
+| Candidate | Found | Files opened | Tool calls | Cost | Wall clock* |
+|---|---|---|---|---|---|
+| `shield/docx_scan.py:266` | no | 2 | 15 (forced) | $0.0149 | 127 s |
+| `shield/structure.py:255` | **yes** | 3 | 13 | $0.0278 | 126 s |
+| `shield/lines.py:137` | no | 3 | 15 (forced) | $0.0164 | 132 s |
+| `shield/lines.py:205` | no | 3 | 15 (forced) | $0.0158 | 132 s |
+| `grounding/html.py:329` | no | 1 | 15 (forced) | $0.0125 | 123 s |
+| `grounding/html.py:246` | no | 3 | 15 (forced) | $0.0215 | 124 s |
+| `shield/doc_kind.py:21` | **yes** | 7 | 12 | $0.0264 | 124 s |
+| `retrieval/rules.py:171` | no | 4 | 15 (forced) | $0.0232 | 127 s |
+| `shield/lines.py:179` | no | 2 | 7 | $0.0081 | 114 s |
+| `shield/structure.py:242` | no | 2 | 15 (forced) | $0.0135 | 133 s |
+
+*Wall clock is recorded, never compared. Most of it is the agent's single full-suite run.
+
+**Headline: the stranger found the planted line in 2 of 10 within a 15-call budget.**
+
+The discriminator is files opened. The two hits opened 3 and 7 files; across all ten, the agent opened the mutated
+file in only **3 of 10** runs and answered correctly in 2 of those 3. Cost was $0.18 in total, a median of $0.016
+per candidate.
+
+What the agent did with its budget (measured):
+- it ran the tests exactly once in every run;
+- it spent 9–13 of its 15 calls on `list_files` in six runs;
+- 7 of 10 runs hit the budget and gave a forced answer with no line.
+
+An earlier run of the same harness, before the refusal false positive below was handled, found **1 of 8** (log
+kept), so **3 of 18** across both runs.
+
+**What this does and does not show.**
+- **This is a weak stranger.** It is a plain JSON tool loop with no search tool, a small read window and 15 calls.
+  A production coding agent with search, a larger budget, or a better scaffold would very likely do much better.
+  The 20% is a lower bound for "an AI stranger", not a measurement of the best one.
+- **The comparison is not run yet.** The human side of the same harness (same tools, same budget, same failure
+  output) has not been measured.
+- **Speed is not compared.** It is not the story, and per Q3 never will be.
+- **A false positive in our own router:** in the first run, its lexical refusal detector fired on the agent's own
+  free-text `thought` field and crashed the run. It is now recorded as a turn with no tool call; it did not recur in
+  the second run.
+
+## What the author-versus-stranger measurement does and does not claim
+
+This measurement asks one thing: given the same repository, the same planted bug, the same tools and the same
+budget, does the person whose identity the code is committed under find the bug by opening fewer files, more often,
+than a capable stranger? It claims nothing about who typed the code. Blame attribution means "committed under this
+identity", not "hand-written": code produced with an AI assistant, pair-programmed, or copied in and committed by the
+candidate counts as theirs. On Crucible itself most of the code was written in AI-assisted sessions and committed
+under `hellstar-lab`. What is measured is the ability to navigate and explain code committed under one's name, which
+is what an interviewer actually relies on when a candidate says "I built this". It is not a test of authorship in the
+typing sense, not a speed contest, and not a verdict on the candidate. Its result is a fact for the human reviewer,
+with the same caveats as every other row in the report.
