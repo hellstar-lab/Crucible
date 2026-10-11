@@ -22,7 +22,7 @@ def test_models_exact_strings():
 
 def test_every_task_has_a_known_tier():
     assert set(llm.TASK_TIER.values()) <= set(llm.MODELS)
-    assert len(llm.TASK_TIER) == 15
+    assert len(llm.TASK_TIER) == 16  # Phase 4G added question_generation (super)
 
 
 def test_extract_json_variants():

@@ -32,7 +32,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend import grounding, llm, retrieval, verdicts  # noqa: E402
+from backend import grounding, llm, questions, retrieval, verdicts  # noqa: E402
 from backend.claims.pipeline import extract_claims  # noqa: E402
 from backend.evidence import cache  # noqa: E402
 from backend.evidence.target import Options, analyze_targets, identity_of  # noqa: E402
@@ -97,6 +97,10 @@ def main() -> int:
     ap.add_argument("--reference", help="an opaque operator reference for the candidate (no emails)")
     ap.add_argument("--decomposition-tier", default="nano")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--no-questions", action="store_true", help="skip Phase 4G question generation")
+    ap.add_argument("--max-questions", type=int, default=8)
+    ap.add_argument("--include-unverifiable", action="store_true")
+    ap.add_argument("--per-student", metavar="EMAIL", help="anchor questions only in code this person wrote (G6)")
     a = ap.parse_args()
     logging.disable(logging.WARNING)
     run_id = uuid.uuid4().hex[:8]
@@ -131,12 +135,18 @@ def main() -> int:
             run = verdicts.verdicts_for(claims, sets, run_tag=f"{tag}:4C")  # 4C
             grounded, failures = grounding.ground_all(run.verdicts, sets, views)  # 4D
             view_notes = [n for v in views for n in v.notes]
+            rep = build_report(verdicts=grounded, evidence_sets=sets, target_reports=report.targets, extraction=extraction,
+                               grounding_failures=failures, run=run, claims=claims,
+                               candidate={"github_user": a.user, **({"reference": a.reference} if a.reference else {})},
+                               identity_check=ic,
+                               run_label=f"End-to-end run {run_id}: resume {a.resume.name}, repositories {', '.join(repos)}.")
+            qset = None
+            if not a.no_questions:  # 4G: needs the checkouts (function bodies), so it runs before they are removed
+                qset = questions.generate(json.loads(rep.model_dump_json()), sets, views, person=a.per_student,
+                                          max_questions=a.max_questions, include_unverifiable=a.include_unverifiable,
+                                          run_tag=f"{tag}:4G")
+                rep = rep.model_copy(update={"questions": qset})
 
-    rep = build_report(verdicts=grounded, evidence_sets=sets, target_reports=report.targets, extraction=extraction,
-                       grounding_failures=failures, run=run, claims=claims,
-                       candidate={"github_user": a.user, **({"reference": a.reference} if a.reference else {})},
-                       identity_check=ic,
-                       run_label=f"End-to-end run {run_id}: resume {a.resume.name}, repositories {', '.join(repos)}.")
     a.out.parent.mkdir(parents=True, exist_ok=True)
     data = json.loads(rep.model_dump_json())
     a.out.with_suffix(".json").write_text(json.dumps(data, indent=1))
@@ -173,6 +183,18 @@ def main() -> int:
         print(f"    {task:<22} requests={audit.requests[task]:<4} cost=${audit.cost[task]:.6f}")
     print(f"    TOTAL                  requests={sum(audit.requests.values()):<4} cost=${sum(audit.cost.values()):.6f}")
     print(f"\nprompt audit: {len(audit.needles)} needles (hidden spans + canary) checked in every prompt; hits={len(audit.hits)} {audit.hits}")
+    if qset is not None:
+        print(f"\nQUESTIONS (4G): {len(qset.questions)} kept, {len(qset.rejected)} rejected, {len(qset.skipped)} not asked, "
+              f"{qset.dropped_by_cap} over the cap of {qset.max_questions}; {qset.calls} request, ${qset.cost_usd}"
+              + (f"; per student {qset.person}" if qset.person else ""))
+        for q in qset.questions:
+            a_ = q.anchor
+            where = f"{a_.path}:{a_.start_line}-{a_.end_line} {a_.function} ccn={a_.ccn} authored={a_.authored_line_ratio}" if a_.kind == "function" else "claim only"
+            print(f"  {q.rank}. [{q.verdict} -> {q.shape}] {q.text}\n       anchor: {where}\n       claim: {q.claim_text!r}")
+        for r in qset.rejected:
+            print(f"  REJECTED {r['rule']} {r['claim_id']}: {r['text']!r} ({r['detail']})")
+        for sk in qset.skipped:
+            print(f"  not asked {sk['claim_id']} [{sk['verdict']}]: {sk['reason']}")
     print("\nCLAIMS")
     for r in rep.rows:
         c = r.citation

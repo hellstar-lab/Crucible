@@ -364,8 +364,9 @@ class _Run:
             fab = [c["text"] for c in raw_claims if verbs.fabricated_assertion(u.text, c["text"])]
             if fab:
                 self.counters["fabricated_assertion"] += 1
+                amb = " (its first word is verb_ambiguous: read as a noun)" if verbs.verb_ambiguous(u.text) else ""
                 return self.exclude(u, "decomposition", "fabricated_assertion",
-                                    f"the unit states no verb, but the claim {fab[0]!r} asserts one")
+                                    f"the unit states no verb{amb}, but the claim {fab[0]!r} asserts one")
             kept = []
             for c in list(raw_claims):
                 if is_bare_date_range(c["text"]):  # F3: a date range produced by decomposition is a field value too

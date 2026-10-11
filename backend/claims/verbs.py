@@ -15,8 +15,10 @@ Source and claim are read slightly differently, both on the cautious side:
     "Redis caching layer" and "hiring-evidence system" stay verbless; a hyphenated compound is never a verb;
   * in a CLAIM, any lexicon form counts ("Built", "building", "builds");
   * in both, a noun-like base form mid-phrase ("Senior Engineer", "release pipeline") is a noun.
-Known limit, on the safe side: a noun-like base form that STARTS a unit ("Release pipeline for mobile apps") is read as
-an imperative verb, so the guard does not fire there. M1 already routes headings and entry lines before this backstop.
+A noun-like base form that STARTS a source unit ("Release pipeline for mobile apps", "Design the API") is
+verb_ambiguous and counts as VERBLESS: without a POS tagger the guard cannot tell a noun phrase from an imperative,
+so it errs to the conservative side. A real claim from such a unit is then excluded ("could not process") rather than
+a fabricated verb passing.
 """
 
 from __future__ import annotations
@@ -93,8 +95,11 @@ def has_verb(text: str, *, source: bool = False) -> bool:
         if base is None:
             continue
         low = tok.lower()
-        if low == base and base in _NOUNISH and i != 0:
-            continue  # "Release pipeline", "Senior Engineer": a noun (source and claim alike)
+        if low == base and base in _NOUNISH and (i != 0 or source):
+            # mid-phrase: a noun ("Senior Engineer"). Unit-initial in a SOURCE: verb_ambiguous ("Release pipeline ..."
+            # or "Design the API"?), treated as VERBLESS so the guard errs to "could not process", never to a
+            # fabricated assertion (Phase 4G fold-in from the M2 review)
+            continue
         if source and low.endswith("ing"):
             nxt = toks[i + 1].lower() if i + 1 < len(toks) else ""
             if not (i == 0 or nxt in _OBJECT_STARTERS):
@@ -106,3 +111,12 @@ def has_verb(text: str, *, source: bool = False) -> bool:
 def fabricated_assertion(source: str, claim: str) -> bool:
     """M2: the source states no verb, the claim does."""
     return not has_verb(source, source=True) and has_verb(claim)
+
+
+def verb_ambiguous(text: str) -> bool:
+    """The unit's first word is verb-shaped but could be a noun (a bare noun-like base form)."""
+    toks = _TOKEN.findall(text or "")
+    if not toks or "-" in toks[0]:
+        return False
+    base = _verb_form(toks[0])
+    return base is not None and toks[0].lower() == base and base in _NOUNISH

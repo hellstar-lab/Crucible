@@ -1046,8 +1046,54 @@ class ReportHeader(CrucibleModel):
     stage_versions: dict[str, Optional[str]] = {}
 
 
+class QuestionAnchor(CrucibleModel):
+    """What a question may talk about, chosen by code (Phase 4G G1). kind "function": candidate-authored code with its
+    line range, complexity and authored ratio; "claim": the claim's own words only, no code (contradicted,
+    no_evidence, unverifiable, and inconclusive without authored evidence)."""
+    kind: Literal["function", "claim"]
+    repo: Optional[str] = None
+    path: Optional[str] = None
+    function: Optional[str] = None
+    start_line: Optional[int] = None
+    end_line: Optional[int] = None
+    ccn: Optional[int] = None
+    authored_line_ratio: Optional[float] = None  # for the person the question is for
+    artifact: Optional[str] = None  # what the claim names (contradicted: "Tell me about your role on <artifact>")
+
+
+class Question(CrucibleModel):
+    rank: int
+    claim_id: str
+    claim_text: str
+    verdict: str  # for the REVIEWER; never sent to the model, never in the question text (R2, R3)
+    shape: Literal["code_decision", "role", "where", "walkthrough", "conversation"]
+    anchor: QuestionAnchor
+    text: str
+    rank_key: list = []  # (group, -score, claim order): the deterministic order (G5)
+
+
+class QuestionSet(CrucibleModel):
+    """Phase 4G: interview questions from a ClaimEvidenceReport. Code selects claims, anchors and order; one model
+    request only phrases them; every question passes R1-R4 or is dropped (recorded). No score, no ranking of PEOPLE:
+    the rank orders questions, most useful first."""
+    questions: list[Question] = []
+    rejected: list[dict] = []  # {claim_id, text, rule, detail}
+    skipped: list[dict] = []  # {claim_id, verdict, reason}: rows that could not be anchored or are not asked
+    rejected_count: int = 0
+    skipped_count: int = 0
+    dropped_by_cap: int = 0
+    dropped_claim_ids: list[str] = []
+    max_questions: int
+    person: Optional[str] = None  # per-student mode (G6): the email the anchors were filtered to (shown as given)
+    include_unverifiable: bool = False
+    calls: int = 0
+    cost_usd: Optional[float] = None
+    tier: Optional[str] = None
+
+
 class ClaimEvidenceReport(CrucibleModel):
     """One row per claim, plus a header saying what was analysed, excluded and not checkable. No scores, no ranking,
     no hire/reject signal."""
     header: ReportHeader
     rows: list[ReportRow]
+    questions: Optional[QuestionSet] = None  # Phase 4G

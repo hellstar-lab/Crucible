@@ -34,6 +34,7 @@ TASK_TIER = {
     "generate_tests": "super",
     "write_dockerfile": "super",
     "compose_bug": "super",
+    "question_generation": "super",  # Phase 4G: phrasing only; code selects claims and anchors
     "stranger_agent": "super",
     # ultra: verification and judgement
     "verify_claim": "ultra",

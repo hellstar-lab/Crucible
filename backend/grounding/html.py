@@ -203,6 +203,7 @@ blockquote{margin:0;padding:0 0 0 10px;border-left:3px solid var(--line)}
 pre.span{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--code);border-radius:4px;padding:6px 8px;margin:4px 0 10px;
 font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 ol.shield-items{padding-left:22px}
+ol.questions{padding-left:22px}ol.questions li{margin-bottom:14px}p.question{margin:0 0 4px;font-size:1.02rem}
 section.alert{border:2px solid var(--v-contradicted);background:var(--warn-bg)}
 section.alert h2{color:var(--v-contradicted)}
 """
@@ -483,6 +484,56 @@ class Page:
                 f'{self.val(v + ("authored_files",), "int")}</strong> of {self.val(v + ("files",), "int")} files importing '
                 f'{self.val(v + ("technology",))}</div>')
 
+    def questions(self) -> str:
+        """Phase 4G. The question is what the candidate hears; the claim and verdict beside it are for the reviewer."""
+        if self.get("questions") is None:
+            return ""
+        b = ("questions",)
+        qs = self.get("questions", "questions") or []
+        person = self.get("questions", "person")
+        out = ['<section id="questions"><h2>Interview questions</h2>',
+               '<p class="small muted">Chosen and ordered by code (contradicted claims first, then the most complex code the '
+               'person wrote, then claims with no evidence, then inconclusive ones); phrased by a model that never saw the '
+               'verdicts; every question checked against four rules (only authored code, no accusation, no verdict, no fact '
+               'outside its anchor). The verdict beside each question is for the reviewer, not for the candidate.</p>']
+        if person:
+            out.append(f'<p class="warn small">Per-student sheet: questions anchored only in code written by '
+                       f'<span class="mono">{self.val(b + ("person",))}</span>.</p>')
+        if not qs:
+            out.append("<p>No question passed selection and the four rules.</p>")
+        out.append('<ol class="questions">')
+        for i, q in enumerate(qs):
+            qb = b + ("questions", i)
+            a = q["anchor"]
+            if a["kind"] == "function":
+                anchor = (f'<span class="mono">{self.val(qb + ("anchor", "function"))}</span> · '
+                          f'<span class="mono">{self.val(qb + ("anchor", "path"))}:{self.val(qb + ("anchor", "start_line"))}–'
+                          f'{self.val(qb + ("anchor", "end_line"))}</span> · complexity {self.val(qb + ("anchor", "ccn"))} · '
+                          f'{self.val(qb + ("anchor", "authored_line_ratio"), "ratio")} written by '
+                          + ("this student" if person else "the candidate"))
+            else:
+                anchor = "about the claim only (no code is cited)"
+            out.append(f'<li><p class="question"><strong>{self.val(qb + ("text",))}</strong></p>'
+                       f'<div class="small">anchor: {anchor}</div>'
+                       f'<div class="small muted">for the reviewer: claim {self.val(qb + ("claim_text",))} · verdict '
+                       f'{self.val(qb + ("verdict",), "label")}</div></li>')
+        out.append("</ol>")
+        rej = self.get("questions", "rejected") or []
+        skipped = self.get("questions", "skipped") or []
+        out.append(f'<p class="small muted">Rejected by the rules: {self.val(b + ("rejected_count",))} · not asked: '
+                   f'{self.val(b + ("skipped_count",))} · over the cap of {self.val(b + ("max_questions",))}: '
+                   f'{self.val(b + ("dropped_by_cap",))}</p>')
+        if rej:
+            out.append('<ul class="small">' + "".join(
+                f'<li><strong>{self.val(b + ("rejected", j, "rule"))}</strong> {self.val(b + ("rejected", j, "text"))} '
+                f'<span class="muted">({self.val(b + ("rejected", j, "detail"))})</span></li>' for j in range(len(rej))) + "</ul>")
+        if skipped:
+            out.append('<ul class="small muted">' + "".join(
+                f'<li>{self.val(b + ("skipped", j, "claim_id"), cls="mono")}: {self.val(b + ("skipped", j, "reason"))}</li>'
+                for j in range(len(skipped))) + "</ul>")
+        out.append("</section>")
+        return "".join(out)
+
     def not_checkable(self) -> str:
         nc = self.get("header", "not_checkable")
         out = ['<section id="not-checkable"><h2>Not checkable from code</h2>']
@@ -606,7 +657,8 @@ def render_html(data: dict, title: str = "Claim evidence report") -> str:
     if re.search(r"\d", title):
         raise TraceError("the page title is static text and may not carry numbers")
     pg = Page(data)
-    body = "".join([pg.identity_banner(), pg.analysed(), pg.shield(), pg.claims(), pg.not_checkable(), pg.excluded(), pg.provenance()])
+    body = "".join([pg.identity_banner(), pg.analysed(), pg.shield(), pg.claims(), pg.questions(), pg.not_checkable(),
+                    pg.excluded(), pg.provenance()])
     page = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<meta name="color-scheme" content="light dark"><title>{E(title)}</title><style>{CSS}</style></head><body><main>'

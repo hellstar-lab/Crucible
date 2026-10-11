@@ -86,3 +86,25 @@ def test_report_lists_references_with_the_repos_they_name(fake):
     rep = build_report(verdicts=[], evidence_sets=[], target_reports=[], extraction=ext)
     assert [r["text"] for r in rep.header.references] == ["Crucible, hiring-evidence system"]
     assert all(r["text"] not in [row.claim_text for row in rep.rows] for r in rep.header.references)
+
+
+# --- 4G fold-in: verb_ambiguous unit-initial words count as verbless -----------------------------------------------
+
+@pytest.mark.parametrize("source,claim", [("Release pipeline for mobile apps", "Built a release pipeline"),
+                                          ("Design system for the checkout", "Designed the checkout design system")])
+def test_verb_ambiguous_first_word_is_treated_as_verbless(source, claim):
+    assert verbs.verb_ambiguous(source) and verbs.fabricated_assertion(source, claim)
+
+
+def test_unambiguous_initial_verbs_still_count():
+    assert not verbs.verb_ambiguous("Redesigned the checkout flow")
+    assert not verbs.fabricated_assertion("Migrated the billing service to Go", "Migrated the billing service to Go")
+
+
+def test_verb_ambiguous_drop_is_listed_as_could_not_process(fake):
+    unit = "Release pipeline for mobile apps"
+    fake.script[("claim_decomposition", unit)] = J("decomposed", claims=[{"text": "Built a release pipeline for mobile apps",
+                                                                          "qualifiers": []}])
+    out = pipeline.extract_from_text(unit, headings=["SUMMARY"], decomposition_tier="nano")
+    [e] = out.excluded
+    assert e.reason_code == "fabricated_assertion" and "verb_ambiguous" in e.detail
