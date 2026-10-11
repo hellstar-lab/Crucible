@@ -1,0 +1,9 @@
+# THROWAWAY (Phase 5 spike). Used for `cosmic-ray init` ONLY (enumerate candidates, execute nothing).
+[cosmic-ray]
+module-path = "backend"
+timeout = 120.0
+excluded-modules = []
+test-command = "python -m pytest -q -p no:cacheprovider -x tests"
+
+[cosmic-ray.distributor]
+name = "local"
