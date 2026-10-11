@@ -68,28 +68,45 @@ def check(verdict: ClaimVerdict, es: EvidenceSet, views) -> tuple[dict[str, str]
         else:
             res["c_lines"] = "pass"
 
-    if verdict.verdict == "supported" and verdict.claim_kind in ("ownership", "technology_use"):
-        # ownership: EVERY source line of the cited span is the candidate's; technology_use (K1): AT LEAST ONE is, i.e.
-        # the technology appears in code the candidate wrote
-        flags = view.line_flags(item.path) if (view and item.path) else None
-        if flags is None:
-            res["c_authored"], why["c_authored"] = "unavailable", "no line-level blame for the cited file under the candidate identity"
+    if verdict.verdict == "supported" and verdict.claim_kind == "ownership":
+        # ownership: EVERY source line of the CITED span is the candidate's (the claim names that artifact)
+        ok, detail = _authored_span(views, item, need=all)
+        res["c_authored"] = ok
+        if detail:
+            why["c_authored"] = detail
+    elif verdict.verdict == "supported" and verdict.claim_kind == "technology_use":
+        # L1: the verdict's authorship came from the whole EvidenceSet, so that is what is re-checked: at least one item
+        # whose span has an authored source line, re-read from blame (the citation itself is checked by c_index/path/lines)
+        results = [_authored_span(views, it, need=any) for it in es.items if it.authored_by_candidate is True]
+        if any(r == "pass" for r, _d in results):
+            res["c_authored"] = "pass"
+        elif not results:
+            res["c_authored"], why["c_authored"] = "fail", "no evidence item is attributed to the candidate"
         else:
-            start = item.start_line or 1
-            end = item.end_line or item.start_line or len(flags)
-            span = flags[start - 1:end]
-            source = [a for s, a in span if s] or [a for _s, a in span]
-            need = any if verdict.claim_kind == "technology_use" else all
-            if span and need(source):
-                res["c_authored"] = "pass"
-            else:
-                mine = sum(1 for a in source if a)
-                res["c_authored"], why["c_authored"] = "fail", (f"the candidate authored {mine} of {len(source)} source lines in "
-                                                               f"{item.path}:{start}-{end}, "
-                                                               + ("none of them" if need is any else "not all of them"))
+            res["c_authored"], why["c_authored"] = (("unavailable" if all(r == "unavailable" for r, _d in results) else "fail"),
+                                                    "no item attributed to the candidate re-verified from blame: "
+                                                    + "; ".join(d for _r, d in results if d)[:300])
     else:
         res["c_authored"] = "not_applicable"
     return res, why
+
+
+def _authored_span(views, item, need) -> tuple[str, str | None]:
+    """("pass" | "fail" | "unavailable", detail) for one item: are its span's source lines the candidate's (need=all)
+    or is at least one (need=any)?"""
+    view = _view_for(views, item.repo_full_name)
+    flags = view.line_flags(item.path) if (view and item.path) else None
+    if flags is None:
+        return "unavailable", f"no line-level blame for {item.path!r} under the candidate identity"
+    start = item.start_line or 1
+    end = item.end_line or item.start_line or len(flags)
+    span = flags[start - 1:end]
+    source = [a for s, a in span if s] or [a for _s, a in span]
+    if span and need(source):
+        return "pass", None
+    mine = sum(1 for a in source if a)
+    return "fail", (f"the candidate authored {mine} of {len(source)} source lines in {item.path}:{start}-{end}, "
+                    + ("none of them" if need is any else "not all of them"))
 
 
 def ground(verdict: ClaimVerdict, es: EvidenceSet, views, failures: Counter | None = None) -> ClaimVerdict:

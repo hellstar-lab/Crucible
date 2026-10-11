@@ -70,7 +70,7 @@ def _scope(claim) -> tuple[str, str | None]:
     return scope_of(_get(claim, "text") or "", _get(claim, "kind") or "")
 
 
-def _judge_sample(sample: dict, es, kind, scope, target, counters: Counter) -> dict:
+def _judge_sample(sample: dict, es, kind, scope, target, counters: Counter, set_auth=None) -> dict:
     """Citation check + matrix for ONE sampled judgement."""
     data = sample["data"]
     label = data.get("content_supported")
@@ -86,7 +86,7 @@ def _judge_sample(sample: dict, es, kind, scope, target, counters: Counter) -> d
         counters["unparseable_label"] += 1
         out = matrix.Outcome("inconclusive", f"no valid content label in the reply ({label!r})", "unparseable_label")
     else:
-        out = matrix.decide(label, kind, cited, scope, target)
+        out = matrix.decide(label, kind, cited, scope, target, authorship=set_auth)
     top = ((sample.get("distribution") or {}).get("values", {}).get(label) or {}).get("prob") if label else None
     if sample.get("greedy_disagreement"):
         counters["greedy_disagreement"] += 1
@@ -96,9 +96,9 @@ def _judge_sample(sample: dict, es, kind, scope, target, counters: Counter) -> d
             "greedy_disagreement": sample.get("greedy_disagreement", False), "error": sample.get("error")}
 
 
-def _round(claim_text, es, tier, kind, scope, target, counters, run_tag):
+def _round(claim_text, es, tier, kind, scope, target, counters, run_tag, set_auth=None):
     j = judge.judge(claim_text, es, tier, run_tag=run_tag)
-    judged = [_judge_sample(s, es, kind, scope, target, counters) for s in j["samples"]]
+    judged = [_judge_sample(s, es, kind, scope, target, counters, set_auth) for s in j["samples"]]
     finals = [x["outcome"].verdict for x in judged]
     unanimous = len(judged) == config.ENSEMBLE_N and len(set(finals)) == 1
     return j, judged, unanimous
@@ -134,7 +134,10 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
         return ClaimVerdict(**base, verdict="no_evidence", reason=reason, matrix_row="no_evidence:empty_items"), 0, 0.0
 
     kind = base["claim_kind"]
-    j, judged, unanimous = _round(base["claim_text"], es, config.CONTENT_TIER, kind, scope, target, counters, run_tag)
+    set_auth = matrix.set_authorship(es.items) if kind == "technology_use" else None  # L1
+    if set_auth is not None:
+        base["set_authorship"] = set_auth.summary
+    j, judged, unanimous = _round(base["claim_text"], es, config.CONTENT_TIER, kind, scope, target, counters, run_tag, set_auth)
     super_judged, super_unanimous = judged, unanimous
     calls, cost = 1, j["cost_usd"] or 0.0
     samples = _record(judged, j["tier"])
@@ -149,7 +152,8 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
         elif low is not None and low < config.ESCALATION_MIN_TOP_PROB:
             why = f"lowest sample probability of the chosen label {low:.3f} < {config.ESCALATION_MIN_TOP_PROB}"
     if why:
-        j, judged, unanimous = _round(base["claim_text"], es, config.ESCALATION_TIER, kind, scope, target, counters, run_tag)
+        j, judged, unanimous = _round(base["claim_text"], es, config.ESCALATION_TIER, kind, scope, target, counters, run_tag,
+                                      set_auth)
         calls += 1
         cost += j["cost_usd"] or 0.0
         samples += _record(judged, j["tier"])

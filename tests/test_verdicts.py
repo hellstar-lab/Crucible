@@ -408,3 +408,42 @@ def test_super_disagreement_resolved_by_a_unanimous_ultra(scenarios, fake):
     v, calls, _ = verdicts.verdict_for(REDIS, es, counters)
     assert v.verdict == "supported" and v.model_tier == "ultra" and calls == 2 and len(v.samples) == 6
     assert counters["disagreements_resolved_by_ultra"] == 1 and counters.get("ensemble_disagreements", 0) == 0
+
+
+# --- Phase 4L L1: technology_use authorship from the whole EvidenceSet ---------------------------------------------
+
+def _httpx_set():
+    from backend.contracts import EvidenceSet, SearchedBlock
+    dep = EvidenceItem(repo_full_name="o/r", path="requirements.txt", start_line=6, end_line=6, kind="dependency",
+                       rule="r_dependency", technology="httpx", authored_by_candidate=False, authorship_confidence="low")
+    imp = EvidenceItem(repo_full_name="o/r", path="src/client.py", start_line=1, end_line=1, kind="import", rule="r_import",
+                       technology="httpx", authored_by_candidate=True, authorship_confidence="low",
+                       volume={"basis": "authored_files_importing", "technology": "httpx", "files": 4, "authored_files": 4})
+    return EvidenceSet(claim_id="s.c5", claim_kind="technology_use", retrieval_performed=True, retrieval_version="t",
+                       searched=SearchedBlock(technologies=["httpx"]), items=[dep, imp])
+
+
+@pytest.mark.parametrize("cited", [0, 1])
+def test_httpx_verdict_does_not_depend_on_which_item_is_cited(fake, cited):
+    """The measured flip: citing the requirements.txt line (not authored) used to give inconclusive."""
+    es = _httpx_set()
+    fake.answers = [("supported", cited, 0.95, False)]
+    v, _, _ = verdicts.verdict_for({"claim_id": "s.c5", "text": "httpx", "kind": "technology_use"}, es)
+    assert v.verdict == "supported" and v.cited_item_index == cited
+    assert v.set_authorship["authored_items"] == 1 and v.set_authorship["not_authored_items"] == 1
+
+
+def test_ownership_still_uses_the_cited_item():
+    es = _httpx_set()
+    sa = matrix.set_authorship(es.items)
+    out = matrix.decide("supported", "ownership", es.items[0], "specific_artifact", "requirements", authorship=sa)
+    assert out.verdict != "supported"  # the cited file is not the candidate's; the set does not rescue an ownership claim
+
+
+def test_set_authorship_ladder():
+    items = _httpx_set().items
+    assert matrix.set_authorship(items).authored_by_candidate is True
+    assert matrix.set_authorship(items[:1]).authored_by_candidate is False
+    unknown = items[0].model_copy(update={"authored_by_candidate": None, "authorship_caveat": "no blame"})
+    assert matrix.set_authorship([items[0], unknown]).authored_by_candidate is None  # unknown beats "not authored"
+    assert matrix.decide("supported", "technology_use", items[0], authorship=matrix.set_authorship(items[:1])).verdict == "inconclusive"

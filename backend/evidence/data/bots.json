@@ -1,0 +1,4 @@
+{
+ "_comment": "Phase 4L L4: commit authors that are automation, matched (fnmatch, case-insensitive) against the author name and the email's local part. Bots are still blamed as authors of their lines; they only do not count toward distinct authors for the authorship-confidence ladder.",
+ "patterns": ["*[bot]", "dependabot*", "github-actions*", "renovate*", "snyk-bot", "greenkeeper*"]
+}

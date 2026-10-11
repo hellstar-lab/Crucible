@@ -8,7 +8,8 @@ Every line is chosen against the repository's default branch (main @ 2bffef4), m
   * "Designed the unicode scanning module ...": backend/shield/unicode_scan.py, 164/164 lines by another account
     (Auratech350) -> the contradiction path, which needs Super 3/3 AND Ultra 3/3;
   * "Reduced PDF analysis latency by 40%": a metric with no benchmark in the repository -> no_evidence;
-  * "Led a team of 4 engineers": team size -> unverifiable;
+  * "Led a team of 4 engineers": team size -> must PASS Stage 2 (a factual assertion) and come out unverifiable (L2);
+  * "Passionate about clean architecture.": opinion -> no_verifiable_claims at Stage 2, listed as "not a claim" (L2);
   * the contact line links github.com/hellstar-lab and the repository, so the identity check agrees.
 Not part of the frozen 2C ground truth (MANIFEST.json): a demo input, rebuilt deterministically by this script.
 """
@@ -26,6 +27,8 @@ def main() -> None:
     d.core_properties.title = "Demo resume for hellstar-lab"
     d.add_heading("Crucible Demo Candidate", 0)
     d.add_paragraph("github.com/hellstar-lab | github.com/hellstar-lab/Crucible")
+    d.add_heading("Summary", 1)
+    d.add_paragraph("Passionate about clean architecture.")
     d.add_heading("Projects", 1)
     d.add_heading("Crucible, hiring-evidence system", 3)
     for line in ("Built the blame attribution module that maps every source line to its author.",

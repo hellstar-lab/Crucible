@@ -422,7 +422,8 @@ class Page:
             cite = (f'<td class="cite"><div class="mono small">{self.val(c + ("repo",))}</div>'
                     f'<div class="mono">{self.val(c + ("path",), missing="(repository-level item)")}{lines}</div></td>')
             auth = [f'<td class="auth small">{mm}',
-                    f'<div>candidate wrote cited lines: <strong>{self.val(b + ("authored_by_candidate",), "bool")}</strong></div>',
+                    f'<div>candidate wrote the cited lines: <strong>{self.val(b + ("authored_by_candidate",), "bool")}</strong>'
+                    + (' <span class="muted">(cited item)</span>' if r.get("claim_kind") == "technology_use" else "") + '</div>',
                     f'<div>file authored: <strong>{self.val(b + ("authored_ratio",), "ratio")}</strong>, confidence '
                     f'<strong>{self.val(b + ("authorship_confidence",), cls="mono")}</strong></div>',
                     f'<div style="margin-top:4px">confidence reason: {self.val(b + ("authorship_confidence_reason",))}</div>']
@@ -445,9 +446,22 @@ class Page:
         return f"<tr>{claim}{''.join(verdict)}{reason}{cite}{auth}{ground}</tr>"
 
     def _volume(self, b, r) -> str:
-        """K1: how much of the technology is in the candidate's code. Formatting only; the counts come from 4B."""
+        """K1: how much of the technology is in the candidate's code. Formatting only; the counts come from 4B.
+        L1: for technology_use the verdict's authorship is the WHOLE evidence set's, shown first; the cited item's
+        authorship above it is the reasoning anchor only."""
         if r.get("claim_kind") != "technology_use":
             return ""
+        out = ""
+        sa = b + ("set_authorship",)
+        if r.get("set_authorship") is None:
+            out += f'<div style="margin-top:4px">across the evidence: {NOT_MEASURED}</div>'
+        else:
+            out += (f'<div style="margin-top:4px"><strong>across all {self.val(sa + ("items",), "int")} evidence items</strong> '
+                    f'(this decides the verdict): {self.val(sa + ("authored_items",), "int")} in code the candidate authored, '
+                    f'{self.val(sa + ("not_authored_items",), "int")} not, {self.val(sa + ("unknown_items",), "int")} unknown</div>')
+        return out + self._volume_line(b, r)
+
+    def _volume_line(self, b, r) -> str:
         vol = r.get("volume")
         if vol is None:
             return f'<div style="margin-top:4px">volume: {NOT_MEASURED}</div>'
@@ -504,20 +518,31 @@ class Page:
             if e.get("top_excluded"):
                 out.append('<ul class="small mono">' + "".join(f"<li>{self.val(b + ('top_excluded', j))}</li>"
                                                               for j in range(len(e["top_excluded"]))) + "</ul>")
-        out.append("<h3>Resume text left out of claim extraction</h3>")
         units = self.get("header", "excluded_units")
         if self.get("header", "shield") is None and not units:
-            out.append(f"<p>{NOT_MEASURED}: no resume document was analysed in this report.</p>")
-        elif not units:
-            out.append("<p>None.</p>")
+            out.append(f"<h3>Resume text left out of claim extraction</h3><p>{NOT_MEASURED}: no resume document was "
+                       "analysed in this report.</p>")
         else:
-            out.append("<ul>")
-            for i, _u in enumerate(units):
-                b = ("header", "excluded_units", i)
-                out.append(f'<li><span class="mono small">{self.val(b + ("unit_id",))}</span> · '
-                           f'<strong>{self.val(b + ("reason_code",), "label")}</strong> at {self.val(b + ("stage",), "label")}: '
-                           f'{self.val(b + ("detail",))}</li>')
-            out.append("</ul>")
+            # L5: "the candidate did not claim this" and "Crucible could not process this" are different absences
+            for cat, title, blurb, empty in (
+                    ("could_not_process", "Could not process",
+                     "Factual claims the pipeline failed on. The candidate DID claim these; Crucible could not turn them into "
+                     "checkable claims, and they are not verdicts of any kind.", "None: every factual claim was processed."),
+                    ("not_a_claim", "Not a claim",
+                     "Text with no factual assertion (opinion, contact details, formatting text, a bare date).", "None.")):
+                rows = [(i, u) for i, u in enumerate(units or []) if u.get("category") == cat]
+                out.append(f"<h3>{title}</h3><p class=\"small muted\">{blurb}</p>")
+                if not rows:
+                    out.append(f"<p class=\"small\">{empty}</p>")
+                    continue
+                out.append("<ul>")
+                for i, u in rows:
+                    b = ("header", "excluded_units", i)
+                    gone = "(contact details are not reproduced)" if u.get("reason_code") == "contact_info" else NOT_MEASURED
+                    text = f'<blockquote>{self.val(b + ("text",), missing=gone)}</blockquote>'
+                    out.append(f'<li>{text}<span class="small"><strong>{self.val(b + ("reason_code",), "label")}</strong> at '
+                               f'{self.val(b + ("stage",), "label")}: {self.val(b + ("detail",))}</span></li>')
+                out.append("</ul>")
         out.append("</section>")
         return "".join(out)
 

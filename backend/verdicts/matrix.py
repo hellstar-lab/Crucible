@@ -152,10 +152,45 @@ class Outcome:
     scope_match_score: float | None = None
 
 
-def decide(content: str, claim_kind: str | None, cited, scope: str | None = None, scope_target: str | None = None) -> Outcome:
-    """Final verdict from the model's content label, the claim's scope and the cited EvidenceItem's authorship fields
-    (decided by 4B). Every path that would end in "contradicted" goes through the scope rule first."""
-    out = _decide(content, claim_kind, cited)
+@dataclass
+class SetAuthorship:
+    """Phase 4L L1: authorship across the WHOLE EvidenceSet, for technology_use. Measured: httpx flipped supported /
+    inconclusive / supported across runs only because one run cited the requirements.txt line (not the candidate's)
+    while 4 of 4 importing files were the candidate's. The question for a technology is "is it anywhere in code the
+    candidate authored?", so the citation stays the reasoning anchor (4D still verifies it) and authorship comes from
+    the set. Ownership keeps the CITED item: the claim names that artifact."""
+    authored_by_candidate: bool | None
+    authorship_confidence: str | None
+    likely_identity_gap: bool | None
+    authorship_caveat: str | None
+    summary: dict
+
+
+def set_authorship(items) -> SetAuthorship:
+    yes = [it for it in items if it.authored_by_candidate is True]
+    no = [it for it in items if it.authored_by_candidate is False]
+    unknown = [it for it in items if it.authored_by_candidate is None]
+    summary = {"items": len(items), "authored_items": len(yes), "not_authored_items": len(no), "unknown_items": len(unknown),
+               "authored_example": None if not yes else {"path": yes[0].path, "start_line": yes[0].start_line,
+                                                         "end_line": yes[0].end_line, "rule": yes[0].rule}}
+    if yes:
+        confs = [it.authorship_confidence for it in yes]
+        conf = next((c for c in confs if c and c != "none"), confs[0])
+        return SetAuthorship(True, conf, False, None, summary)
+    if unknown:
+        return SetAuthorship(None, unknown[0].authorship_confidence, unknown[0].likely_identity_gap,
+                             unknown[0].authorship_caveat, summary)
+    first = no[0] if no else None
+    return SetAuthorship(False if no else None, getattr(first, "authorship_confidence", None),
+                         any(it.likely_identity_gap is True for it in no), None, summary)
+
+
+def decide(content: str, claim_kind: str | None, cited, scope: str | None = None, scope_target: str | None = None,
+           authorship: SetAuthorship | None = None) -> Outcome:
+    """Final verdict from the model's content label, the claim's scope and authorship fields decided by 4B: the CITED
+    item's, or, for technology_use, ``authorship`` across the evidence set (L1). Every path that would end in
+    "contradicted" goes through the scope rule first, which always uses the cited item."""
+    out = _decide(content, claim_kind, authorship if (authorship is not None and claim_kind == "technology_use") else cited)
     if out.verdict == "contradicted":
         ok, reason, gate, rule, score = _contradiction_allowed(cited, scope, scope_target, claim_kind)
         if not ok:

@@ -13,7 +13,8 @@ Degradations present:
     so the citation cannot be confirmed (c_path unavailable) and the verdict is downgraded;
   * a Shield finding: hidden text found, extraction ran on cleaned text, units removed;
   * two claims not checkable from code (role_or_team);
-  * one claim whose Super AND Ultra samples disagree (inconclusive, both sample sets kept).
+  * one claim whose Super AND Ultra samples disagree (inconclusive, both sample sets kept);
+  * excluded resume text of both kinds: "not a claim" (contact line, opinion) and "could not process" (L5).
 """
 
 from __future__ import annotations
@@ -114,8 +115,10 @@ def build(tmp: Path) -> dict:
     gviews = [broken if v is gap else v for v in views]
     grounded, failures = grounding.ground_all(run.verdicts, sets, gviews)
 
+    doc_text = ("Alex Sample | alex@example.com\nSkills\nPython, Redis\nExperience\nRewrote it in Go for the platform team.\n"
+                "Passionate about clean architecture.")
     extraction = ClaimExtraction(
-        document="degraded_fixture_resume.pdf", cost_cap_usd=0.0, calls=0, cost_usd=None,
+        document="degraded_fixture_resume.pdf", cost_cap_usd=0.0, calls=0, cost_usd=None, document_text=doc_text,
         shield=ShieldGate(applied=True, document_status="hidden_text_found", needs_review=True,
                           detectors=["hidden_text", "instruction_injection"], hidden_fragments=2, units_removed=1,
                           items=[ShieldItem(kind="hidden_fragment", detector="white_text", reasons=["white_text"], page=2,
@@ -124,8 +127,12 @@ def build(tmp: Path) -> dict:
                                             location="DOCX run (no fixed pages)", span="Scripted hidden run: holds a PhD.")]),
         excluded=[ExcludedUnit(unit_id="u7", source_span=(812, 940), source_section="Experience", stage="shield",
                                reason_code="shield_payload", detail="unit contained a hidden-text fragment flagged by the Shield"),
-                  ExcludedUnit(unit_id="u0", source_span=(0, 58), source_section=None, stage="split", reason_code="contact_info",
-                               detail="contact line (name, email, phone): not a claim")])
+                  ExcludedUnit(unit_id="u0", source_span=(0, 30), source_section=None, stage="split", reason_code="contact_info",
+                               detail="contact line (name, email, phone): not a claim"),
+                  ExcludedUnit(unit_id="u4", source_span=(63, 102), source_section="Experience", stage="disambiguation",
+                               reason_code="cannot_be_disambiguated", detail="failed referent: 'it'; resolutions disagreed"),
+                  ExcludedUnit(unit_id="u5", source_span=(103, 139), source_section="Experience", stage="selection",
+                               reason_code="no_verifiable_claims", detail="opinion: no factual assertion")])
     rep = build_report(verdicts=grounded, evidence_sets=sets, target_reports=reports, extraction=extraction,
                        grounding_failures=failures, run=run, run_label=RUN_LABEL,
                        claims=claims, candidate={"github_user": M.LOGIN, "reference": "degraded-fixture"})

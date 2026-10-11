@@ -221,3 +221,12 @@ def test_stage3_ensemble_disagreement_refuses_and_records_all_samples(monkeypatc
     assert codes(out) == {"cannot_be_disambiguated"} and out.counters["stage3_ensemble_disagreements"] == 1
     d3 = [d for d in out.units[0].decisions if d.stage == "disambiguation"][0]
     assert len(d3.samples) == 3 and "resolutions disagreed" in out.excluded[0].detail
+
+
+def test_stage2_rubric_asks_for_a_factual_assertion_not_checkability():
+    """L2: "verifiable" read as "checkable" made Stage 2 drop "Led a team of 4 engineers", so a claim the candidate MADE
+    vanished instead of reaching the report as unverifiable."""
+    from backend.claims.stages import SELECTION_RUBRIC
+    r = SELECTION_RUBRIC.lower()
+    assert "not whether" in r and "checked" in r and "not checkable from" in r and "team led" in r
+    assert "led a team of 4" not in r  # the test instance is never a rubric example

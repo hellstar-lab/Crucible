@@ -21,6 +21,10 @@ ROW_SOURCES = {"verdict": "4C matrix, after 4D grounding", "reason": "4C / 4D", 
                "matrix_row": "4C matrix", "scope": "4A Stage 5", "grounding": "4D"}
 
 NOT_MEASURED = "not measured"
+# L5: two kinds of absence. NOT_A_CLAIM: the candidate did not claim anything here (opinion, contact line, formatting
+# text, a bare date, hidden text the Shield removed). Everything else is COULD NOT PROCESS: a factual claim Crucible
+# failed on (a disambiguation that did not settle, a guard that fired, a refusal, the cost cap ...).
+NOT_A_CLAIM = frozenset({"no_verifiable_claims", "contact_info", "shield_payload"})
 REPRODUCIBILITY_NOTE = ("Verdicts come from sampled model judgements: the platform is not deterministic even at temperature 0 "
                         "and ignores seed, so a re-run can change a verdict. Each judged row records the prompt hash of its "
                         "request and every sample is kept in the 4C verdict output. Retrieval, the verdict matrix and "
@@ -83,7 +87,7 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
             authorship_confidence=item.authorship_confidence if item else None,
             authorship_confidence_reason=ra.authorship_confidence_reason if ra else None,
             likely_identity_gap=ra.likely_identity_gap if ra else None, authorship_note=v.authorship_note,
-            volume=item.volume if item else None,
+            volume=item.volume if item else None, set_authorship=v.set_authorship,
             content_reason=v.content_reason, matrix_row=v.matrix_row, agreement=v.agreement, model_tier=v.model_tier,
             escalated=v.escalated if v.samples else None, escalation_reason=v.escalation_reason, scope=v.scope,
             scope_target=v.scope_target, scope_match_rule=v.scope_match_rule, prompt_hash=v.prompt_hash,
@@ -124,8 +128,14 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
              for c in claims}  # I2d: from the CLAIM, never from a verdict that may not exist
     not_checkable = [{"claim_id": es.claim_id, "claim_text": texts.get(es.claim_id), "kind": es.claim_kind,
                       "skip_reason": es.skip_reason, "source": "4B"} for es in evidence_sets if not es.retrieval_performed]
-    excluded_units = [{"unit_id": u.unit_id, "section": u.source_section, "stage": u.stage, "reason_code": u.reason_code,
-                       "detail": u.detail, "source": "4A"} for u in (getattr(extraction, "excluded", None) or [])]
+    doc_text = getattr(extraction, "document_text", None) or ""
+    excluded_units = []
+    for u in (getattr(extraction, "excluded", None) or []):
+        cat = "not_a_claim" if u.reason_code in NOT_A_CLAIM else "could_not_process"
+        a, b = u.source_span
+        text = None if u.reason_code == "contact_info" else (" ".join(doc_text[a:b].split()) or None)
+        excluded_units.append({"unit_id": u.unit_id, "category": cat, "text": text, "section": u.source_section,
+                               "stage": u.stage, "reason_code": u.reason_code, "detail": u.detail, "source": "4A"})
     versions = {"retrieval": next((es.retrieval_version for es in evidence_sets), None)}
     header = ReportHeader(candidate=dict(candidate) if candidate else None, identity_check=identity_check, analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
                           grounding_failures=(None if grounding_failures is None else

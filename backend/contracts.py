@@ -952,6 +952,7 @@ class ClaimVerdict(CrucibleModel):
     grounding_passed: Optional[bool] = None
     pre_grounding_verdict: Optional[str] = None  # set when grounding downgraded the verdict
     superseded_reason: Optional[str] = None  # I2a: the reason a grounding downgrade replaced
+    set_authorship: Optional[dict] = None  # L1, technology_use: authorship across the whole EvidenceSet (decides the verdict)
     agreement: Optional[str] = None  # e.g. "3/3" of the final-verdict samples that agreed
     # model bookkeeping
     model_tier: Optional[str] = None
@@ -999,6 +1000,7 @@ class ReportRow(CrucibleModel):
     likely_identity_gap: Optional[bool] = None  # 3.6, for the cited item's repo
     authorship_note: Optional[str] = None  # 4C matrix
     volume: Optional[dict] = None  # 4B, for the cited item (K1)
+    set_authorship: Optional[dict] = None  # 4C (L1): technology_use authorship across the whole EvidenceSet
     content_reason: Optional[str] = None  # 4C: the model's one-sentence reading of the evidence (content only)
     matrix_row: Optional[str] = None  # 4C: which rule decided the verdict ("gate:..." = decided by code, no model call)
     agreement: Optional[str] = None  # 4C: final-tier samples agreeing on the verdict, e.g. "3/3"

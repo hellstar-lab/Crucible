@@ -30,7 +30,7 @@ from .repo_signals import commit_facts
 from .structure import detect_structure
 
 log = logging.getLogger(__name__)
-SNAPSHOT_VERSION = 2  # 2: authorship_only files (Phase 4K K3)
+SNAPSHOT_VERSION = 3  # 2: authorship_only files (4K K3); 3: comment-header generated check (4L L3)
 MAX_MANIFEST_BYTES = 512_000
 MAX_README_BYTES = 256_000
 

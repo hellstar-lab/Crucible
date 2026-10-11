@@ -248,4 +248,18 @@ def test_excluded_reasons_report_lines_whenever_they_report_files(degraded):
     """K4b: both or neither. A reason with files always shows its line count, 0 included."""
     for e in degraded["header"]["excluded"]:
         assert set(e["files_by_reason"]) == set(e["lines_by_reason"])
-    assert "lines not measured" not in _text(render_html(degraded)).split("Code never used as evidence")[1].split("Resume text")[0]
+    assert "lines not measured" not in _text(render_html(degraded)).split("Code never used as evidence")[1].split("Could not process")[0]
+
+
+# --- L5: two kinds of absence --------------------------------------------------------------------------------------
+
+def test_excluded_text_is_split_into_not_a_claim_and_could_not_process(degraded, page):
+    units = {u["unit_id"]: u for u in degraded["header"]["excluded_units"]}
+    assert units["u4"]["category"] == "could_not_process" and units["u4"]["text"] == "Rewrote it in Go for the platform team."
+    assert units["u5"]["category"] == "not_a_claim" and units["u0"]["category"] == "not_a_claim"
+    assert units["u0"]["text"] is None  # contact details never reproduced
+    sec = _text(page.split('id="excluded"')[1].split("</section>")[0])
+    cnp, nac = sec.split("Could not process")[1].split("Not a claim")
+    assert "Rewrote it in Go" in cnp and "cannot be disambiguated" in cnp and "Passionate" not in cnp
+    assert "Passionate about clean architecture" in nac and "contact details are not reproduced" in nac
+    assert "alex@example.com" not in page

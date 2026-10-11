@@ -190,3 +190,34 @@ Findings:
 2. **"Led a team of 4 engineers" is dropped at Stage 2 selection** ("no checkable fact") in all three runs, so it never reaches routing and appears as an excluded unit, not as unverifiable. The unverifiable rows that did appear are Stage 4 sub-claims routed `other`.
 3. **Another authored-code false positive, in the GENERATED list:** `backend/evidence/exclusions.py`, the whole exclusion module (198 lines), is excluded as generated, because pygount's "do not edit" header check matched a docstring sentence that only mentions such headers. As a result no counted file imports `yaml`, and PyYAML shows "0 of 0 files". Not fixed: it needs the generated check restricted to comment headers.
 4. Stage 4 sometimes splits a metric into fragments ("By 40%" as a claim, run 3); both pieces were no_evidence.
+
+## Phase 4L: fixes from the K5 run
+
+**L1: authorship source depends on claim kind.**
+- **ownership:** authorship comes from the CITED item, because the claim names it.
+- **technology_use:** authorship comes from the WHOLE EvidenceSet (`matrix.set_authorship`). Any item in authored code makes it supported; otherwise unknown makes it inconclusive, then "not authored" makes it inconclusive.
+- The citation stays the reasoning anchor, and 4D still checks it (`c_index`, `c_path`, `c_lines`). For technology_use, `c_authored` re-verifies an authored item of the set from blame.
+- The row shows both: the cited item's authorship, and `set_authorship` ("across all N evidence items: A in code the candidate authored, B not, C unknown") next to the volume.
+- Measured cause: httpx flipped supported / inconclusive / supported only because run 2 cited the requirements.txt line, which another author wrote.
+
+**L2: Stage 2 asks "is this a factual assertion?", not "can we check it?".**
+- The rubric now says so outright, because "verifiable" reads as "checkable" to a model.
+- "Led a team of 4 engineers" must pass and come out unverifiable (role_or_team). "Passionate about clean architecture" stays `no_verifiable_claims`.
+- Both lines are on the Crucible resume.
+- Note: this changes the Stage 2 prompt after the 4A eval set was labelled; any C5 comparison must use the new rubric on both arms.
+
+**L3: "do not edit" only in a real comment header.**
+- pygount's generated-line check scanned the first 15 lines with no regard for syntax, so a file discussing generated-file detection was classified as generated.
+- pygount's line check is now off (`generated_regexes=[]`). The same phrase list applies only to the first 5 lines, only on a comment line (`#`, `//`, `/*`, `*`, `<!--`, `--`, `;`, `%`), and never inside a triple-quoted string.
+- On hellstar-lab/Crucible @ 2bffef4, exactly one file changes classification: `backend/evidence/exclusions.py`, from generated to counted. Source files go from 85 to 86, and source lines from 10,006 to 10,129. Its `import yaml` is now visible to PyYAML.
+- `SNAPSHOT_VERSION` 3 invalidates cached snapshots.
+
+**L4: distinct authors for the confidence ladder.**
+- Commit emails were already `.mailmap`-resolved (git log `%aE`, the same mapping as `git check-mailmap`).
+- On top of that, every address 3.6 recognises as the candidate counts as one author, a GitHub noreply address counts as its login, and bots are left out. The bot list is a committed data file, `backend/evidence/data/bots.json`: `*[bot]` (literal brackets), `dependabot*`, `github-actions*`, `renovate*`, `snyk-bot`, `greenkeeper*`.
+- Bots are still blamed for their lines. The confidence reason says when addresses were merged or bots left out.
+- **Not fixed, and not fixable from history:** forged author dates. Every span uses author dates, which the committer sets. A repository whose author and committer dates were both forged looks exactly like a real one.
+
+**L5: two kinds of absence.**
+- Excluded resume text is split into **Could not process** (a factual claim the pipeline failed on, with stage and reason; the candidate DID claim it) and **Not a claim** (opinion, contact details, formatting text, bare dates, Shield-removed hidden text).
+- Each unit's text is shown, except contact details, which are never reproduced.

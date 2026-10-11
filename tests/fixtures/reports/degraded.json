@@ -39,6 +39,7 @@
     "files_by_reason": {},
     "lines_by_reason": {},
     "top_excluded": [],
+    "authorship_only": [],
     "source": "3.5 via 3.6"
    },
    {
@@ -46,6 +47,7 @@
     "files_by_reason": {},
     "lines_by_reason": {},
     "top_excluded": [],
+    "authorship_only": [],
     "source": "3.5 via 3.6"
    }
   ],
@@ -135,6 +137,8 @@
   "excluded_units": [
    {
     "unit_id": "u7",
+    "category": "not_a_claim",
+    "text": null,
     "section": "Experience",
     "stage": "shield",
     "reason_code": "shield_payload",
@@ -143,10 +147,32 @@
    },
    {
     "unit_id": "u0",
+    "category": "not_a_claim",
+    "text": null,
     "section": null,
     "stage": "split",
     "reason_code": "contact_info",
     "detail": "contact line (name, email, phone): not a claim",
+    "source": "4A"
+   },
+   {
+    "unit_id": "u4",
+    "category": "could_not_process",
+    "text": "Rewrote it in Go for the platform team.",
+    "section": "Experience",
+    "stage": "disambiguation",
+    "reason_code": "cannot_be_disambiguated",
+    "detail": "failed referent: 'it'; resolutions disagreed",
+    "source": "4A"
+   },
+   {
+    "unit_id": "u5",
+    "category": "not_a_claim",
+    "text": "Passionate about clean architecture.",
+    "section": "Experience",
+    "stage": "selection",
+    "reason_code": "no_verifiable_claims",
+    "detail": "opinion: no factual assertion",
     "source": "4A"
    }
   ],
@@ -172,7 +198,7 @@
    "reproducibility_note": "Verdicts come from sampled model judgements: the platform is not deterministic even at temperature 0 and ignores seed, so a re-run can change a verdict. Each judged row records the prompt hash of its request and every sample is kept in the 4C verdict output. Retrieval, the verdict matrix and grounding are deterministic code."
   },
   "stage_versions": {
-   "retrieval": "4B.1+79608e3dad"
+   "retrieval": "4B.1+dd8683be54"
   }
  },
  "rows": [
@@ -201,6 +227,13 @@
     "files": 1,
     "authored_files": 0
    },
+   "set_authorship": {
+    "items": 4,
+    "authored_items": 0,
+    "not_authored_items": 2,
+    "unknown_items": 2,
+    "authored_example": null
+   },
    "content_reason": "Scripted judgement citing evidence item 3.",
    "matrix_row": "grounding:c_path",
    "agreement": "3/3",
@@ -219,7 +252,7 @@
     "c_authored": "not_applicable"
    },
    "pre_grounding_verdict": "inconclusive",
-   "superseded_reason": "the cited code is not attributed to the candidate, but likely_identity_gap is set: they may have written it under an email we do not recognise",
+   "superseded_reason": "authorship_confidence is none: blame attributed every line to the committer by construction (single-commit import), so authorship cannot be established",
    "sources": {
     "verdict": "4C matrix, after 4D grounding",
     "reason": "4C / 4D",
@@ -256,6 +289,7 @@
    "likely_identity_gap": false,
    "authorship_note": null,
    "volume": null,
+   "set_authorship": null,
    "content_reason": "Scripted judgement citing evidence item 0.",
    "matrix_row": "supported+confidence_none",
    "agreement": "3/3",
@@ -306,6 +340,7 @@
    "likely_identity_gap": null,
    "authorship_note": null,
    "volume": null,
+   "set_authorship": null,
    "content_reason": null,
    "matrix_row": "ensemble:disagreed",
    "agreement": "2/3",
@@ -351,6 +386,7 @@
    "likely_identity_gap": null,
    "authorship_note": null,
    "volume": null,
+   "set_authorship": null,
    "content_reason": null,
    "matrix_row": "gate:retrieval_not_performed",
    "agreement": null,
@@ -396,6 +432,7 @@
    "likely_identity_gap": null,
    "authorship_note": null,
    "volume": null,
+   "set_authorship": null,
    "content_reason": null,
    "matrix_row": "gate:retrieval_not_performed",
    "agreement": null,

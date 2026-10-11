@@ -8,7 +8,10 @@ is not, so only history can bound how much an authorship number can mean.
 
 from __future__ import annotations
 
+import fnmatch
+import json
 import re
+from pathlib import Path
 from collections import Counter
 
 from backend.contracts import Authorship, CommitInfo, HotFile
@@ -104,6 +107,45 @@ def authorship_confidence(history: dict) -> tuple[str, str]:
 
 
 # --------------------------------------------------------------------------
+# distinct authors for the ladder (Phase 4L L4)
+# --------------------------------------------------------------------------
+
+_BOT_PATTERNS = tuple(json.loads((Path(__file__).resolve().parent / "data" / "bots.json").read_text())["patterns"])
+_NOREPLY = re.compile(r"^(?:\d+\+)?([A-Za-z0-9-]+)@users\.noreply\.github\.com$", re.I)
+
+
+def is_bot(name: str | None, email: str | None) -> bool:
+    local = (email or "").split("@", 1)[0].lower()
+    who = [(name or "").lower(), local, (email or "").lower()]
+    # "[" is literal in these patterns ("*[bot]"), not an fnmatch character class
+    return any(fnmatch.fnmatchcase(w, p.lower().replace("[", "[[]")) for w in who if w for p in _BOT_PATTERNS)
+
+
+def effective_author_count(commits: list[dict], is_candidate) -> tuple[int, int, int]:
+    """(distinct authors, candidate addresses merged into one, bot accounts left out) over the commits git log saw.
+
+    Measured hole: the count was distinct commit EMAILS, so one person with two addresses reached "high" alone, and
+    bots counted as authors. Emails are already .mailmap-resolved (git log %aE, the same mapping as check-mailmap);
+    on top of that every address 3.6 recognises as the candidate is one author, a GitHub noreply address counts as its
+    login, and bots (data/bots.json) are left out. Bots are still blamed for their lines: this is the ladder only."""
+    keys, cand_addresses, bots = set(), set(), set()
+    for c in commits:
+        if c.get("author_time") is None:  # seen only by blame (boundary / out-of-scope): not in the history
+            continue
+        email = (c.get("author_email") or "").lower()
+        if is_bot(c.get("author_name"), email):
+            bots.add(email)
+            continue
+        if is_candidate(email):
+            cand_addresses.add(email)
+            keys.add("<candidate>")
+            continue
+        m = _NOREPLY.match(email)
+        keys.add(f"login:{m.group(1).lower()}" if m else email)
+    return len(keys), max(0, len(cand_addresses) - 1), len(bots)
+
+
+# --------------------------------------------------------------------------
 # attribution
 # --------------------------------------------------------------------------
 
@@ -148,7 +190,15 @@ def compute_authorship(snap: dict, identity: IdentitySet, *, owner_login: str | 
         if f_auth:
             hot.append(HotFile(path=path, authored_lines=f_auth, total_lines=f_total, ratio=round(f_auth / f_total, 4)))
 
-    level, reason = authorship_confidence(snap.get("history") or {})
+    history = dict(snap.get("history") or {})
+    if history:
+        n_authors, merged, bots = effective_author_count(commits, is_candidate)
+        history["distinct_author_count"] = n_authors
+    level, reason = authorship_confidence(history)
+    if history and (merged or bots):
+        notes = ([f"{merged + 1} addresses of the candidate counted as one author"] if merged else []) + \
+                ([f"{bots} bot account(s) not counted"] if bots else [])
+        reason += f" ({'; '.join(notes)}.)"
     whole = round(authored / total, 6) if total else None
     ratio_whole = ratio_delta = None
     delta_reason = None

@@ -282,3 +282,16 @@ def test_c_authored_runs_on_technology_use(scenarios):
     vd = verdict(REDIS, es, i).model_copy(update={"claim_kind": "technology_use"})
     out = grounding.ground(vd, es, [v])
     assert out.grounding_checks["c_authored"] == "pass" and out.grounding_passed
+
+
+def test_c_authored_for_technology_reverifies_the_set_not_the_citation(scenarios):
+    """L1: the citation may be a line someone else wrote; c_authored re-checks an authored item in the set from blame."""
+    v = view(scenarios, "clean_small")
+    es = retrieval.retrieve(claim("Built a caching layer with Redis"), [v])
+    i = next(k for k, it in enumerate(es.items) if it.rule == "r_import" and it.authored_by_candidate)
+    j = next(k for k, it in enumerate(es.items) if k != i)
+    forged = es.items[j].model_copy(update={"authored_by_candidate": False})
+    es2 = es.model_copy(update={"items": [forged if k == j else it for k, it in enumerate(es.items)]})
+    vd = verdict(REDIS, es2, j).model_copy(update={"claim_kind": "technology_use"})
+    out = grounding.ground(vd, es2, [v])
+    assert out.grounding_checks["c_authored"] == "pass" and out.grounding_passed

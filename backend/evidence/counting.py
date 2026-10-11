@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from pygount import SourceAnalysis, SourceState
-from pygount.analysis import (DEFAULT_GENERATED_NAME_PATTERNS_TEXT, DuplicatePool, _line_parts, encoding_for,
+from pygount.analysis import (DEFAULT_GENERATED_LINE_PATTERNS_TEXT, DEFAULT_GENERATED_NAME_PATTERNS_TEXT, DuplicatePool, _line_parts, encoding_for,
                               guess_lexer, is_markup_file)
 from pygount.common import regexes_from
 
@@ -33,6 +33,31 @@ SOURCE_MARKS = frozenset("cs")  # code or string lines count as source
 # pygount's own default generated-name list (lock files etc.). The library
 # applies it only when passed explicitly; the CLI passes it by default.
 GENERATED_NAME_REGEXES = regexes_from(DEFAULT_GENERATED_NAME_PATTERNS_TEXT)
+
+# Phase 4L L3: pygount's "generated" LINE check scans the first 15 lines for phrases like "do not edit" with no regard
+# for syntax. Measured: backend/evidence/exclusions.py (198 authored lines) was excluded as generated because its
+# DOCSTRING mentions '"do not edit" headers'. Any file that discusses generated-file detection was classified as
+# generated. Our check uses pygount's own phrase list, but only on the first GENERATED_HEADER_LINES lines, only on a
+# real comment line, and never inside a triple-quoted string.
+GENERATED_LINE_REGEXES = regexes_from(DEFAULT_GENERATED_LINE_PATTERNS_TEXT)
+GENERATED_HEADER_LINES = 5
+_COMMENT_PREFIXES = ("#", "//", "/*", "*", "<!--", "--", ";", "%")
+
+
+def generated_header(text: str) -> tuple[int, str] | None:
+    """(1-based line number, pattern) when a comment header marks the file as generated, else None."""
+    in_triple = False
+    for n, line in enumerate(text.splitlines()[:GENERATED_HEADER_LINES], 1):
+        stripped = line.strip()
+        is_comment = not in_triple and stripped.startswith(_COMMENT_PREFIXES)
+        if is_comment:
+            for rx in GENERATED_LINE_REGEXES:
+                if rx.match(stripped):
+                    return n, rx.pattern
+        for q in ('"""', "'''"):
+            if line.count(q) % 2 == 1:
+                in_triple = not in_triple
+    return None
 
 
 @dataclass
@@ -105,7 +130,7 @@ def count_file(disk_path: Path, rel_path: str, pool: DuplicatePool | None, root:
     try:
         encoding = choose_encoding(disk_path)
         a = SourceAnalysis.from_file(str(disk_path), GROUP, encoding=encoding, duplicate_pool=pool,
-                                     generated_name_regexes=GENERATED_NAME_REGEXES)
+                                     generated_regexes=[], generated_name_regexes=GENERATED_NAME_REGEXES)  # L3: see generated_header
     except Exception as exc:  # noqa: BLE001 - third-party parser on untrusted input
         return FileCount(rel_path, SourceState.error.name,
                          _relative_info(f"pygount failed: {type(exc).__name__}: {exc}", root))
@@ -113,6 +138,13 @@ def count_file(disk_path: Path, rel_path: str, pool: DuplicatePool | None, root:
                    a.documentation_count, a.string_count, a.empty_count)
     if not fc.counted:
         return fc
+    try:
+        with open(disk_path, encoding=encoding) as fh:
+            hit = generated_header(fh.read())
+    except Exception:  # noqa: BLE001
+        hit = None
+    if hit:
+        return FileCount(rel_path, SourceState.generated.name, f"line {hit[0]} is a comment header matching {hit[1]!r}")
     try:
         marks = line_marks(disk_path, encoding)
     except Exception as exc:  # noqa: BLE001
