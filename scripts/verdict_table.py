@@ -27,9 +27,7 @@ sys.path.insert(0, str(ROOT))
 from backend import retrieval, verdicts  # noqa: E402
 from backend.claims.pipeline import extract_claims  # noqa: E402
 from backend.evidence import cache  # noqa: E402
-from backend.evidence.github_client import GitHubClient  # noqa: E402
-from backend.evidence.identity import IdentitySet, build_identity_set  # noqa: E402
-from backend.evidence.target import Options, analyze_targets  # noqa: E402
+from backend.evidence.target import Options, analyze_targets, identity_of  # noqa: E402
 from backend.shield.analyze import analyze_document  # noqa: E402
 
 
@@ -49,15 +47,7 @@ def main() -> int:
     print(f"4A: {len(claims)} claims, {len(extraction.excluded or [])} units excluded, {extraction.calls} calls, ${extraction.cost_usd}")
 
     report = analyze_targets(a.repo, user=a.user, emails=a.email or None, opts=Options())
-    # the same identity 3.6 used (the report stores emails redacted, so it is rebuilt here, by the same precedence)
-    if a.email:
-        identity = IdentitySet(login="")
-        for e in a.email:
-            identity.add(e, "admin_supplied_email")
-    else:
-        client = GitHubClient()
-        metas = [client.get_repo(*t.repo_facts.full_name.split("/")) for t in report.targets if t.repo_facts]
-        identity = build_identity_set(a.user, client, repos=metas)
+    identity = identity_of(report)  # J4c: the identity 3.6 used (in-process only; reports stay redacted)
     views = []
     with tempfile.TemporaryDirectory(prefix="crucible-4c-") as tmp:
         for t in report.targets:

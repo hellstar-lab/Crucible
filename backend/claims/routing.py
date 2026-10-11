@@ -67,8 +67,40 @@ _RX: list[tuple[str, re.Pattern]] = [
 ]
 
 
+# J4a: a job-title line ("Senior Engineer, Northwind Payments", "Software Engineer at Contoso") states a role. Measured:
+# it routed to "other", so 4B said "no checkability rule matched" instead of the role reason.
+_TITLE_NOUNS = (r"(?:engineer|developer|programmer|architect|scientist|analyst|consultant|intern|designer|administrator|"
+                r"researcher|manager|director|lead|founder|co-founder|cto|ceo|specialist|technician|officer|associate|"
+                r"fellow|instructor|sre|devops)")
+_TITLE_LINE = re.compile(rf"(?i)^\s*(?:[\w./&+-]+\s+){{0,4}}{_TITLE_NOUNS}s?\b\s*(?:,|\bat\b|@|[-–—|])\s*\S")
+_ACTION_VERB = re.compile(r"(?i)\b(built|build|implemented|wrote|written|authored|designed|developed|created|architected|refactored|"
+                          r"rewrote|migrated|maintained|shipped|contributed|led|managed|mentored|reduced|improved|deployed|"
+                          r"automated|added|used|worked)\b")
+
+
+def is_title_line(text: str) -> bool:
+    return bool(_TITLE_LINE.match(text or "")) and len((text or "").split()) <= 12 and not _ACTION_VERB.search(text or "")
+
+
+CAREER_REASON = ("career-scope {kind} claim (education dates, employment duration, years of experience, or volume across a "
+                 "career): a repository sample cannot establish or refute it, so it is not searched and no model sees it")
+
+
+def apply_scope(rt: dict, scope: str) -> dict:
+    """J3: a timeline or scale claim whose scope is career is not checkable from code. Decided at routing, so the
+    claim never reaches retrieval or a model; 4C's history/count gate stays as defence in depth."""
+    if rt["kind"] in ("timeline", "scale") and scope == "career":
+        return {**rt, "checkable_from_code": "no", "evidence_kind": None,
+                "why_not_checkable": CAREER_REASON.format(kind=rt["kind"]), "checkability_note": None}
+    return rt
+
+
 def route(claim_text: str) -> dict:
     """{kind, secondary_kinds, checkable_from_code, evidence_kind, why_not_checkable, checkability_note}."""
+    if is_title_line(claim_text):
+        checkable, evidence, why = ROUTES["role_or_team"]
+        return {"kind": "role_or_team", "secondary_kinds": [], "checkable_from_code": checkable, "evidence_kind": evidence,
+                "why_not_checkable": why, "checkability_note": None}
     kinds: list[str] = [k for k, rx in _RX if rx.search(claim_text)]
     if any(_is_tech(e) for e in support.entities(claim_text)):
         kinds.append("technology_use")
@@ -105,11 +137,9 @@ _GENERIC = frozenset("new main core internal custom simple small large first own
 
 
 def scope_of(claim_text: str, kind: str, unit_text: str | None = None, section: str | None = None) -> tuple[str, str | None]:
-    """(scope, scope_target). specific_artifact > project > career > none, except that timeline and scale claims are
-    always career (their evidence is a repository sample's history or size, never the object itself)."""
+    """(scope, scope_target). specific_artifact > project > career > none. A timeline or scale claim is career unless it
+    names a file or a project ("Grew the crucible repository to 40k lines" is project-scoped and searchable)."""
     text = claim_text or ""
-    if kind in ("timeline", "scale"):
-        return "career", None
     m = _FILE_TOKEN.search(text)
     if m:
         return "specific_artifact", m.group(0)
@@ -119,7 +149,8 @@ def scope_of(claim_text: str, kind: str, unit_text: str | None = None, section: 
     m = _NAMED_PROJECT.search(text)
     if m and m.group(1).lower() not in ("the", "a", "this", "that", "open-source", "open"):
         return "project", m.group(1)
-    if _CAREER.search(text):
+    if _CAREER.search(text) or kind in ("timeline", "scale"):
+        # a timeline / scale claim that names no file or project is about a career (J3: it is then not searched)
         return "career", None
     if kind == "ownership":
         m = _COMPONENT.search(text)

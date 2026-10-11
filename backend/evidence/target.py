@@ -252,9 +252,17 @@ def analyze_targets(raws: list[str], user: str | None = None, emails: list[str] 
     finally:
         if own:
             client.close()
-    return AnalysisReport(input_spec=spec, targets=reports, api_calls=client.calls_made,
-                          rate_limit_remaining=client.rate_limit_remaining, stopped_reason=stopped,
-                          elapsed_s=round(time.monotonic() - start, 1), exclusion_ruleset_version=cache.ruleset_version())
+    out = AnalysisReport(input_spec=spec, targets=reports, api_calls=client.calls_made,
+                         rate_limit_remaining=client.rate_limit_remaining, stopped_reason=stopped,
+                         elapsed_s=round(time.monotonic() - start, 1), exclusion_ruleset_version=cache.ruleset_version())
+    out._identity = identity  # J4c: in-process only; never serialized
+    return out
+
+
+def identity_of(report: AnalysisReport) -> IdentitySet | None:
+    """The exact identity 3.6 used for blame (J4c), for in-process callers such as 4B. Replaces rebuilding it outside
+    3.6, which duplicated the precedence logic and the GitHub API calls. Not part of any serialized report."""
+    return report._identity
 
 
 def _analyze_one(t: Target, meta: dict, redirected: str | None, identity: IdentitySet | None, unresolved: str | None,

@@ -10,6 +10,13 @@ from dotenv import load_dotenv
 
 load_dotenv()  # entry point only: library code reads os.environ
 
+import os
+
+# Tests never touch the network. The NLI model is pinned by revision and cached locally; without these, transformers
+# asks the Hugging Face Hub for metadata on load, and a stalled connection hung the suite (measured in Phase 4J).
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 import sys
 from pathlib import Path
 

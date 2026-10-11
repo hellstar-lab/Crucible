@@ -38,7 +38,7 @@ from backend import llm
 from backend.contracts import (ClaimExtraction, ClaimUnit, DocumentReport, ExcludedUnit, ExtractedClaim, ShieldGate, ShieldItem,
                                StageDecision, SHIELD_SPAN_CAP)
 
-from . import config, guards, routing, stages, support
+from . import config, guards, routing, skills, stages, support
 from .split import Unit, split_structure
 
 log = logging.getLogger(__name__)
@@ -75,17 +75,19 @@ def _span(text):
 def gate(report: DocumentReport) -> ShieldGate:
     detectors = sorted({f.detector for f in report.security_findings})
     items = []
+    where = {"docx_run": "DOCX run (no fixed pages)", "metadata": "document metadata", "document": "document"}
     for h in report.hidden_fragments:
-        docx = h.detection_method.startswith("docx")
-        page = None if (docx or h.page == 0) else h.page
-        where = "DOCX run (no fixed pages)" if docx else ("document metadata" if h.page == 0 else f"page {h.page}")
         span, cut = _span(h.text)
-        items.append(ShieldItem(kind="hidden_fragment", detector=h.detection_method, reasons=list(h.reasons), page=page,
-                                location=where, span=span, span_truncated=cut))
+        items.append(ShieldItem(kind="hidden_fragment", detector=h.detection_method, reasons=list(h.reasons), page=h.page,
+                                location_kind=h.location_kind,
+                                location=f"page {h.page}" if h.location_kind == "page" else where[h.location_kind],
+                                span=span, span_truncated=cut))
     for f in report.security_findings:
         span, cut = _span(f.reconstructed_text)
         items.append(ShieldItem(kind="security_finding", detector=f.detector, severity=f.severity, page=f.page,
-                                location=f"page {f.page}" if f.page else "document", span=span, span_truncated=cut))
+                                location_kind=f.location_kind,
+                                location=f"page {f.page}" if f.location_kind == "page" else where[f.location_kind],
+                                span=span, span_truncated=cut))
     return ShieldGate(applied=bool(report.security_findings or report.hidden_fragments), document_status=report.status,
                       needs_review=report.needs_review, detectors=detectors, hidden_fragments=len(report.hidden_fragments),
                       items=items)
@@ -261,6 +263,24 @@ class _Run:
             return "unparseable_response", f"no valid disambiguation label: {r.verdict!r}"
         return self.check_output(r.data.get("clarified_text") or selected, source, u.text)
 
+    def skills_list(self, u: Unit, cu, items):
+        kept, over = items[: skills.MAX_ITEMS], items[skills.MAX_ITEMS:]
+        self.counters["skills_units"] += 1
+        self.counters["skills_claims"] += len(kept)
+        cu.decisions.append(StageDecision(stage="decomposition", tier="deterministic", verdict="decomposed",
+                                          reason=f"skills list split in code into {len(kept)} item(s); no model call"))
+        checkable, evidence, why = routing.ROUTES["technology_use"]
+        for i, (a, b, item) in enumerate(kept):
+            self.claims.append(ExtractedClaim(
+                claim_id=f"{u.unit_id}.c{i}", unit_id=u.unit_id, text=item, qualifiers=[], source_span=(a, b),
+                source_section=u.section, kind="technology_use", secondary_kinds=[], checkable_from_code=checkable,
+                evidence_kind=evidence, why_not_checkable=why, scope="none", scope_target=None, decomposition_tier="deterministic"))
+        if over:
+            self.counters["skills_items_over_cap"] += len(over)
+            self.exclude(u, "decomposition", "list_cap", f"skills list has {len(items)} items; the first {skills.MAX_ITEMS} became claims, "
+                         f"these {len(over)} did not: {', '.join(t for _a, _b, t in over)}")
+        return None
+
     def process(self, u: Unit):
         cu = u.to_contract()
         self.units.append(cu)
@@ -269,6 +289,10 @@ class _Run:
         if is_bare_date_range(u.text):  # F3: never reaches a model, 4B or 4C
             self.counters["bare_date_units"] += 1
             return self.exclude(u, "selection", "no_verifiable_claims", BARE_DATE_REASON)
+        if skills.is_skills_unit(u.text, u.section, u.heading_path):  # J1: a list decomposes in code, no model call
+            items = skills.split_items(self.text, u.start, u.end)
+            if items is not None:
+                return self.skills_list(u, cu, items)
         try:
             # Stage 2: selection
             r = self.stage(stages.select, cu, u.text, context, self.tiers["selection"])
@@ -343,6 +367,7 @@ class _Run:
             for i, c in enumerate(kept):
                 rt = routing.route(c["text"])
                 scope, target = routing.scope_of(c["text"], rt["kind"], u.text, u.section)
+                rt = routing.apply_scope(rt, scope)  # J3: career-scope timeline / scale never reach retrieval or a model
                 self.claims.append(ExtractedClaim(scope=scope, scope_target=target, 
                     claim_id=f"{u.unit_id}.c{i}", unit_id=u.unit_id, text=c["text"], qualifiers=[q for q in (c.get("qualifiers") or []) if q],
                     source_span=(u.start, u.end), source_section=u.section, kind=rt["kind"], secondary_kinds=rt["secondary_kinds"],
@@ -364,7 +389,8 @@ def _finish(run: _Run, document: str, gate_info: ShieldGate, extra_excluded: lis
     counters = dict(run.counters)
     for k in ("model_refused", "sentinel_normalized", "injection_suspected", "fabricated_quantity", "fabricated_entity",
               "qualifier_dropped", "stage3_pregate_skips", "rubric_leak", "ungrounded_qualifier", "stage3_escalations",
-              "greedy_disagreement", "stage3_ensemble_disagreements", "bare_date_units", "bare_date_claims_dropped"):
+              "greedy_disagreement", "stage3_ensemble_disagreements", "bare_date_units", "bare_date_claims_dropped",
+              "skills_units", "skills_claims", "skills_items_over_cap"):
         counters.setdefault(k, 0)
     counters["model_decisions"] = run.decisions
     return ClaimExtraction(

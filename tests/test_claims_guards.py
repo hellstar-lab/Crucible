@@ -96,7 +96,9 @@ def test_control_a_source_that_says_proficient_passes():
 def test_pipeline_excludes_and_counts_an_ungrounded_qualifier(fake):
     unit = "Python, Go, PostgreSQL"
     fake.script[("claim_decomposition", unit)] = J("decomposed", claims=[{"text": "Proficient in Python", "qualifiers": []}])
-    out = pipeline.extract_from_text(unit, headings=["SKILLS"], decomposition_tier="nano")
+    # under a non-skills heading the unit takes the model path, where the guard applies (under SKILLS, J1 splits the
+    # list in code and no model ever sees it: see test_claims_skills.py)
+    out = pipeline.extract_from_text(unit, headings=["SUMMARY"], decomposition_tier="nano")
     assert codes(out) == {"ungrounded_qualifier"} and out.counters["ungrounded_qualifier"] == 1
 
 

@@ -178,6 +178,7 @@ def _make_visual_fragment(run: list[CharInfo], reasons_by_idx: dict[int, list[st
     return HiddenFragment(
         text=" ".join("".join(c.text for c in run).split()),
         page=run[0].page,
+        location_kind="page",
         bbox=_union([c.bbox for c in run if not c.inkless]),
         reasons=reasons,
         detection_method="+".join(methods),
@@ -274,6 +275,7 @@ def _unicode_fragments(
                 HiddenFragment(
                     text=f.text,
                     page=page_no,
+                    location_kind="page",
                     bbox=_union(boxes[f.start:f.end]),
                     reasons=[f.kind],
                     detection_method="unicode",
@@ -382,7 +384,8 @@ def _scan(path: Path, keep: bool = False, with_fonts: bool = False, max_seconds:
             fragments.append(
                 HiddenFragment(
                     text=m.value,
-                    page=0,
+                    page=None,
+                    location_kind="metadata",
                     bbox=(0.0, 0.0, 0.0, 0.0),
                     reasons=["overlong_metadata", f"field:{m.field}"],
                     detection_method="metadata",

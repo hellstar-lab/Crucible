@@ -259,7 +259,7 @@ def scan_docx(path: str | Path, max_seconds: float | None = None) -> DocxResult:
                 continue
             vis.append(text)
         for text, reasons in cur:
-            res.fragments.append(HiddenFragment(text=" ".join(text.split()), page=0, bbox=(0.0, 0.0, 0.0, 0.0), reasons=reasons,
+            res.fragments.append(HiddenFragment(text=" ".join(text.split()), page=None, location_kind="docx_run", bbox=(0.0, 0.0, 0.0, 0.0), reasons=reasons,
                                                 detection_method="docx_attribute"))
         for h in child.iter(f"{W}hyperlink"):
             rid = h.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
@@ -270,7 +270,7 @@ def scan_docx(path: str | Path, max_seconds: float | None = None) -> DocxResult:
         raw = "".join(vis)
         if has_hidden_unicode(raw):  # detect on RAW text before ftfy/cleaning erases the evidence
             for f in scan_text(raw):
-                res.fragments.append(HiddenFragment(text=f.text, page=0, bbox=(0.0, 0.0, 0.0, 0.0), reasons=[f.kind],
+                res.fragments.append(HiddenFragment(text=f.text, page=None, location_kind="docx_run", bbox=(0.0, 0.0, 0.0, 0.0), reasons=[f.kind],
                                                     detection_method="unicode"))
             raw = strip_hidden_unicode(raw)
         text, moji = hygiene.clean(" ".join(raw.split()))
@@ -290,5 +290,5 @@ def scan_docx(path: str | Path, max_seconds: float | None = None) -> DocxResult:
                            references=structure.references_block(units, sections, full_text), body_size=None, notes=[])
     res.extracted = structure.Extracted(block, full_text, units, {}, res.mojibake_fixed, [1])
     res.visible_text = "\n".join(visible_parts)
-    res.findings += [f.model_copy(update={"page": None}) for f in link_findings(link_obs)]
+    res.findings += [f.model_copy(update={"page": None, "location_kind": "docx_run"}) for f in link_findings(link_obs)]
     return res

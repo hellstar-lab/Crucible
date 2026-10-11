@@ -202,6 +202,8 @@ blockquote{margin:0;padding:0 0 0 10px;border-left:3px solid var(--line)}
 pre.span{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--code);border-radius:4px;padding:6px 8px;margin:4px 0 10px;
 font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 ol.shield-items{padding-left:22px}
+section.alert{border:2px solid var(--v-contradicted);background:var(--warn-bg)}
+section.alert h2{color:var(--v-contradicted)}
 """
 
 
@@ -222,6 +224,19 @@ class Page:
         return None if v is _MISSING else v
 
     # ---- sections ------------------------------------------------------------------------------------------------
+    def _mismatch(self) -> bool:
+        return self.get("header", "identity_check", "status") == "mismatch"
+
+    def identity_banner(self) -> str:
+        """J2: a mismatch between the resume's GitHub identity and the analysed account, at the TOP of the page."""
+        if not self._mismatch():
+            return ""
+        b = ("header", "identity_check")
+        return (f'<section id="identity-mismatch" class="alert" role="alert"><h2>Identity mismatch</h2>'
+                f'<p>{self.val(b + ("message",))}</p><dl class="kv small">'
+                f'<dt>GitHub named in the resume</dt><dd class="mono">{self.val(b + ("resume_accounts",))}</dd>'
+                f'<dt>account analysed (operator)</dt><dd class="mono">{self.val(b + ("operator_user",))}</dd></dl></section>')
+
     def analysed(self) -> str:
         out = ['<section id="analysed"><h2>Analysed</h2>']
         cand = self.get("header", "candidate")
@@ -235,7 +250,14 @@ class Page:
             if "reference" in cand:
                 parts.append(f'reference <strong class="mono">{self.val(("header", "candidate", "reference"))}</strong>')
             out.append(" · ".join(parts) or NOT_MEASURED)
-        out.append("</dd></dl>")
+        out.append("</dd>")
+        ic = ("header", "identity_check")
+        if self.get(*ic) is None:
+            out.append(f"<dt>resume GitHub link</dt><dd>{NOT_MEASURED}: the resume's links were not compared with the analysed account</dd>")
+        else:
+            out.append(f"<dt>resume GitHub link</dt><dd><strong>{self.val(ic + ('status',), 'label')}</strong>: "
+                       f"{self.val(ic + ('message',))}</dd>")
+        out.append("</dl>")
         repos = self.get("header", "analysed") or []
         if not repos:
             out.append(f"<p>{NOT_MEASURED}: no repository was analysed in this report.</p>")
@@ -382,16 +404,21 @@ class Page:
             reason += f'<div class="small" style="margin-top:6px">authorship note: {self.val(b + ("authorship_note",))}</div>'
         reason += "</td>"
 
+        mm = ""
+        if self._mismatch():
+            ic = ("header", "identity_check")
+            mm = (f'<div class="warn">identity mismatch: analysed {self.val(ic + ("operator_user",))}, the resume links '
+                  f'{self.val(ic + ("resume_accounts",))}</div>')
         if r.get("citation") is None:
             cite = '<td class="cite small muted">no cited item</td>'
-            auth = (f'<td class="auth small">{NOT_MEASURED}: no item is cited, so authorship of cited code does not apply.</td>')
+            auth = (f'<td class="auth small">{NOT_MEASURED}: no item is cited, so authorship of cited code does not apply.{mm}</td>')
         else:
             c = b + ("citation",)
             lines = (f':{self.val(c + ("start_line",))}–{self.val(c + ("end_line",))}' if r["citation"].get("start_line") is not None
                      else f' <span class="muted">(lines {NOT_MEASURED})</span>')
             cite = (f'<td class="cite"><div class="mono small">{self.val(c + ("repo",))}</div>'
                     f'<div class="mono">{self.val(c + ("path",), missing="(repository-level item)")}{lines}</div></td>')
-            auth = [f'<td class="auth small">',
+            auth = [f'<td class="auth small">{mm}',
                     f'<div>candidate wrote cited lines: <strong>{self.val(b + ("authored_by_candidate",), "bool")}</strong></div>',
                     f'<div>file authored: <strong>{self.val(b + ("authored_ratio",), "ratio")}</strong>, confidence '
                     f'<strong>{self.val(b + ("authorship_confidence",), cls="mono")}</strong></div>',
@@ -519,7 +546,7 @@ def render_html(data: dict, title: str = "Claim evidence report") -> str:
     if re.search(r"\d", title):
         raise TraceError("the page title is static text and may not carry numbers")
     pg = Page(data)
-    body = "".join([pg.analysed(), pg.shield(), pg.claims(), pg.not_checkable(), pg.excluded(), pg.provenance()])
+    body = "".join([pg.identity_banner(), pg.analysed(), pg.shield(), pg.claims(), pg.not_checkable(), pg.excluded(), pg.provenance()])
     page = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<meta name="color-scheme" content="light dark"><title>{E(title)}</title><style>{CSS}</style></head><body><main>'

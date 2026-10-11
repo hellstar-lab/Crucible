@@ -43,9 +43,9 @@ abstain value.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 
 
 class CrucibleModel(BaseModel):
@@ -74,20 +74,32 @@ class SecurityFinding(CrucibleModel):
 
     detector: str
     severity: Severity
-    page: Optional[int] = None  # 1-based; None for document-level findings
+    page: Optional[int] = None  # 1-based; None for document-level findings and for DOCX (no fixed pages)
     evidence: dict = {}
     reconstructed_text: Optional[str] = None
+    # J4b: where the finding is, stated rather than inferred from page. Defaults from page when a detector does not set it.
+    location_kind: Optional[Literal["page", "docx_run", "metadata", "document"]] = None
+
+    @model_validator(mode="after")
+    def _location(self):
+        if self.location_kind is None:
+            self.location_kind = "page" if self.page else "document"
+        return self
 
 
 class HiddenFragment(CrucibleModel):
     """A run of text a machine can read but a human cannot see.
 
-    ``page`` is 1-based; 0 means the fragment came from document metadata
-    rather than a page. ``bbox`` is (left, bottom, right, top) in PDF points.
+    ``page`` is 1-based for a PDF page and None otherwise; ``location_kind``
+    says which (J4b: page=0 used to mean both "metadata" and "a DOCX run").
+    ``bbox`` is (left, bottom, right, top) in PDF points.
     """
 
     text: str
-    page: int
+    page: Optional[int]
+    # Set explicitly by every 2C detector. The validator only fills it for older constructors (tests, experiments,
+    # cached JSON): detection_method "metadata" -> metadata, "docx_*" -> docx_run, otherwise page.
+    location_kind: Optional[Literal["page", "docx_run", "metadata"]] = None
     bbox: tuple[float, float, float, float]
     reasons: list[str]
     detection_method: str
@@ -99,6 +111,15 @@ class HiddenFragment(CrucibleModel):
     ] = None
     classification_confidence: Optional[float] = None
     classification_failed: bool = False
+
+    @model_validator(mode="after")
+    def _location(self):
+        if self.location_kind is None:
+            m = self.detection_method or ""
+            self.location_kind = "metadata" if m == "metadata" else ("docx_run" if m.startswith("docx") else "page")
+        if self.location_kind != "page" and self.page == 0:
+            self.page = None  # page=0 no longer doubles as "not a page"
+        return self
 
 
 class ShieldSection(CrucibleModel):
@@ -510,6 +531,10 @@ class InputSpec(CrucibleModel):
 
 
 class AnalysisReport(CrucibleModel):
+    """3.6 output. ``_identity`` (J4c) is the UNREDACTED IdentitySet 3.6 used, for in-process callers only (4B blame
+    via backend.evidence.target.identity_of). It is a pydantic private attribute: never serialized, never in a
+    report, so redaction still happens at the report boundary."""
+    _identity: Any = PrivateAttr(default=None)
     input_spec: InputSpec
     targets: list[TargetReport]
     api_calls: int = 0
@@ -748,7 +773,7 @@ class ExcludedUnit(CrucibleModel):
     reason_code: Literal["no_verifiable_claims", "cannot_be_disambiguated", "model_refused", "unparseable_response",
                          "fabricated_quantity", "fabricated_entity", "injection_suspected", "qualifier_dropped", "shield_payload",
                          "rubric_leak", "ungrounded_qualifier",
-                         "contact_info", "cost_cap", "model_unavailable"]
+                         "contact_info", "cost_cap", "model_unavailable", "list_cap"]
     detail: str
 
 
@@ -782,6 +807,7 @@ class ShieldItem(CrucibleModel):
     reasons: list[str] = []
     severity: Optional[str] = None
     page: Optional[int] = None
+    location_kind: Optional[Literal["page", "docx_run", "metadata", "document"]] = None  # J4b, from 2C
     location: Optional[str] = None  # "page N", "document metadata", "DOCX run (no fixed pages)", "document"
     span: Optional[str] = None
     span_truncated: bool = False
@@ -985,6 +1011,7 @@ class ReportRow(CrucibleModel):
 
 class ReportHeader(CrucibleModel):
     candidate: Optional[dict] = None  # I2b: what the operator supplied: {github_user, reference}; emails never appear
+    identity_check: Optional[dict] = None  # J2: the resume's GitHub links vs the operator's --user / --repo
     analysed: list[dict] = []  # 3.6 repo_facts: repo, ref, head_sha, scope, source files and lines, languages
     excluded: list[dict] = []  # 3.5 via 3.6: excluded files and lines by reason, per repo
     authorship: list[dict] = []  # 3.6: per repo authored ratio WITH its confidence and reason (rendering rule)

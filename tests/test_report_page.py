@@ -193,3 +193,50 @@ def test_committed_degraded_fixture_still_validates_and_renders():
     page = render_html(data)
     assert assert_traceable(page, data) > 50 and page.count('<pre class="span">') == 2
     assert "reason before grounding replaced it" in page and "degraded-fixture" in page
+
+
+# --- J2: resume identity vs operator identity ----------------------------------------------------------------------
+
+def _doc(*links):
+    from types import SimpleNamespace as NS
+    return NS(structure=NS(links=[NS(kind="github", github_account=a, github_target=t) for a, t in links]))
+
+
+@pytest.mark.parametrize("links,user,repos,status,analysed,source", [
+    ([("jordan-lee-demo", None)], "hellstar-lab", ["hellstar-lab/Crucible"], "mismatch", ["hellstar-lab/Crucible"], "operator"),
+    ([("Hellstar-Lab", None)], "hellstar-lab", ["hellstar-lab/Crucible"], "agree", ["hellstar-lab/Crucible"], "operator"),
+    ([], "hellstar-lab", ["hellstar-lab/Crucible"], "no_link", ["hellstar-lab/Crucible"], "operator"),
+    ([("sam", "sam/cachekit")], "sam", [], "agree", ["sam/cachekit"], "resume"),
+    ([("acme", "acme/platform")], "sam", [], "unconfirmed", ["acme/platform"], "resume"),
+])
+def test_identity_check(links, user, repos, status, analysed, source):
+    from backend.grounding.identity import compare
+    ic, use = compare(_doc(*links), user, repos)
+    assert (ic["status"], use, ic["repos_source"]) == (status, analysed, source)
+    if status == "mismatch":
+        assert "jordan-lee-demo" in ic["message"] and "hellstar-lab" in ic["message"]
+    if status == "no_link":
+        assert ic["message"].startswith("No GitHub link found in the document")
+    if source == "resume":
+        assert "the repositories the resume names were analysed" in ic["message"]
+
+
+def test_mismatch_is_at_the_top_and_on_every_authorship_cell(degraded):
+    from backend.grounding.identity import compare
+    d = copy.deepcopy(degraded)
+    d["header"]["identity_check"], _ = compare(_doc(("jordan-lee-demo", None)), "alex-sample-demo", ["x/y"])
+    page = render_html(d)
+    ids = re.findall(r'<section id="([\w-]+)"', page)
+    assert ids[0] == "identity-mismatch" and ids[1:] == ["analysed", "shield", "claims", "not-checkable", "excluded", "provenance"]
+    rows = _rows(page)
+    assert rows and all("identity mismatch: analysed" in re.search(r'<td class="auth[^"]*">(.*?)</td>', r, re.S).group(1) for r in rows)
+    assert "<h2>Identity mismatch</h2>" in page.split('id="analysed"')[0]
+
+
+def test_agreement_is_recorded_without_a_banner(degraded):
+    from backend.grounding.identity import compare
+    d = copy.deepcopy(degraded)
+    d["header"]["identity_check"], _ = compare(_doc(("alex-sample-demo", None)), "alex-sample-demo", ["x/y"])
+    page = render_html(d)
+    assert 'id="identity-mismatch"' not in page and "identity mismatch" not in page and "agree" in _text(page)
+

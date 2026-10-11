@@ -42,3 +42,41 @@ def test_role_claim_is_never_routed_to_code_even_with_a_technology():
 def test_metric_and_timeline_carry_a_note():
     assert "benchmark" in route("Reduced latency by 40%")["checkability_note"]
     assert "rewritten" in route("Joined in 2021")["checkability_note"]
+
+
+# --- Phase 4J J4a: job-title lines are role_or_team -----------------------------------------------------------------
+
+@pytest.mark.parametrize("text", ["Senior Engineer, Northwind Payments", "Software Engineer at Contoso",
+                                  "Backend Developer @ Fabrikam", "Staff Software Engineer - Tailspin Toys",
+                                  "Engineer, Contoso Freight Jul 2018 - Feb 2021", "Data Scientist, Example Labs"])
+def test_title_lines_route_to_role_or_team(text):
+    r = route(text)
+    assert r["kind"] == "role_or_team" and r["checkable_from_code"] == "no" and "Roles, titles" in r["why_not_checkable"]
+
+
+@pytest.mark.parametrize("text", ["Built the cache client", "Built a caching layer with Redis",
+                                  "Worked with data engineers at Contoso on the ingestion pipeline",
+                                  "Designed the ledger reconciliation module", "Mentored two junior developers"])
+def test_sentences_with_a_title_noun_are_not_title_lines(text):
+    from backend.claims.routing import is_title_line
+    assert not is_title_line(text)
+
+
+# --- Phase 4J J3: career-scope timeline / scale are not checkable --------------------------------------------------
+
+@pytest.mark.parametrize("text", ["Completed the degree between 2014 and 2018", "6 years of backend experience",
+                                  "Maintained 300k lines of code"])
+def test_career_scope_timeline_and_scale_are_not_checkable(text):
+    from backend.claims.routing import apply_scope, scope_of
+    rt = route(text)
+    assert rt["kind"] in ("timeline", "scale")
+    out = apply_scope(rt, scope_of(text, rt["kind"])[0])
+    assert out["checkable_from_code"] == "no" and out["why_not_checkable"].startswith("career-scope")
+
+
+def test_project_scoped_scale_claim_stays_searchable():
+    from backend.claims.routing import apply_scope, scope_of
+    text = "Grew the crucible repository to 40k lines"
+    rt = route(text)
+    scope = scope_of(text, rt["kind"])
+    assert rt["kind"] == "scale" and scope == ("project", "crucible") and apply_scope(rt, scope[0])["checkable_from_code"] == "yes"

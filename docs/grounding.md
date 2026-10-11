@@ -114,3 +114,31 @@ Live, clean_small, two sets of 3 runs, claim c0:
 6. 3.6 clones each repo and 4B clones it again for excerpts. The second clone can miss `head_sha` if the branch moves; `load_view` records that.
 7. The candidate identity is rebuilt outside 3.6 (3.6 redacts emails), duplicating its precedence logic and its GitHub API calls.
 8. Nothing compares the operator-supplied `--user` with the resume's own GitHub link. The clean fixture links `github.com/jordan-lee-demo` and was run as `hellstar-lab`, with no warning.
+
+## Phase 4J: make the report non-empty
+
+**J1: skills lists decompose in code** (`backend/claims/skills.py`).
+- Applies to a delimited list under a Skills / Technologies / Tools / Languages / Frameworks / Stack heading, or behind such a label ("Skills: Python, Docker.").
+- It is split on `, ; |` and bullet glyphs at parenthesis depth 0, after stripping a leading category label. There is no model call.
+- Each item becomes one `technology_use` claim with scope none, checkable yes, the bare item as its text, and a `source_span` on the item itself.
+- At most 40 items per unit; the overflow is excluded as `list_cap` with the dropped items named.
+- An item the tech lexicon doesn't know is skipped by 4B as `unknown_technology: …`, not dropped. An empty search would wrongly read as "looked, found nothing".
+
+**J2: resume identity vs operator identity** (`backend/grounding/identity.py`).
+- The resume's GitHub links (from 2C) are compared with `--user` / `--repo`. Statuses: `agree`, `mismatch`, `unconfirmed` (repository links only, none owned by the user), `no_link`.
+- A mismatch shows at the top of the page and in every claim row's authorship cell.
+- With no `--repo`, the resume's repositories are used, and the header says so.
+- The run never fails on a mismatch.
+
+**J3: career-scope timeline and scale claims never reach a model.**
+- `routing.apply_scope` makes them not checkable (`career-scope … claim`), and 4B skips them again as defence in depth.
+- A timeline or scale claim that names a file or a project is scoped to it and stays searchable.
+- The 4C history/count gate is kept, and pinned by a test that forces evidence past routing with a mocked unanimous contradiction.
+
+**J4: three smaller fixes, plus a pin.**
+- **J4a:** job-title lines route to `role_or_team`.
+- **J4b:** `location_kind` (page | docx_run | metadata, plus `document` for whole-document findings) is set by every 2C detector, and `page=0` no longer means "not a page".
+- **J4c:** 3.6 keeps its unredacted `IdentitySet` as a private, never-serialized attribute (`identity_of`), so the identity is no longer rebuilt.
+- **Pin:** the excerpt clone is pinned to the analysed `head_sha` (fetched explicitly if the branch moved). De-duplicating the double clone is left for later.
+
+Recorded, not fixed: `route("Built the cache client")` is `outcome`, because the outcome pattern matches "client" as in customers.

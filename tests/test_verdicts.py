@@ -305,11 +305,22 @@ def test_greedy_disagreement_rate_is_reported(scenarios, fake):
 # --------------------------------------------------------------------------
 
 
-def test_degree_dates_are_never_contradicted_by_a_repository_history(scenarios, fake):
-    """The measured failure: "2014 - 2018" came back contradicted in 3 of 3 runs, citing one repo's 2026 history."""
+def test_degree_dates_never_reach_a_model(scenarios, fake):
+    """The measured failure: "2014 - 2018" came back contradicted in 3 of 3 runs, citing one repo's 2026 history.
+    J3: a career-scope timeline claim is not searched and no model sees it."""
+    c = claim("Completed the degree between 2014 and 2018", "timeline")
+    es = retrieval.retrieve(c, [view(scenarios, "clean_small")])
+    assert not es.retrieval_performed and es.skip_reason.startswith("career-scope timeline claim")
+    v, calls, _ = verdicts.verdict_for(c, es)
+    assert v.verdict == "unverifiable" and calls == 0 and fake.calls == []
+
+
+def test_history_gate_still_holds_if_a_career_claim_slips_past_routing(scenarios, fake):
+    """Defence in depth, pinned: evidence forced past the J3 routing rule (retrieved as if project-scoped) and a MOCKED
+    unanimous contradicted must still come back inconclusive at the 4C history/count gate."""
     from datetime import date
     c = claim("2014 - 2018", "timeline")
-    es = retrieval.retrieve(c, [view(scenarios, "clean_small")], today=date(2026, 10, 11))
+    es = retrieval.retrieve({**c, "scope": "project"}, [view(scenarios, "clean_small")], today=date(2026, 10, 11))
     hist = next(i for i, it in enumerate(es.items) if it.kind == "history")
     fake.answers = [("contradicted", hist, 1.0, False)]
     v, calls, _ = verdicts.verdict_for(c, es)

@@ -27,16 +27,33 @@ from .sources import RepoView, assert_eligible, load_view  # noqa: F401  (re-exp
 
 def _claim_fields(claim) -> dict:
     get = (lambda k: claim.get(k)) if isinstance(claim, dict) else (lambda k: getattr(claim, k, None))
-    return {k: get(k) for k in ("claim_id", "kind", "checkable_from_code", "text", "secondary_kinds")}
+    return {k: get(k) for k in ("claim_id", "kind", "checkable_from_code", "text", "secondary_kinds", "scope",
+                                "why_not_checkable")}
+
+
+def _skip(c, version, reason) -> EvidenceSet:
+    return EvidenceSet(claim_id=c["claim_id"], claim_kind=c["kind"], retrieval_performed=False, retrieval_version=version,
+                       skip_reason=reason)
 
 
 def retrieve(claim, views: list[RepoView], today: date | None = None) -> EvidenceSet:
     c = _claim_fields(claim)
     version = config.retrieval_version()
     kind = c["kind"]
-    if kind in config.SKIPPED_KINDS or c["checkable_from_code"] == "no" or kind not in config.KIND_RULES:
-        return EvidenceSet(claim_id=c["claim_id"], claim_kind=kind, retrieval_performed=False, retrieval_version=version,
-                           skip_reason=config.SKIPPED_KINDS.get(kind, f"{kind} has no retrieval rule; not searched"))
+    if kind in config.SKIPPED_KINDS:
+        return _skip(c, version, config.SKIPPED_KINDS[kind])
+    if kind in ("timeline", "scale"):  # J3 defence in depth: a career-scope claim is never searched, whoever built it
+        from backend.claims.routing import CAREER_REASON, scope_of
+        scope = c["scope"] or scope_of(c["text"] or "", kind)[0]
+        if scope == "career":
+            return _skip(c, version, CAREER_REASON.format(kind=kind))
+    if c["checkable_from_code"] == "no" or kind not in config.KIND_RULES:
+        return _skip(c, version, c["why_not_checkable"] or f"{kind} has no retrieval rule; not searched")
+    if kind == "technology_use" and not lexicon.recognise(c["text"]):
+        # J1: a technology the lexicon does not know is reported, not dropped: there is no manifest, import, config or
+        # file pattern to search for, and an empty search would wrongly read as "looked and found nothing".
+        return _skip(c, version, f"unknown_technology: {c['text']!r} is not in the technology lexicon, so there is no "
+                                 "dependency, import, config or file pattern to search for")
     rule_names = list(config.KIND_RULES[kind])
     for k in c.get("secondary_kinds") or []:  # e.g. a metric claim that also names a technology
         for r in config.KIND_RULES.get(k, ()):
@@ -66,8 +83,6 @@ def retrieve(claim, views: list[RepoView], today: date | None = None) -> Evidenc
                 if marker not in searched.rules_fired:
                     searched.rules_fired.append(marker)
         notes.extend(n for n in view.notes if n not in notes)
-    if not techs and kind == "technology_use":
-        notes.append("no lexicon technology recognised in the claim: dependency/import/config rules had nothing to match")
     ranked, dropped = rank.rank(c["text"], items)
     return EvidenceSet(claim_id=c["claim_id"], claim_kind=kind, retrieval_performed=True, searched=searched, items=ranked,
                        items_dropped=dropped, retrieval_version=version, notes=list(dict.fromkeys(notes)))

@@ -223,3 +223,31 @@ def test_shield_items_carry_location_and_span():
     assert any("IGNORE ALL PREVIOUS INSTRUCTIONS" in i.span for i in g.items)
     pdf = gate(analyze_document(Path(__file__).parent / "fixtures" / "white_text.pdf"))
     assert pdf.items and all(i.page and i.page >= 1 and i.location == f"page {i.page}" for i in pdf.items if i.kind == "hidden_fragment")
+
+
+# --- J4b: location_kind, not page=0 --------------------------------------------------------------------------------
+
+def test_every_2c_fragment_constructor_states_its_location_kind():
+    """The contract validator only back-fills older constructors; every 2C detector must say where its fragment is."""
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent / "backend" / "shield"
+    calls = [(p.name, p.read_text()[m.end(): m.end() + 250]) for p in root.glob("*.py")
+             for m in re.finditer(r"\bHiddenFragment\(", p.read_text())]
+    assert len(calls) == 5 and all("location_kind=" in c for _n, c in calls), [n for n, c in calls if "location_kind=" not in c]
+
+
+def test_docx_and_pdf_locations():
+    from pathlib import Path
+    from backend.claims.pipeline import gate
+    from backend.shield.analyze import analyze_document
+    fx = Path(__file__).parent / "fixtures"
+    docx = analyze_document(fx / "docs" / "docx_hidden.docx")
+    assert docx.hidden_fragments and all(h.location_kind == "docx_run" and h.page is None for h in docx.hidden_fragments)
+    assert all(i.location_kind == "docx_run" for i in gate(docx).items)
+    pdf = analyze_document(fx / "white_text.pdf")
+    assert pdf.hidden_fragments and all(h.location_kind == "page" and h.page >= 1 for h in pdf.hidden_fragments)
+    from backend.contracts import HiddenFragment
+    meta = HiddenFragment(text="x" * 40, page=0, bbox=(0, 0, 0, 0), reasons=["overlong_metadata"], detection_method="metadata")
+    assert meta.location_kind == "metadata" and meta.page is None
+

@@ -57,7 +57,8 @@ def _provenance(run, extraction, run_label) -> dict:
 
 
 def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, grounding_failures=None, run=None,
-                 run_label: str | None = None, claims=None, candidate: dict | None = None) -> ClaimEvidenceReport:
+                 run_label: str | None = None, claims=None, candidate: dict | None = None,
+                 identity_check: dict | None = None) -> ClaimEvidenceReport:
     """``claims``: the 4A claims (dicts or ExtractedClaim); defaults to ``extraction.claims``. ``candidate``: what the
     operator supplied, {"github_user": ..., "reference": ...}; an email is refused (3.6 redacts them)."""
     if candidate:
@@ -122,7 +123,7 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
     excluded_units = [{"unit_id": u.unit_id, "section": u.source_section, "stage": u.stage, "reason_code": u.reason_code,
                        "detail": u.detail, "source": "4A"} for u in (getattr(extraction, "excluded", None) or [])]
     versions = {"retrieval": next((es.retrieval_version for es in evidence_sets), None)}
-    header = ReportHeader(candidate=dict(candidate) if candidate else None, analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
+    header = ReportHeader(candidate=dict(candidate) if candidate else None, identity_check=identity_check, analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
                           grounding_failures=(None if grounding_failures is None else
                                               {c: grounding_failures.get(c, 0) for c in CHECKS}), excluded_units=excluded_units,
                           provenance=_provenance(run, extraction, run_label), stage_versions=versions)

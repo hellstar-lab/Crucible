@@ -481,3 +481,16 @@ def test_readme_claims_extract_declarative_text_only():
     assert "This service schedules deliveries using Redis queues." in texts
     assert "Supports offline sync for field agents" in texts
     assert not any("npm install" in t or t.endswith("?") for t in texts)
+
+
+def test_identity_is_exposed_in_process_and_never_serialized(tmp_path):
+    """J4c: callers reuse 3.6's identity instead of rebuilding it; the serialized report still carries no email."""
+    from backend.evidence.target import identity_of
+    repo = tmp_path / "single"
+    M.init(repo)
+    M.commit(repo, {"src/app.py": M.code("app", 30)}, M.CAND, DAY.format(1, 1))
+    rep = run(["o/single"], {"/repos/o/single": meta("o", "single")}, {"o/single": repo})
+    ident = identity_of(rep)
+    assert ident is not None and M.CAND[1] in ident.emails
+    dumped = rep.model_dump_json()
+    assert '"_identity"' not in dumped and M.CAND[1] not in dumped

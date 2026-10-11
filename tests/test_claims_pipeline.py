@@ -116,7 +116,7 @@ def test_a_label_outside_the_partition_is_unparseable_not_unclear(fake):
 
 
 def test_stage3_pregate_skips_units_with_nothing_to_resolve(fake):
-    out = run_text("Skills: Python, Docker.")
+    out = run_text("Built a routing engine in Go.")  # (a "Skills:" line no longer reaches a model at all: J1)
     assert [t for t, _tier, _p in fake.prompts] == ["claim_selection", "claim_decomposition"]
     assert out.counters["stage3_pregate_skips"] == 1 and out.units[0].decisions[1].tier == "pre-gate"
     fake.prompts.clear()
@@ -243,7 +243,13 @@ def test_every_claim_traces_to_its_unit_span(fake):
     spans = {u.unit_id: u.source_span for u in out.units}
     assert out.claims
     for c in out.claims:
-        assert c.source_span == spans[c.unit_id] and 0 <= c.source_span[0] < c.source_span[1] <= len(out.document_text)
+        assert 0 <= c.source_span[0] < c.source_span[1] <= len(out.document_text)
+        if c.decomposition_tier == "deterministic":  # J1 skills item: its own span inside the unit, verbatim
+            u0, u1 = spans[c.unit_id]
+            assert u0 <= c.source_span[0] < c.source_span[1] <= u1
+            assert " ".join(out.document_text[c.source_span[0]:c.source_span[1]].split()) == c.text
+        else:
+            assert c.source_span == spans[c.unit_id]
     every = {u.unit_id for u in out.units}
     assert {c.unit_id for c in out.claims} | {e.unit_id for e in out.excluded} == every  # every unit is accounted for
 
