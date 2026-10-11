@@ -63,7 +63,13 @@ def canonical_identity_emails(identity: IdentitySet, mailmap_text: str) -> set[s
 
 
 def authorship_confidence(history: dict) -> tuple[str, str]:
-    """(level, reason) where reason is readable by a hiring manager."""
+    """(level, reason) where reason is readable by a hiring manager. The ladder, top rung first; anything that matches
+    no higher rung falls DOWN, never up:
+      none    one commit, or one author inside an hour
+      low     fewer than 5 commits; span under 1 day (any author count); committer dates clustered (rewrite);
+              several authors over less than 7 days
+      medium  one author, span of a day or more
+      high    several authors over 7 days or more"""
     n = history.get("commit_count") or 0
     authors = history.get("distinct_author_count") or 0
     span_s = history.get("author_span_s") or 0
@@ -90,7 +96,11 @@ def authorship_confidence(history: dict) -> tuple[str, str]:
                           "is no other contributor to compare against.")
     if days >= 7:
         return "high", f"{n} commits by {authors} authors over {days:.0f} days."
-    return "medium", f"{n} commits by {authors} authors, but over only {days:.1f} days."
+    # Phase 4K K2: several authors over a short span matched no rung and fell UPWARD to medium (measured: "7 commits by
+    # 2 authors, but over only 1.0 days" -> medium, a reason that contradicts its own level). Span dominates author
+    # count: under 7 days, a second author does not make the history long enough to compare who wrote what.
+    return "low", (f"{n} commits by {authors} authors, but over only {days:.1f} days: too short a history for the "
+                   "authors' contributions to be compared.")
 
 
 # --------------------------------------------------------------------------
@@ -184,11 +194,11 @@ def compute_authorship(snap: dict, identity: IdentitySet, *, owner_login: str | 
     )
 
 
-def line_authorship(snap: dict, identity: IdentitySet) -> dict[str, list[tuple[bool, bool]]]:
-    """Per counted file, per line: (is_source, authored_by_candidate)."""
+def line_authorship(snap: dict, identity: IdentitySet, include_authorship_only: bool = False) -> dict[str, list[tuple[bool, bool]]]:
+    """Per counted file (and, if asked, per authorship-only file, K3), per line: (is_source, authored_by_candidate)."""
     canonical = canonical_identity_emails(identity, snap.get("mailmap", ""))
     commits = snap.get("commits", [])
     cand = [c["author_email"] in canonical or identity.matches(c["author_email"]) for c in commits]
-    return {path: [(m in "cs", cand[ci]) for m, ci in zip(e["marks"], e["line_commits"])]
-            for path, e in snap.get("counted", {}).items()}
+    files = {**snap.get("counted", {}), **(snap.get("authorship_only", {}) if include_authorship_only else {})}
+    return {path: [(m in "cs", cand[ci]) for m, ci in zip(e["marks"], e["line_commits"])] for path, e in files.items()}
 

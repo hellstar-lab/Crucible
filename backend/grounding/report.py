@@ -83,6 +83,7 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
             authorship_confidence=item.authorship_confidence if item else None,
             authorship_confidence_reason=ra.authorship_confidence_reason if ra else None,
             likely_identity_gap=ra.likely_identity_gap if ra else None, authorship_note=v.authorship_note,
+            volume=item.volume if item else None,
             content_reason=v.content_reason, matrix_row=v.matrix_row, agreement=v.agreement, model_tier=v.model_tier,
             escalated=v.escalated if v.samples else None, escalation_reason=v.escalation_reason, scope=v.scope,
             scope_target=v.scope_target, scope_match_rule=v.scope_match_rule, prompt_hash=v.prompt_hash,
@@ -100,8 +101,11 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
                          "languages": {k: n for k, n in (rf.languages or {}).items() if n} if rf.languages is not None else None,
                          "source": "3.6 repo_facts"})
         excluded.append({"repo": rf.full_name, "files_by_reason": {k: n for k, n in rf.excluded_files_by_reason.items() if n},
-                         "lines_by_reason": {k: n for k, n in rf.excluded_lines_by_reason.items() if n},
-                         "top_excluded": [f"{e.path} ({e.reason})" for e in rf.top_excluded_files[:5]], "source": "3.5 via 3.6"})
+                         # K4b: lines for EVERY reason that has files, 0 included (12 empty .gitkeep duplicates are 0 lines,
+                         # measured; dropping the zero made the page say "lines not measured")
+                         "lines_by_reason": {k: rf.excluded_lines_by_reason.get(k, 0) for k, n in rf.excluded_files_by_reason.items() if n},
+                         "top_excluded": [f"{e.path} ({e.reason})" for e in rf.top_excluded_files[:5]],
+                         "authorship_only": list(rf.authorship_only_files), "source": "3.5 via 3.6"})
         a = t.authorship
         authorship.append({"repo": rf.full_name, "authored_ratio": a.authored_ratio if a else None,
                            "authorship_confidence": a.authorship_confidence if a else None,

@@ -284,3 +284,44 @@ def test_cli_end_to_end(scenarios, tmp_path, capsys, monkeypatch):
     assert "c1" in out and "authored_by_candidate=2" in out and "NOT SEARCHED: role_or_team is not knowable from code" in out
     data = json.loads((tmp_path / "out.json").read_text())
     assert data[0]["items"][0]["excerpt"] in ("redis==5.0.1", "import redis") and data[1]["searched"] is None
+
+
+# --- Phase 4K K3: authored fixture code is authorship-eligible, not counted in stats -------------------------------
+
+def test_fixture_generator_is_blamed_but_not_counted(tmp_path):
+    from backend.evidence.snapshot import build_snapshot
+    from backend.evidence import exclusions as ex
+    repo = tmp_path / "fx"
+    M.init(repo)
+    M.commit(repo, {"src/app.py": M.code("app", 20),
+                    "tests/fixtures/make_fixtures.py": M.code("gen", 30),        # authored generator: authorship-only
+                    "tests/fixtures/expected.json": b'{"a": 1}\n',               # fixture DATA: stays excluded
+                    "tests/fixtures/repo/node_modules/x/index.js": b"module.exports = 1;\n",  # really vendored
+                    ".github/scripts/release.py": M.code("rel", 5)}, M.CAND, "2024-01-01T10:00:00+00:00")
+    snap = build_snapshot(repo, "o/fx")
+    assert set(snap["authorship_only"]) == {"tests/fixtures/make_fixtures.py", ".github/scripts/release.py"}
+    assert set(snap["counted"]) == {"src/app.py"}  # line counts / languages / ratio unchanged
+    reasons = {e[0]: e[2] for e in snap["excluded"]}
+    assert reasons["tests/fixtures/make_fixtures.py"] == ex.VENDORED_PATH  # still excluded for stats
+    assert not ex.authorship_only("tests/fixtures/repo/node_modules/x/index.js")
+    assert not ex.authorship_only("tests/fixtures/expected.json")
+
+
+def test_authorship_only_file_is_ownership_evidence_and_blamed(tmp_path):
+    from backend.evidence import cache as C
+    repo = tmp_path / "fx2"
+    M.init(repo)
+    M.commit(repo, {"src/app.py": M.code("app", 20), "tests/fixtures/make_fixtures.py": M.code("gen", 30)}, M.CAND,
+             "2024-01-01T10:00:00+00:00")
+    M.commit(repo, {"src/more.py": M.code("more", 20)}, M.CAND, "2024-03-01T10:00:00+00:00")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(C, "CACHE_DIR", tmp_path / "cache")
+        report = T.run([f"{M.LOGIN}/fx2"], {f"/repos/{M.LOGIN}/fx2": T.meta(M.LOGIN, "fx2")}, {f"{M.LOGIN}/fx2": repo},
+                       use_cache=True).targets[0]
+        v = load_view(report, snapshot_root=tmp_path / "cache", checkout=repo, identity=identity())
+    assert report.repo_facts.authorship_only_files == ["tests/fixtures/make_fixtures.py"]
+    assert report.repo_facts.total_source_lines == sum(report.repo_facts.languages.values())
+    assert "tests/fixtures/make_fixtures.py" not in v.counted and v.eligible("tests/fixtures/make_fixtures.py")
+    es = retrieval.retrieve(claim("Wrote the fixtures generator", "ownership"), [v])
+    hit = next(it for it in es.items if it.path == "tests/fixtures/make_fixtures.py")
+    assert hit.authored_by_candidate is True and hit.authored_ratio == 1.0

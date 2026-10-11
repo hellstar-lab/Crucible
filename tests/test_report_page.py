@@ -229,8 +229,10 @@ def test_mismatch_is_at_the_top_and_on_every_authorship_cell(degraded):
     ids = re.findall(r'<section id="([\w-]+)"', page)
     assert ids[0] == "identity-mismatch" and ids[1:] == ["analysed", "shield", "claims", "not-checkable", "excluded", "provenance"]
     rows = _rows(page)
-    assert rows and all("identity mismatch: analysed" in re.search(r'<td class="auth[^"]*">(.*?)</td>', r, re.S).group(1) for r in rows)
+    assert rows and all("identity mismatch: see the top" in re.search(r'<td class="auth[^"]*">(.*?)</td>', r, re.S).group(1) for r in rows)
     assert "<h2>Identity mismatch</h2>" in page.split('id="analysed"')[0]
+    # K4a: the full sentence appears ONCE (the banner); rows and the Analysed section carry a short marker only
+    assert _text(page).count("The code below is evidence about") == 1
 
 
 def test_agreement_is_recorded_without_a_banner(degraded):
@@ -240,3 +242,10 @@ def test_agreement_is_recorded_without_a_banner(degraded):
     page = render_html(d)
     assert 'id="identity-mismatch"' not in page and "identity mismatch" not in page and "agree" in _text(page)
 
+
+
+def test_excluded_reasons_report_lines_whenever_they_report_files(degraded):
+    """K4b: both or neither. A reason with files always shows its line count, 0 included."""
+    for e in degraded["header"]["excluded"]:
+        assert set(e["files_by_reason"]) == set(e["lines_by_reason"])
+    assert "lines not measured" not in _text(render_html(degraded)).split("Code never used as evidence")[1].split("Resume text")[0]

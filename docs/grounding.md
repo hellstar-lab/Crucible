@@ -142,3 +142,51 @@ Live, clean_small, two sets of 3 runs, claim c0:
 - **Pin:** the excerpt clone is pinned to the analysed `head_sha` (fetched explicitly if the branch moved). De-duplicating the double clone is left for later.
 
 Recorded, not fixed: `route("Built the cache client")` is `outcome`, because the outcome pattern matches "client" as in customers.
+
+## Phase 4K: correctness fixes
+
+**K1: technology_use checks authorship.**
+
+| Cited evidence | Verdict |
+|---|---|
+| technology in code the candidate authored | `supported` |
+| technology present, not in authored code | `inconclusive`, "the technology is present but in code the candidate did not author" (`supported+not_authored+technology`) |
+| `authored_by_candidate` is None (confidence none, file never blamed, identity not reproduced) | `inconclusive` |
+
+- `artifact_exists` keeps the old rule (supported, with an authorship note), because "the repo has CI" is about the repository.
+- 4D now runs `c_authored` on technology_use too. Ownership needs every source line of the cited span to be the candidate's; technology_use needs at least one.
+- Every technology item carries `volume`, which is never sent to the model. For a language it is authored source lines in that language, of the repository's lines in it, the same lines 3.6 reports. For a library it is the files whose import line the candidate authored, of all files importing it.
+
+**K2: the confidence ladder falls down, never up.** "7 commits by 2 authors, but over only 1.0 days" was `medium`. Several authors over less than 7 days is now `low`.
+
+Audit of the other rungs:
+- `none` (one commit; one author inside an hour): no hole.
+- `low` (fewer than 5 commits; span under 1 day; clustered committer dates): no hole. Each rung is conservative.
+- `medium` for a single author over any span of a day or more: never reaches high. Conservative, by design.
+- **Open, author count:** it is distinct commit emails. One person committing from two addresses (a laptop with an unlinked email, plus the noreply address) counts as two authors, and so can reach `high` with no second person. Bots (dependabot, github-actions[bot]) count as authors too. Both push upward. Fixing them needs alias resolution, beyond `.mailmap`, and a bot list; recorded, not fixed.
+- **Open, dates:** every span uses author dates, which the committer sets. The clustered-committer-date rung catches history rewrites, but not a repository whose author and committer dates were both forged. Version history cannot detect that.
+
+**K3: fixture code is authored code.**
+- Linguist's fixture patterns (`testdata/`, `tests?/fixtures/`, `specs?/fixtures/`, `.github/`) exclude files from language statistics. For a CODE file whose only vendor matches are those patterns, the file is now authorship-only.
+- An authorship-only file is still excluded from line counts, language stats and the authored ratio, so those numbers are unchanged. It is blamed, usable as ownership and technology evidence, and listed in the report (`authorship_only_files`).
+- Fixture data (pdf, json, docx …) and paths that also match real vendoring (`node_modules/`, `vendor/`) stay fully excluded.
+- On hellstar-lab/Crucible the 74 vendored files are 71 under `tests/fixtures/`, plus `.gitignore`, one `node_modules/` file and one `vendor/` file (both inside the deliberately-vendored `exclusion_repo` fixture).
+- The authored-code false positives were the three generators: `make_doc_fixtures.py` (45 KB), `make_fixtures.py` and `make_git_fixtures.py`. The other 7 code files sit inside `tests/fixtures/exclusion_repo/`, a fake repository built to look vendored, minified and duplicated. They are authored too and now authorship-only, except the two under `node_modules/` and `vendor/`.
+
+**K4: presentation.**
+- **K4a:** the identity-mismatch sentence appears once, in the banner. Rows and the Analysed section carry a short marker.
+- **K4b:** every exclusion reason that reports files reports lines, 0 included. The 12 "duplicates" are empty `.gitkeep` files, 0 lines, measured.
+
+**K5: a resume the repository can answer** (`scripts/make_crucible_resume.py` → `tests/fixtures/docs/docx_crucible_resume.docx`).
+
+Three live runs against hellstar-lab/Crucible main @ 2bffef4. The identity check agreed, and the repository was taken from the resume.
+- **Contradicted** ("Designed the unicode scanning module": `backend/shield/unicode_scan.py`, 164/164 lines by Auratech350) in all 3 runs, both tiers 3/3.
+- **Supported ownership** ("Built the blame attribution module": `backend/evidence/blame.py`) in 2 runs. In run 3 that bullet was excluded at Stage 3 ("resolutions disagreed").
+- **Skills:** 9 of 11 supported in every run, with volume. FastAPI is always inconclusive: the requirements.txt line is not the candidate's, and 0 files import it.
+- **httpx** was supported in runs 1 and 3 and inconclusive in run 2, where the model cited the requirements.txt line, which another author wrote, instead of an import line the candidate wrote.
+
+Findings:
+1. **K1 makes technology verdicts depend on WHICH item the model cites** (httpx above). Never repairing citations is a rule, so the fix is a design choice: either code picks the technology item deterministically and the model judges content only, or the verdict stays citation-bound. Open.
+2. **"Led a team of 4 engineers" is dropped at Stage 2 selection** ("no checkable fact") in all three runs, so it never reaches routing and appears as an excluded unit, not as unverifiable. The unverifiable rows that did appear are Stage 4 sub-claims routed `other`.
+3. **Another authored-code false positive, in the GENERATED list:** `backend/evidence/exclusions.py`, the whole exclusion module (198 lines), is excluded as generated, because pygount's "do not edit" header check matched a docstring sentence that only mentions such headers. As a result no counted file imports `yaml`, and PyYAML shows "0 of 0 files". Not fixed: it needs the generated check restricted to comment headers.
+4. Stage 4 sometimes splits a metric into fragments ("By 40%" as a claim, run 3); both pieces were no_evidence.

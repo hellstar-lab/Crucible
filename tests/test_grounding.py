@@ -251,3 +251,34 @@ def test_docx_and_pdf_locations():
     meta = HiddenFragment(text="x" * 40, page=0, bbox=(0, 0, 0, 0), reasons=["overlong_metadata"], detection_method="metadata")
     assert meta.location_kind == "metadata" and meta.page is None
 
+
+# --- K1: technology_use checks authorship, and carries volume ------------------------------------------------------
+
+def test_technology_items_carry_volume(scenarios):
+    v = view(scenarios, "clean_small")
+    es = retrieval.retrieve(claim("Built a caching layer with Redis"), [v])
+    redis = [it for it in es.items if it.technology == "redis"]
+    assert redis and all(it.volume == redis[0].volume for it in redis)
+    vol = redis[0].volume
+    assert vol["basis"] == "authored_files_importing" and vol["files"] >= 1 and vol["authored_files"] == vol["files"]
+    py = retrieval.retrieve(claim("Python"), [v])
+    pv = next(it.volume for it in py.items if it.technology == "python")
+    assert pv["basis"] == "authored_lines_in_language" and pv["language"] == "Python"
+    assert 0 < pv["authored_lines"] <= pv["source_lines"]
+    assert pv["source_lines"] == v.report.repo_facts.languages["Python"]  # the same lines 3.6 reports, nothing new
+
+
+def test_volume_is_never_sent_to_the_model(scenarios):
+    from backend.verdicts import judge
+    es = retrieval.retrieve(claim("Built a caching layer with Redis"), [view(scenarios, "clean_small")])
+    assert "volume" in judge.FORBIDDEN_FIELDS and "volume" not in judge.PROMPT_ITEM_FIELDS
+    assert all("volume" not in it for it in judge.payload("x", es)["items"])
+
+
+def test_c_authored_runs_on_technology_use(scenarios):
+    v = view(scenarios, "clean_small")
+    es = retrieval.retrieve(claim("Built a caching layer with Redis"), [v])
+    i = next(k for k, it in enumerate(es.items) if it.rule == "r_import")
+    vd = verdict(REDIS, es, i).model_copy(update={"claim_kind": "technology_use"})
+    out = grounding.ground(vd, es, [v])
+    assert out.grounding_checks["c_authored"] == "pass" and out.grounding_passed

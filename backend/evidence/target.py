@@ -94,6 +94,7 @@ def repo_facts_from(snap: dict, meta: dict, redirected_from: str | None, target:
         source_files=len(snap.get("counted", {})),
         total_source_lines=total if snap.get("counted") else None,
         excluded_files_by_reason=by_files, excluded_lines_by_reason=by_lines, top_excluded_files=top,
+        authorship_only_files=sorted(snap.get("authorship_only", {})),
         structure=Structure(**snap["structure"]) if snap.get("structure") else None,
         dependencies=snap.get("dependencies", []), manifests=snap.get("manifests", []),
         readme_path=snap.get("readme_path"), readme_claims=snap.get("readme_claims", []),

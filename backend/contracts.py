@@ -398,6 +398,8 @@ class RepoFacts(CrucibleModel):
     excluded_files_by_reason: dict[str, int] = {}
     excluded_lines_by_reason: dict[str, int] = {}
     top_excluded_files: list[ExcludedFile] = []
+    # K3: excluded from the counts above (Linguist: fixtures, .github/) but authored code, so blamed and usable as evidence
+    authorship_only_files: list[str] = []
     structure: Optional[Structure] = None
     dependencies: list[Dependency] = []
     manifests: list[Manifest] = []
@@ -885,6 +887,10 @@ class EvidenceItem(CrucibleModel):
     authorship_caveat: Optional[str] = None  # human-readable reason authored_by_candidate is None / misleading
     observed_value: Optional[str] = None  # r_scale / r_history: what the repository shows
     claimed_value: Optional[str] = None  # r_scale / r_history: what the claim states (no comparison is made)
+    # K1: how much of the technology is in the candidate's code, so a reviewer can weigh a supported row. Computed by 4B
+    # from blame; never sent to the model. {"basis": "authored_lines_in_language", "language", "authored_lines",
+    # "source_lines"} or {"basis": "authored_files_importing", "technology", "authored_files", "files"}.
+    volume: Optional[dict] = None
 
 
 class EvidenceSet(CrucibleModel):
@@ -992,6 +998,7 @@ class ReportRow(CrucibleModel):
     authorship_confidence_reason: Optional[str] = None  # 3.6, for the cited item's repo (H0c: repeated on every row)
     likely_identity_gap: Optional[bool] = None  # 3.6, for the cited item's repo
     authorship_note: Optional[str] = None  # 4C matrix
+    volume: Optional[dict] = None  # 4B, for the cited item (K1)
     content_reason: Optional[str] = None  # 4C: the model's one-sentence reading of the evidence (content only)
     matrix_row: Optional[str] = None  # 4C: which rule decided the verdict ("gate:..." = decided by code, no model call)
     agreement: Optional[str] = None  # 4C: final-tier samples agreeing on the verdict, e.g. "3/3"

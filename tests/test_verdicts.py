@@ -118,13 +118,30 @@ def test_bobs_code_with_an_ownership_claim_is_contradicted(scenarios, fake):
     assert v.verdict == "contradicted" and v.matrix_row == "supported+not_authored+ownership" and v.authorship_note
 
 
-def test_bobs_code_with_a_use_claim_is_supported_with_an_authorship_note(scenarios, fake):
+def test_a_technology_only_in_bobs_code_is_inconclusive(scenarios, fake):
+    """K1: a technology_use claim is about the candidate. Present only in code someone else wrote -> inconclusive."""
     c, es = _ledger_evidence(scenarios, "technology_use")
     idx = next(i for i, it in enumerate(es.items) if it.path == "src/billing/ledger.py")
     fake.answers = [("supported", idx, 0.95, False)]
     v, _, _ = verdicts.verdict_for(c, es)
-    assert v.verdict == "supported" and v.matrix_row == "supported+not_authored+use"
-    assert "not written by the candidate" in v.authorship_note
+    assert v.verdict == "inconclusive" and v.matrix_row == "supported+not_authored+technology"
+    assert v.reason == matrix.TECH_NOT_AUTHORED_REASON and "not written by the candidate" in v.authorship_note
+
+
+def test_existence_claims_on_someone_elses_code_stay_supported_with_a_note():
+    """artifact_exists ("has CI") is about the repository, so it keeps the old rule, with the authorship note."""
+    item = EvidenceItem(repo_full_name="o/r", path=".github/workflows/ci.yml", kind="config", rule="r_structure",
+                        authored_by_candidate=False, authorship_confidence="medium")
+    out = matrix.decide("supported", "artifact_exists", item)
+    assert out.verdict == "supported" and out.row == "supported+not_authored+use" and out.authorship_note
+
+
+@pytest.mark.parametrize("authored,confidence,verdict", [(True, "medium", "supported"), (False, "medium", "inconclusive"),
+                                                         (None, "medium", "inconclusive"), (True, "none", "inconclusive")])
+def test_technology_use_authorship_ladder(authored, confidence, verdict):
+    item = EvidenceItem(repo_full_name="o/r", path="src/a.py", kind="import", rule="r_import", technology="redis",
+                        authored_by_candidate=authored, authorship_confidence=confidence)
+    assert matrix.decide("supported", "technology_use", item).verdict == verdict
 
 
 def test_exclusion_stress_empty_items_is_no_evidence_without_a_call(scenarios, fake):

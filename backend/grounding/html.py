@@ -74,6 +74,7 @@ FORMATS = {
     "usd": _usd,
     "bool": lambda v: "yes" if v else "no",
     "sha": lambda v: str(v)[:12],
+    "int": lambda v: f"{v:,}",  # thousands separators only
 }
 
 
@@ -254,6 +255,9 @@ class Page:
         ic = ("header", "identity_check")
         if self.get(*ic) is None:
             out.append(f"<dt>resume GitHub link</dt><dd>{NOT_MEASURED}: the resume's links were not compared with the analysed account</dd>")
+        elif self._mismatch():
+            out.append(f"<dt>resume GitHub link</dt><dd><strong>{self.val(ic + ('status',), 'label')}</strong>: "
+                       "see the banner at the top of the report</dd>")
         else:
             out.append(f"<dt>resume GitHub link</dt><dd><strong>{self.val(ic + ('status',), 'label')}</strong>: "
                        f"{self.val(ic + ('message',))}</dd>")
@@ -407,8 +411,7 @@ class Page:
         mm = ""
         if self._mismatch():
             ic = ("header", "identity_check")
-            mm = (f'<div class="warn">identity mismatch: analysed {self.val(ic + ("operator_user",))}, the resume links '
-                  f'{self.val(ic + ("resume_accounts",))}</div>')
+            mm = '<div class="warn">⚠ identity mismatch: see the top of the report</div>'
         if r.get("citation") is None:
             cite = '<td class="cite small muted">no cited item</td>'
             auth = (f'<td class="auth small">{NOT_MEASURED}: no item is cited, so authorship of cited code does not apply.{mm}</td>')
@@ -423,6 +426,7 @@ class Page:
                     f'<div>file authored: <strong>{self.val(b + ("authored_ratio",), "ratio")}</strong>, confidence '
                     f'<strong>{self.val(b + ("authorship_confidence",), cls="mono")}</strong></div>',
                     f'<div style="margin-top:4px">confidence reason: {self.val(b + ("authorship_confidence_reason",))}</div>']
+            auth.append(self._volume(b, r))
             if r.get("likely_identity_gap"):
                 auth.append('<div class="warn">possible identity gap in this repository</div>')
             if r.get("authorship_caveat"):
@@ -439,6 +443,21 @@ class Page:
             items = "".join(f'<li><code>{E(k)}</code> {self.val(b + ("grounding_checks", k), "label")}</li>' for k in checks)
             ground = f'<td class="ground small">passed: <strong>{self.val(b + ("grounding_passed",), "bool")}</strong><ul>{items}</ul></td>'
         return f"<tr>{claim}{''.join(verdict)}{reason}{cite}{auth}{ground}</tr>"
+
+    def _volume(self, b, r) -> str:
+        """K1: how much of the technology is in the candidate's code. Formatting only; the counts come from 4B."""
+        if r.get("claim_kind") != "technology_use":
+            return ""
+        vol = r.get("volume")
+        if vol is None:
+            return f'<div style="margin-top:4px">volume: {NOT_MEASURED}</div>'
+        v = b + ("volume",)
+        if vol.get("basis") == "authored_lines_in_language":
+            return (f'<div style="margin-top:4px">volume: <strong>{self.val(v + ("authored_lines",), "int")}</strong> authored '
+                    f'{self.val(v + ("language",))} source lines, of {self.val(v + ("source_lines",), "int")} in the repository</div>')
+        return (f'<div style="margin-top:4px">volume: the candidate wrote the import in <strong>'
+                f'{self.val(v + ("authored_files",), "int")}</strong> of {self.val(v + ("files",), "int")} files importing '
+                f'{self.val(v + ("technology",))}</div>')
 
     def not_checkable(self) -> str:
         nc = self.get("header", "not_checkable")
@@ -476,6 +495,12 @@ class Page:
                              else f", lines {NOT_MEASURED}")
                     out.append(f"<dt>{E(k.replace('_', ' '))}</dt><dd>{self.val(b + ('files_by_reason', k))} files{lines}</dd>")
                 out.append("</dl>")
+            if e.get("authorship_only"):
+                out.append('<p class="small">Still counted as the candidate\'s authored work (blamed, usable as evidence), '
+                           'though excluded from line counts and language statistics: fixture code Linguist sets aside '
+                           'for statistics only.</p><ul class="small mono">'
+                           + "".join(f"<li>{self.val(b + ('authorship_only', j))}</li>" for j in range(len(e["authorship_only"])))
+                           + "</ul>")
             if e.get("top_excluded"):
                 out.append('<ul class="small mono">' + "".join(f"<li>{self.val(b + ('top_excluded', j))}</li>"
                                                               for j in range(len(e["top_excluded"]))) + "</ul>")

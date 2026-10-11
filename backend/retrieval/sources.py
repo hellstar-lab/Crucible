@@ -62,7 +62,7 @@ class RepoView:
     def excluded_paths(self) -> set[str]:
         out = {e[0] if isinstance(e, (list, tuple)) else e.get("path") for e in (self.snap or {}).get("excluded", [])}
         out |= {s["path"] for s in (self.snap or {}).get("skipped_files", []) if s.get("state") in config.UNUSABLE_SKIP_STATES}
-        return out
+        return out - set(self.authorship_only)  # K3: authored fixture code is evidence, though not counted in stats
 
     @property
     def eligible_paths(self) -> list[str]:
@@ -74,7 +74,18 @@ class RepoView:
 
     @property
     def counted(self) -> dict:
+        """Files counted in line totals and language stats (3.5)."""
         return (self.snap or {}).get("counted", {})
+
+    @property
+    def authorship_only(self) -> dict:
+        """K3: authored code Linguist excludes only for language stats (fixture generators): blamed, never counted."""
+        return (self.snap or {}).get("authorship_only", {})
+
+    @property
+    def blamed(self) -> dict:
+        """Every file with per-line blame: counted + authorship-only."""
+        return {**self.counted, **self.authorship_only}
 
     def eligible(self, path: str | None) -> bool:
         return path is None or (path in set(self.eligible_paths))
@@ -94,8 +105,9 @@ class RepoView:
 
     def _file_auth(self) -> dict | None:
         if self._auth is None and self.snap and self.identity is not None and self.counted:
-            self._auth = line_authorship(self.snap, self.identity)
-            mine = sum(1 for flags in self._auth.values() for src, a in flags if src and a)
+            self._auth = line_authorship(self.snap, self.identity, include_authorship_only=True)
+            # the cross-check against 3.6 uses COUNTED files only, as 3.6 does
+            mine = sum(1 for p, flags in self._auth.items() if p in self.counted for src, a in flags if src and a)
             reported = self.authorship.authored_source_lines if self.authorship else None
             self._identity_ok = reported is not None and mine == reported
             if not self._identity_ok:
@@ -143,7 +155,7 @@ class RepoView:
 
     def line_count(self, path: str) -> int | None:
         """Lines in the file at head_sha: from the snapshot when the file was counted, else from the checkout."""
-        entry = self.counted.get(path)
+        entry = self.blamed.get(path)
         if entry is not None:
             return len(entry["marks"])
         t = self.text(path)

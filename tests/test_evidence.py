@@ -687,3 +687,30 @@ def test_utf8_source_with_multibyte_characters_is_counted(tmp_path, identity):
     r = analyze_local_repo(repo, identity, "utf8")
     assert r.excluded_files_by_reason["unparseable"] == 0
     assert r.source_files == 2 and r.source_lines == 3 and r.authored_ratio == 1.0
+
+
+# --- Phase 4K K2: the confidence ladder falls down, never up -------------------------------------------------------
+
+def _hist(n, authors, days, clustered=False):
+    return {"commit_count": n, "distinct_author_count": authors, "span_days": days, "author_span_s": int(days * 86400),
+            "committer_dates_clustered": clustered}
+
+
+@pytest.mark.parametrize("hist,level", [
+    (_hist(7, 2, 1.0), "low"),      # the measured case: was medium, with a reason that contradicted its level
+    (_hist(7, 2, 1.04), "low"),     # "1.0 days" as displayed
+    (_hist(30, 5, 6.9), "low"),     # several authors, still under a week
+    (_hist(7, 2, 0.5), "low"),      # span under a day, whatever the author count
+    (_hist(7, 1, 0.5), "low"),
+    (_hist(7, 1, 1.0), "medium"),   # one author, a day or more
+    (_hist(40, 1, 400), "medium"),  # one author never reaches high
+    (_hist(7, 2, 7.0), "high"),
+    (_hist(4, 3, 300), "low"),      # under 5 commits
+    (_hist(1, 1, 0), "none"),
+    (_hist(6, 1, 0.01), "none"),    # one author inside an hour
+    (_hist(30, 3, 30, clustered=True), "low"),
+])
+def test_confidence_ladder(hist, level):
+    from backend.evidence.authorship import authorship_confidence
+    got, reason = authorship_confidence(hist)
+    assert got == level, reason

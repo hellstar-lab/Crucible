@@ -181,12 +181,22 @@ def _safe_dest(root: Path, rel: str) -> Path | None:
 
 
 def _measure(repo: Path, files: list[tuple[str, int, str]], attrs: GitAttributes, text: set[str],
-             raw: dict[str, int], tmp: Path) -> tuple[list[FileCount], list[tuple[str, int, str]], list[SkippedFile]]:
-    """Decide every file: countable (with pygount counts) or excluded (with a reason)."""
+             raw: dict[str, int], tmp: Path, authorship_only: list | None = None
+             ) -> tuple[list[FileCount], list[tuple[str, int, str]], list[SkippedFile]]:
+    """Decide every file: countable (with pygount counts) or excluded (with a reason). When ``authorship_only`` is a
+    list, vendored-path code files that are authored work (exclusions.authorship_only, K3) stay excluded AND are measured
+    into it, for blame only."""
     excluded: list[tuple[str, int, str]] = []
     candidates: list[tuple[str, int, str, Path]] = []
+    ao_candidates: list[tuple[str, Path]] = []
     for path, size, sha in sorted(files):
         reason = path_reason(path, attrs)
+        if (authorship_only is not None and reason == ex.VENDORED_PATH and ex.authorship_only(path, attrs) and 0 < size
+                and size <= config.MAX_BLAME_FILE_BYTES and path in text):
+            dest = _safe_dest(tmp, path)
+            if dest is not None:
+                ao_candidates.append((path, dest))
+                write_blobs(repo, [(sha, dest)])
         if reason is None and size > 0 and path not in text:
             reason = ex.BINARY
         if reason is None and size > config.MAX_BLAME_FILE_BYTES:
@@ -219,6 +229,14 @@ def _measure(repo: Path, files: list[tuple[str, int, str]], attrs: GitAttributes
         else:
             excluded.append((path, raw.get(path, 0), _STATE_REASON.get(fc.state, ex.UNPARSEABLE)))
             skipped.append(SkippedFile(path=path, state=fc.state, state_info=fc.state_info))
+    if authorship_only is not None:
+        ao_pool = DuplicatePool()
+        for path, dest in ao_candidates:
+            if content_reason(path, dest.read_bytes().decode("utf-8", "replace")) is not None:
+                continue
+            fc = count_file(dest, path, ao_pool, root=tmp)
+            if fc.counted:
+                authorship_only.append(fc)
     return counted, excluded, skipped
 
 

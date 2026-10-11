@@ -83,9 +83,53 @@ def retrieve(claim, views: list[RepoView], today: date | None = None) -> Evidenc
                 if marker not in searched.rules_fired:
                     searched.rules_fired.append(marker)
         notes.extend(n for n in view.notes if n not in notes)
+    if kind == "technology_use":
+        _attach_volume(techs, views, items)
     ranked, dropped = rank.rank(c["text"], items)
     return EvidenceSet(claim_id=c["claim_id"], claim_kind=kind, retrieval_performed=True, searched=searched, items=ranked,
                        items_dropped=dropped, retrieval_version=version, notes=list(dict.fromkeys(notes)))
+
+
+def _volume(tech: str, view: RepoView, items) -> dict | None:
+    """K1: how much of ``tech`` is in the candidate's code in this repo. Counting only: lines come from blame flags,
+    files from the r_import items already found. None when the technology has neither a language nor import prefixes."""
+    entry = lexicon.technologies()[tech]
+    names = {a.lower() for a in entry.get("aliases", [])} | {tech.lower()}
+    if (entry.get("note") or "").startswith("language"):
+        paths = [p for p, e in view.counted.items() if (e.get("language") or "").lower() in names and view.eligible(p)]
+        if not paths:
+            return None
+        source = authored = 0
+        known = True
+        for p in paths:
+            flags = view.line_flags(p)
+            marks = view.counted[p]["marks"]
+            source += sum(1 for m in marks if m in "cs")
+            if flags is None:
+                known = False
+            else:
+                authored += sum(1 for is_src, a in flags if is_src and a)
+        return {"basis": "authored_lines_in_language", "language": view.counted[paths[0]]["language"],
+                "authored_lines": authored if known else None, "source_lines": source}
+    if not entry.get("imports"):
+        return None
+    mine = [it for it in items if it.rule == "r_import" and it.technology == tech and it.repo_full_name == view.full_name]
+    files = sorted({it.path for it in mine})
+    authored = sorted({it.path for it in mine if it.authored_by_candidate is True})
+    unknown = any(it.authored_by_candidate is None for it in mine)
+    return {"basis": "authored_files_importing", "technology": tech, "files": len(files),
+            "authored_files": None if (unknown and not authored) else len(authored)}
+
+
+def _attach_volume(techs, views, items) -> None:
+    for view in views:
+        for tech in techs:
+            vol = _volume(tech, view, items)
+            if vol is None:
+                continue
+            for i, it in enumerate(items):
+                if it.technology == tech and it.repo_full_name == view.full_name:
+                    items[i] = it.model_copy(update={"volume": vol})
 
 
 def retrieve_all(claims, views: list[RepoView], today: date | None = None) -> list[EvidenceSet]:

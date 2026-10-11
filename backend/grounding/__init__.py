@@ -68,7 +68,9 @@ def check(verdict: ClaimVerdict, es: EvidenceSet, views) -> tuple[dict[str, str]
         else:
             res["c_lines"] = "pass"
 
-    if verdict.verdict == "supported" and verdict.claim_kind == "ownership":
+    if verdict.verdict == "supported" and verdict.claim_kind in ("ownership", "technology_use"):
+        # ownership: EVERY source line of the cited span is the candidate's; technology_use (K1): AT LEAST ONE is, i.e.
+        # the technology appears in code the candidate wrote
         flags = view.line_flags(item.path) if (view and item.path) else None
         if flags is None:
             res["c_authored"], why["c_authored"] = "unavailable", "no line-level blame for the cited file under the candidate identity"
@@ -77,12 +79,14 @@ def check(verdict: ClaimVerdict, es: EvidenceSet, views) -> tuple[dict[str, str]
             end = item.end_line or item.start_line or len(flags)
             span = flags[start - 1:end]
             source = [a for s, a in span if s] or [a for _s, a in span]
-            if span and all(source):
+            need = any if verdict.claim_kind == "technology_use" else all
+            if span and need(source):
                 res["c_authored"] = "pass"
             else:
                 mine = sum(1 for a in source if a)
                 res["c_authored"], why["c_authored"] = "fail", (f"the candidate authored {mine} of {len(source)} source lines in "
-                                                               f"{item.path}:{start}-{end}, not all of them")
+                                                               f"{item.path}:{start}-{end}, "
+                                                               + ("none of them" if need is any else "not all of them"))
     else:
         res["c_authored"] = "not_applicable"
     return res, why

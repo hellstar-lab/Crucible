@@ -124,6 +124,7 @@ def same_object(cited, scope: str | None, target: str | None) -> bool:
     return scope_match(cited, scope, target)[0]
 
 
+TECH_NOT_AUTHORED_REASON = "the technology is present but in code the candidate did not author"
 PROVENANCE_REASON = ("an ownership claim can only be contradicted by evidence that retrieval identified as that artifact "
                      "(rule r_ownership); this citation came from a different rule")
 
@@ -187,6 +188,11 @@ def _decide(content: str, claim_kind: str | None, cited) -> Outcome:
         if claim_kind == "ownership":
             return Outcome("contradicted", "the claim asserts ownership, and blame attributes the cited code to someone else",
                            "supported+not_authored+ownership", authorship_note=note)
+        if claim_kind == "technology_use":
+            # Phase 4K K1: "uses Python" is a claim about the candidate, not the repository. Measured: a row read
+            # "Python: supported" because the repo contains Python, about a repo flagged as possibly someone else's.
+            return Outcome("inconclusive", TECH_NOT_AUTHORED_REASON, "supported+not_authored+technology",
+                           ["gate:technology_not_in_authored_code"], authorship_note=note)
         return Outcome("supported", "the claim asserts existence or use, which the evidence shows", "supported+not_authored+use",
                        authorship_note=note)
     if authored is True and gap:  # authored by a recognised identity even though the repo shows a gap: still authored

@@ -1069,6 +1069,134 @@
    ],
    "code_artifacts": true,
    "note": null
+  },
+  "pydantic": {
+   "aliases": [
+    "Pydantic"
+   ],
+   "deps": [
+    "pydantic"
+   ],
+   "imports": [
+    "pydantic"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "tree-sitter": {
+   "aliases": [
+    "tree-sitter",
+    "Tree-sitter",
+    "tree sitter"
+   ],
+   "deps": [
+    "tree-sitter",
+    "tree-sitter-language-pack"
+   ],
+   "imports": [
+    "tree_sitter",
+    "tree_sitter_language_pack"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "httpx": {
+   "aliases": [
+    "httpx",
+    "HTTPX"
+   ],
+   "deps": [
+    "httpx"
+   ],
+   "imports": [
+    "httpx"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "pdfplumber": {
+   "aliases": [
+    "pdfplumber"
+   ],
+   "deps": [
+    "pdfplumber"
+   ],
+   "imports": [
+    "pdfplumber"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "pypdf": {
+   "aliases": [
+    "pypdf",
+    "PyPDF"
+   ],
+   "deps": [
+    "pypdf"
+   ],
+   "imports": [
+    "pypdf"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "python-docx": {
+   "aliases": [
+    "python-docx"
+   ],
+   "deps": [
+    "python-docx"
+   ],
+   "imports": [
+    "docx"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "rapidfuzz": {
+   "aliases": [
+    "RapidFuzz",
+    "rapidfuzz"
+   ],
+   "deps": [
+    "rapidfuzz"
+   ],
+   "imports": [
+    "rapidfuzz"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
+  },
+  "pyyaml": {
+   "aliases": [
+    "PyYAML",
+    "pyyaml"
+   ],
+   "deps": [
+    "pyyaml"
+   ],
+   "imports": [
+    "yaml"
+   ],
+   "files": [],
+   "config_keys": [],
+   "code_artifacts": true,
+   "note": null
   }
  }
 }

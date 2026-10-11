@@ -248,7 +248,7 @@ def r_ownership(claim: str, techs: list[str], view: RepoView) -> RuleResult:
                                    match="exact" if score == 100 else "fuzzy",
                                    match_detail=f"claim word {w!r} ~ {t!r} (ratio {score:.1f}, cutoff {config.OWNERSHIP_FUZZY_CUTOFF}); "
                                                 f"function {fn['name']}"))
-    for path in sorted(view.counted):
+    for path in sorted(view.blamed):  # K3: authored fixture code can be the artifact an ownership claim names
         if not view.eligible(path):
             continue
         score, w, t = best([x for part in PurePosixPath(path).with_suffix("").parts for x in _tokens(part)])

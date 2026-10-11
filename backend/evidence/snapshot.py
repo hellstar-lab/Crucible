@@ -30,7 +30,7 @@ from .repo_signals import commit_facts
 from .structure import detect_structure
 
 log = logging.getLogger(__name__)
-SNAPSHOT_VERSION = 1
+SNAPSHOT_VERSION = 2  # 2: authorship_only files (Phase 4K K3)
 MAX_MANIFEST_BYTES = 512_000
 MAX_README_BYTES = 256_000
 
@@ -136,10 +136,11 @@ def build_snapshot(repo: Path, full_name: str, scoped_path: str | None = None,
     paths = [p for p, _s, _h in files]
 
     with tempfile.TemporaryDirectory(prefix="crucible-snap-") as tmp:
+        ao: list = []
         counted, excluded, skipped = _measure(repo, files, _gitattributes(repo), _text_paths(repo),
-                                              _raw_line_counts(repo), Path(tmp))
+                                              _raw_line_counts(repo), Path(tmp), authorship_only=ao)
         functions, imports = [], {}
-        for fc in counted:
+        for fc in counted + ao:
             src = (Path(tmp) / fc.path).read_bytes()
             for fn in extract_functions(fc.path, src):
                 functions.append(fn.__dict__ | {"boundaries_agree": fn.boundaries_agree})
@@ -167,6 +168,22 @@ def build_snapshot(repo: Path, full_name: str, scoped_path: str | None = None,
         files_out[path] = {"language": fc.language, "code": fc.code, "documentation": fc.documentation,
                            "string": fc.string, "empty": fc.empty, "marks": marks, "line_commits": line_commits}
 
+    ao_out: dict[str, dict] = {}  # K3: blamed for authorship, never counted in lines / languages / the ratio
+    for fc, (path, result, problem) in zip(ao, _blame_counted(repo, ao, deadline)):
+        if result is None:
+            snap["notes"].append(f"{path}: authorship-only file not blamed, {problem}")
+            continue
+        lines, marks = result
+        line_commits = []
+        for ln in lines:
+            if ln.sha not in index:
+                index[ln.sha] = len(commits)
+                commits.append({"sha": ln.sha, "author_time": None, "committer_time": None,
+                                "author_email": ln.author_email, "author_name": "", "message_head": "",
+                                "files_changed": None, "insertions": None, "deletions": None})
+            line_commits.append(index[ln.sha])
+        ao_out[path] = {"language": fc.language, "code": fc.code, "documentation": fc.documentation,
+                        "string": fc.string, "empty": fc.empty, "marks": marks, "line_commits": line_commits}
     counted_paths = set(files_out)
     facts = commit_facts(repo, lambda p: p in counted_paths, pathspec=scoped_path)
     total_raw = sum(f["code"] + f["documentation"] + f["string"] + f["empty"] for f in files_out.values())
@@ -192,10 +209,11 @@ def build_snapshot(repo: Path, full_name: str, scoped_path: str | None = None,
     snap.update({
         "files_in_scope": paths,
         "counted": files_out,
+        "authorship_only": ao_out,
         "excluded": excluded,
         "skipped_files": [s.model_dump() for s in skipped],
         "commits": commits,
-        "functions": [f for f in functions if f["path"] in counted_paths],
+        "functions": [f for f in functions if f["path"] in counted_paths or f["path"] in ao_out],
         "imports": imports,
         "manifests": [m.model_dump() for m in manifests],
         "dependencies": [d.model_dump() for d in deps],

@@ -62,7 +62,34 @@ def load_patterns(name: str, directory: Path = LINGUIST_DIR) -> list[re.Pattern]
 
 
 VENDOR_PATTERNS = load_patterns("vendor.yml")
+_vendor_strings = {p.pattern for p in VENDOR_PATTERNS}
 DOCUMENTATION_PATTERNS = load_patterns("documentation.yml")
+
+
+# Phase 4K K3: a per-question split. Linguist marks fixture directories (and .github/) as vendored so that they do not
+# distort LANGUAGE STATISTICS. That is right for line counts and the authored ratio, and wrong for AUTHORSHIP: a fixture
+# generator (tests/fixtures/make_fixtures.py) is code the candidate wrote. A code file whose ONLY Linguist vendor
+# matches are these patterns is "authorship-only": still excluded from source-line counts, language stats and the
+# authored ratio (unchanged), but blamed and usable as ownership / technology evidence. A path that also matches a real
+# vendoring pattern (node_modules/, vendor/ ...) stays fully excluded, and so does fixture DATA (pdf, json, docx ...).
+AUTHORED_FIXTURE_PATTERNS = frozenset({r"(^|/)testdata/", r"(^|/)[Tt]ests?/fixtures/", r"(^|/)[Ss]pecs?/fixtures/",
+                                       r"(^|/)\.github/"})
+AUTHORSHIP_CODE_SUFFIXES = frozenset({".py", ".js", ".jsx", ".mjs", ".ts", ".tsx", ".go", ".rs", ".java", ".kt", ".rb", ".c",
+                                      ".cc", ".cpp", ".h", ".hpp", ".cs", ".php", ".swift", ".scala", ".sh"})
+
+
+def authorship_only(path: str, attrs: "GitAttributes | None" = None) -> bool:
+    """True for authored code that Linguist excludes only for language statistics (see AUTHORED_FIXTURE_PATTERNS)."""
+    if PurePosixPath(path).suffix.lower() not in AUTHORSHIP_CODE_SUFFIXES:
+        return False
+    matching = {p.pattern for p in VENDOR_PATTERNS if p.search(path)}
+    if not matching or not matching <= AUTHORED_FIXTURE_PATTERNS:
+        return False
+    if attrs is not None:
+        ov = attrs.overrides(path)
+        if ov.get("linguist-vendored") is True or ov.get("linguist-generated") is True:
+            return False  # the repository itself says this file is not authored work
+    return True
 
 
 def linguist_path_reason(path: str) -> str | None:
@@ -196,3 +223,8 @@ def content_reason(path: str, text: str) -> str | None:
     if has_source_map(path, text):
         return SOURCE_MAP
     return None
+
+
+_missing = AUTHORED_FIXTURE_PATTERNS - _vendor_strings
+if _missing:  # a Linguist update renamed a pattern: fail loudly rather than silently stop the split
+    raise LinguistPatternError(f"AUTHORED_FIXTURE_PATTERNS not in vendor.yml: {sorted(_missing)}")

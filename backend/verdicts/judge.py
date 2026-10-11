@@ -25,7 +25,7 @@ from . import config
 PROMPT_ITEM_FIELDS = ("kind", "path", "start_line", "end_line", "rule", "match", "match_detail", "technology", "excerpt",
                       "observed_value", "claimed_value", "repo_full_name")
 FORBIDDEN_FIELDS = ("authored_by_candidate", "authored_ratio", "authorship_confidence", "likely_identity_gap",
-                    "authorship_caveat", "score")
+                    "authorship_caveat", "score", "volume")
 
 SCHEMA = {
     "type": "object",
