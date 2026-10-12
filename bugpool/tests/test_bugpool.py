@@ -122,3 +122,28 @@ def test_a_repo_with_a_behaviour_test_yields_a_plantable_pool(tmp_path):
     assert r.returncode == 1  # the planted bug turns its killing test red
     subprocess.run(["git", "checkout", "--", "."], cwd=repo, check=True)
     json.dumps(pool)  # the pool is plain JSON
+
+
+# --- Phase 5 Part B: lint gate, diversity -------------------------------------------------------------------------
+
+def test_lint_gate_rejects_what_the_mutation_introduces_and_nothing_else():
+    from pathlib import Path as P
+    from bugpool.validate import lint_new
+    ruff = str(P(PY).with_name("ruff"))
+    if not P(ruff).exists():
+        pytest.skip("ruff not installed in this environment")
+    src = "def f(x, y):\n    if x is None:\n        return 1\n    if y == True:\n        return 2\n"
+    assert lint_new(ruff, "a.py", src, src.replace("if x is None", "if not x is None"), range(2, 3)) == ["E714"]
+    assert lint_new(ruff, "a.py", src, src.replace("if x is None", "if x is not None"), range(2, 3)) == []
+    # a diagnostic the original line already had is not the mutation's
+    assert lint_new(ruff, "a.py", src, src.replace("y == True", "y != True"), range(4, 5)) == []
+
+
+def test_diversity_caps_killing_tests_and_modules(tmp_path):
+    repo = make_repo(tmp_path, dict(APP, **{"tests/test_flow.py": FLOW}))
+    pool = generate_pool(repo, [ME[1]], source="app", python=PY, behaviour_modules=2, target=10, max_per_killing_test=1,
+                         max_per_module=3, log=lambda *_: None)
+    assert pool["status"] == "ok" and len(pool["candidates"]) == 1  # one killing test in this repo, capped at 1
+    assert pool["stats"]["dropped_for_diversity"] >= 1
+    assert pool["stats"]["spread"]["killing_tests"] == {"tests/test_flow.py::test_month_end_flow": 1}
+    assert all(c["id"] and c["checks"]["plausibility"]["lint_clean"] for c in pool["candidates"])

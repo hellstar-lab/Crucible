@@ -309,3 +309,54 @@ def test_n_returns_every_choice_and_records_a_refusal_per_choice(mocker):
     assert [c["error"] for c in out["choices"]] == [None, "refusal_detected", None]
     assert out["choices"][0]["data"] == {"verdict": "unsupported"}
     llm._clients.clear()
+
+
+# --- Phase 5 (Part D): reasoning text is not a refusal -------------------------------------------------------------
+
+# A RECONSTRUCTION, not the verbatim text: the call log is content-free by design (prompt hashes only), so the exact
+# 357-token `thought` that crashed the first Q3' run (logged as refusal_where="thought:first_person_cannot", super,
+# 2026-10-11T16:58:08Z) was never retained. This has the same shape: an agent reasoning aloud, in a `thought` field,
+# about what it cannot see yet. The exception now carries the matched excerpt so the next one is diagnosable.
+AGENT_THOUGHT = (
+    "The test run shows one failure in tests/test_document.py::test_fixture_matches_manifest, with an IndexError raised "
+    "from scripts/doc_eval.py. I cannot see which document triggered it from the short traceback alone, and I can't tell "
+    "yet whether the bug is in the evaluation script or in the shield code it calls. The manifest test runs every fixture "
+    "through analyze_document, so the planted change is most likely somewhere in backend/shield. I will read "
+    "scripts/doc_eval.py around line 92 first to see which list is empty, then follow the call into the analyzer.")
+
+
+def test_long_agent_reasoning_is_not_a_refusal():
+    assert len(AGENT_THOUGHT) > llm.LONG_TEXT
+    act = {"thought": AGENT_THOUGHT, "action": "read_file", "path": "scripts/doc_eval.py", "start": 80, "selector": None, "line": None}
+    assert llm.detect_refusal(act) is None
+
+
+@pytest.mark.parametrize("field,text", [
+    ("thought", "I cannot see the failing assertion yet, so I will run the tests."),  # short, but a reasoning field
+    ("reason", "I can't tell from item 2 alone whether the cache is the candidate's."),
+    ("summary", "x " * 130 + "I cannot see the rest of the file in this window."),  # long text in any field
+])
+def test_thinking_aloud_does_not_trip_the_detector(field, text):
+    assert llm.detect_refusal({field: text}) is None
+
+
+@pytest.mark.parametrize("field,text,pattern", [
+    ("thought", "I cannot help with that request.", "first_person_cannot"),
+    ("thought", "I'm sorry, that is not something this tool is for.", "apology_opening"),
+    ("reason", "I am unable to comply with this.", "first_person_cannot"),
+    ("thought", "As an AI, I do not evaluate people.", "as_an_ai"),
+    ("reasoning", "x " * 130 + " This would be against my guidelines.", "against_guidelines"),
+])
+def test_a_real_refusal_inside_reasoning_is_still_caught(field, text, pattern):
+    hit = llm.detect_refusal({field: text})
+    assert hit and hit["kind"] == "lexical" and hit["pattern"] == pattern
+
+
+def test_the_exception_carries_an_excerpt_but_the_log_does_not(mocker, tmp_path):
+    mocker.patch.object(llm, "_capabilities", {"nano": {"json_schema": True, "strict_enforced": True}})
+    mocker.patch.object(llm, "MODEL_CALL_LOG", tmp_path / "calls.jsonl")
+    _fake_client(mocker, content='{"verdict": "unsupported", "reason": "I cannot fulfill this request"}')
+    with pytest.raises(llm.LLMRefusalError) as exc:
+        llm.call("extract_claims", "p", json_schema=SCHEMA)
+    assert "I cannot fulfill" in exc.value.refusal["excerpt"]
+    assert "fulfill" not in (tmp_path / "calls.jsonl").read_text()

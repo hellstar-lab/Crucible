@@ -259,6 +259,23 @@ _LEXICAL = [
     ("against_guidelines", re.compile(r"\bagainst\s+my\s+(?:guidelines|policies|policy|programming)\b", re.I)),
     ("no_access", re.compile(r"\bI\s+do(?:\s+not|n't)\s+have\s+(?:access|the\s+ability)\b", re.I)),
 ]
+# Reasoning text is not an answer. An agent thinking aloud says "I cannot see the failure yet, so I will run the tests"
+# without refusing anything (measured, Phase 5 Q3': a 357-token `thought` field tripped first_person_cannot and
+# crashed the run). In a REASONING field, or in any string longer than LONG_TEXT, only refusal-SHAPED language counts:
+# a first-person refusal of the request itself, an opening apology, "as an AI", "against my guidelines".
+REASONING_FIELDS = frozenset({"thought", "thoughts", "reason", "reasoning", "rationale", "explanation", "analysis", "notes",
+                              "evidence_summary", "content_reason", "sufficiency_reason"})
+LONG_TEXT = 240
+_STRICT = [
+    ("first_person_cannot", re.compile(r"\bI\s+(?:cannot|can't|can\s?not|won't|will\s+not|must\s+decline\s+to|am\s+unable\s+to|"
+                                       r"'m\s+unable\s+to|am\s+not\s+able\s+to)\s+(?:help|assist|comply|fulfil+|provide|answer|"
+                                       r"complete|continue\s+with|process|do\s+(?:that|this|so))\b", re.I)),
+    ("apology_opening", re.compile(r"^\s*(?:I'?m\s+sorry|I\s+am\s+sorry|sorry,|I\s+apologi[sz]e)\b", re.I)),
+    ("cannot_fulfill", re.compile(r"\b(?:cannot|can't|unable\s+to)\s+(?:fulfill|comply\s+with|assist\s+with|help\s+with)\b",
+                                  re.I)),
+    ("as_an_ai", re.compile(r"\bas\s+an\s+AI\b", re.I)),
+    ("against_guidelines", re.compile(r"\bagainst\s+my\s+(?:guidelines|policies|policy|programming)\b", re.I)),
+]
 _INABILITY = re.compile(r"\b(?:cannot|can't|can\s+not|unable|not\s+able|not\s+possible|impossible|no\s+access|refuse|decline|"
                         r"not\s+permitted|sorry)\b", re.I)
 _OPENS_WITH_INABILITY = re.compile(r"^\s*(?:sorry\b|unfortunately\b|(?:i\s+)?(?:cannot|can't|am\s+unable|'m\s+unable|unable|not\s+able)\b|"
@@ -280,8 +297,10 @@ def _resolve(node, root):
     return node if isinstance(node, dict) else {}
 
 
-def detect_refusal(data, schema=None):
-    """None, or {kind: lexical|structural, field, pattern} for the first refusal found in a parsed reply."""
+def detect_refusal(data, schema=None, with_excerpt: bool = False):
+    """None, or {kind: lexical|structural, field, pattern} for the first refusal found in a parsed reply. With
+    ``with_excerpt`` the hit also carries the matched text and its surroundings (for the in-memory exception only;
+    the call log stays content-free)."""
     root = schema or {}
 
     def walk(x, sub, path, key):
@@ -302,9 +321,14 @@ def detect_refusal(data, schema=None):
             return None
         if not isinstance(x, str):
             return None
-        for name, pat in _LEXICAL:
-            if pat.search(x):
-                return {"kind": "lexical", "field": path, "pattern": name}
+        reasoning = (key or "").lower() in REASONING_FIELDS or len(x) > LONG_TEXT
+        for name, pat in (_STRICT if reasoning else _LEXICAL):
+            m = pat.search(x)
+            if m:
+                hit = {"kind": "lexical", "field": path, "pattern": name}
+                if with_excerpt:
+                    hit["excerpt"] = x[max(0, m.start() - 60): m.end() + 60]
+                return hit
         enum = sub.get("enum") if sub else None
         if enum is not None and x not in enum and _INABILITY.search(x):
             return {"kind": "structural", "field": path, "pattern": "enum_member_is_prose"}
@@ -656,7 +680,7 @@ def call(task, prompt, schema=None, max_tokens=2000, temperature=0, *, system=No
     if not refusal and schema is not None:
         try:
             data = extract_json(text)
-            detected = detect_refusal(data, check_schema)  # a refusal is not data: check before anything reads it
+            detected = detect_refusal(data, check_schema, with_excerpt=True)  # a refusal is not data: check before anything reads it
             if detected is None and want_logprobs:
                 data, distributions, greedy_disagreement = rerank_enums(data, text, getattr(response.choices[0], "logprobs", None),
                                                                         check_schema)
@@ -705,7 +729,7 @@ def call(task, prompt, schema=None, max_tokens=2000, temperature=0, *, system=No
             elif schema is not None:
                 try:
                     c_data = extract_json(c_text)
-                    hit = detect_refusal(c_data, check_schema)
+                    hit = detect_refusal(c_data, check_schema, with_excerpt=True)
                     if hit:
                         entry["refusal_detected"], entry["error"] = hit, "refusal_detected"
                     else:

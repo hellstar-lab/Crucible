@@ -83,7 +83,8 @@ def authored_lines(repo: Path, paths: set[str], is_candidate) -> dict[str, set[i
 
 
 def integer_literal_at(repo: Path, c: Candidate) -> bool:
-    """NumberReplacer on a float leaves floating-point noise (0.8 - 1 -> -0.19999999999999996): never plausible."""
+    """Number replacement only on an INTEGER literal: a constant or a subscript index (d[0], prev[2]). Never a float
+    (0.8 - 1 -> -0.19999999999999996, measured) and never a complex literal."""
     line = (repo / c.path).read_text().splitlines()[c.start[0] - 1]
     lit = line[c.start[1]: c.end[1]] if c.start[0] == c.end[0] else ""
     return bool(re.fullmatch(r"\d+", lit.strip()))

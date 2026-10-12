@@ -597,3 +597,202 @@ under `hellstar-lab`. What is measured is the ability to navigate and explain co
 is what an interviewer actually relies on when a candidate says "I built this". It is not a test of authorship in the
 typing sense, not a speed contest, and not a verdict on the candidate. Its result is a fact for the human reviewer,
 with the same caveats as every other row in the report.
+
+---
+
+# Phase 5, round 3: stranger parity, diversity, the timed session (2026-10-12)
+
+## Part D: the refusal detector (`backend/llm.py`)
+
+**Cause.** A tool-using agent on Super wrote a 357-token `thought` containing "I cannot …" while reasoning aloud. The
+lexical refusal detector matched `first_person_cannot` and raised `LLMRefusalError`, which crashed the first Q3′ run
+(logged as `refusal_where="thought:first_person_cannot"`).
+
+**Fix, at the detector:**
+- In a reasoning field (`thought`, `reason`, `rationale`, `evidence_summary`, …), or in any string longer than 240
+  characters, only refusal-shaped language counts:
+  - a first-person refusal of the request ("I cannot help / assist / comply / fulfill / provide / answer …");
+  - an opening apology;
+  - "as an AI";
+  - "against my guidelines".
+- Short answer fields keep the full set, and every earlier refusal test still passes.
+- The in-memory exception now carries the matched excerpt; the call log stays content-free.
+
+**Tests** (`tests/test_llm.py`):
+- **Regression:** long agent reasoning is not a refusal.
+- **Thinking aloud:** reasoning fields and long text don't trip the detector.
+- **Real refusals:** a real refusal inside reasoning is still caught.
+- **Excerpt placement:** the excerpt is on the exception and absent from the log.
+
+The regression uses a labelled **reconstruction**, not the verbatim text: the log stores prompt hashes only, by design,
+so the crashing text was never kept. FEEDBACK.md #14 records this.
+
+The workaround is gone from `scripts/spike/q3b_agent.py`.
+
+## Part A: stranger parity
+
+The stranger now has **exactly the participant's view and actions**, through the shared `bugpool/tools.py`:
+- **View:** it starts with the repository's file tree and the failing test's name and output.
+- **Actions:** `FILE_OPEN`, `SEARCH` (regex over tracked, non-hidden files), `TEST_RUN`, `ANSWER`.
+- **Sandbox:** the same worktree sandbox; `.env` and dotfiles are blocked.
+- **Budget:** a ceiling of 40 actions. Super only.
+
+The same 10 candidates as round 2 (`scripts/spike/q3c_agent.py`).
+
+**Found-rate as a function of budget** (found within b actions, counting the ANSWER):
+
+| Budget b | 1–24 | 25 | 30 | 35 | 40 |
+|---|---|---|---|---|---|
+| Found | 0/10 | 1/10 | 1/10 | 1/10 | **1/10** |
+
+A run that answered correctly at action k counts as found for every b ≥ k. A run capped lower would have been forced
+to answer earlier, so the curve is an upper envelope for smaller budgets.
+
+| Candidate | Found at action | Files opened | Actions used | Cost | Wall clock* | Submitted |
+|---|---|---|---|---|---|---|
+| `shield/docx_scan.py:266` | — | 5 | 41 (forced) | $0.412 | 119 s | `MANIFEST.json`, no line |
+| `shield/structure.py:255` | — | 5 | 41 (forced) | $0.375 | 268 s | `structure.py:367` |
+| `shield/lines.py:137` | — | 3 | 41 (forced) | $0.417 | 142 s | `linkcheck.py:34` |
+| `shield/lines.py:205` | — | 5 | 41 (forced) | $0.375 | 193 s | `config.py:69` |
+| `grounding/html.py:329` | — | 4 | 41 (forced) | $0.345 | 95 s | `html.py:328` (one line off) |
+| `grounding/html.py:246` | — | 4 | 41 (forced) | $0.373 | 117 s | `html.py:416` |
+| `shield/doc_kind.py:21` | **25** | 6 | 25 | $0.121 | 68 s | `doc_kind.py:21` ✓ |
+| `retrieval/rules.py:171` | — | 5 | 41 (forced) | $0.238 | 88 s | a yaml fixture, no line |
+| `shield/lines.py:179` | — | 4 | 19 | $0.099 | 68 s | `fonts.py:17` |
+| `shield/structure.py:242` | — | 5 | 32 | $0.240 | 129 s | `structure.py:255` |
+
+*Recorded, never compared.
+
+**Round 2 against round 3, same 10 candidates:**
+
+| | Round 2 | Round 3 |
+|---|---|---|
+| Starting view | had to run the tests to see the failure | the failing test and its output, up front |
+| Tools | `list_files` / `read_file` / `run_tests`; no search | `FILE_OPEN` / `SEARCH` / `TEST_RUN`, the participant's set |
+| Budget | 15 tool calls | 40 actions |
+| **Found** | **2/10** (at 13 and 12 calls) | **1/10** (at 25) |
+| Opened the mutated file | 3/10 | **7/10** |
+| Cost | $0.18 in total | **$3.00 in total** (median $0.36) |
+
+**Read honestly:**
+- More information, search and almost three times the budget did not raise the found-rate. The stranger now reaches
+  the right file 7 times in 10 (against 3), but it then pages through it: `FILE_OPEN` is 35–40 of its 40 actions,
+  `SEARCH` 0–5.
+- It never localises the line in a large file. Two answers landed in the right file one line or one candidate away
+  (`html.py:328` for 329; `structure.py:255`, another pooled line, for 242), and exact-line scoring counts both as
+  misses.
+- **This is still a weak scaffold.** It doesn't know to search for the failing assertion's text, or to bisect. The 1/10
+  measures *this* stranger.
+- **Files opened is the discriminator, but it is near-flat:** 3–6 files for every run, hit or miss. The difference
+  between strangers would show up in how they read those files, and actions alone capture that only partly.
+- Round 3's view is the one the participant gets, so its numbers, not round 2's, are the ones a session record
+  compares against.
+
+## Part C: the timed session (`bugpool/session.py`, `python -m bugpool session`)
+
+**Lifecycle:**
+1. An empty pool is refused with its recorded reason; nothing is planted.
+2. One candidate is chosen and planted in a throwaway git worktree. The participant's real tree is never modified.
+3. The participant sees the file tree, the failing test's name and its output, and nothing else: no diff, no hint, no
+   module name. A test asserts that neither the diff nor the mutated line appears in that view.
+4. Every action is logged with a timestamp and a type: `FILE_OPEN`, `SEARCH`, `TEST_RUN`, `ANSWER`. These are
+   `bugpool.tools.ACTIONS`, the stranger's exact set, through the same implementation.
+5. One `ANSWER` (file and line) ends the hunt. The outcome records correct or incorrect, actions used, distinct files
+   opened and elapsed seconds. Running out of the action budget is recorded as `not_found_within_budget`, a valid
+   outcome, not a failure.
+6. The worktree is destroyed and the session record written.
+
+**The session record** holds:
+- the candidate's id, operator, family and killing test;
+- the full action log;
+- the outcome;
+- a `comparison` block: the participant's actions-to-find, and the **stranger's budget curve for the same candidate**,
+  read from the stranger's results by candidate id.
+
+There is no score, no rank and no hire field; a test scans every key of the record for them. Elapsed time is recorded,
+never the headline, and never compared.
+
+**UI.** A plain terminal REPL, the simplest surface to demo: `tree`, `open PATH [START]`, `search PATTERN [PATH]`,
+`test [SELECTOR]`, `answer PATH LINE`, `quit`. `tree` is free (not an action), because the stranger is given the tree
+in its brief.
+
+**Tests** (`bugpool/tests/test_session.py`, offline, a fixture repo):
+- the empty-pool refusal (no worktree is created);
+- the view and the sandbox: dotfiles can't be listed, opened or searched, and `../` paths are refused;
+- the action log and a correct answer, with the stranger curve attached;
+- budget exhaustion as an outcome.
+
+The worktree is gone after every test, and the real tree is unchanged.
+
+## Part B: pool diversity and the restated gate
+
+**Added to `generate_pool`:**
+- **Diversity:** at most 2 candidates per killing test (`max_per_killing_test`) and at most 3 per module
+  (`max_per_module`).
+  - A module that is full is skipped before validation.
+  - A clean kill whose killing test is already at its cap is dropped and counted.
+- **Ruff lint gate:** a mutation is rejected when it introduces a ruff diagnostic on its line(s) that the original
+  lines did not have. The selection is explicit, `E7,E9,F,SIM,W6`: ruff 0.17's default selection reports nothing for
+  `not x is None`. It catches E714 (`not x is None`), E713 (`not x in`), E712 (`== True`) and SIM201 (`not a == b`). It
+  runs before any test.
+  - New dependency, spike venv only: `ruff 0.17.0`, not in requirements.
+- **Number replacement:** integer literals only, constants and subscript indices alike (`d[0]`, `prev[2]`). Never a
+  float, never a complex literal. Every candidate records `lint_clean` and `integer_literal_only` among its checks, and
+  carries an `id`.
+
+**Crucible's pool, regenerated under the constraint** (target 15, validation cap 400, seed 0, 95 min):
+
+| | Value |
+|---|---|
+| **Candidates** | **9** (stopped at the 400-validation cap) |
+| Validated | 400: 183 survivor, 132 noisy, 49 telegraphed, **20 clean**, 15 lint-rejected, 1 broken |
+| Dropped for diversity | **11 of the 20 clean kills**, every one because `test_fixture_matches_manifest` already killed 2 |
+| **Killing tests** | **8**: `test_fixture_matches_manifest` × 2; `test_every_claim_traces_to_its_unit_span`, `test_fixture_matches_ground_truth_exactly`, `test_bug_targets_and_hard_anchor_rule`, `test_resolver_matrix`, `test_statuses_never_kill_the_batch`, `test_ocr_text_is_added_when_available`, `test_questions_render_traced_and_neutral` × 1 each |
+| **Modules** | **9**, one candidate each: `claims/split.py`, `shield/fonts.py`, `shield/pdf_security.py`, `evidence/blame.py`, `evidence/question_surface.py`, `evidence/resolve.py`, `evidence/target.py`, `shield/analyze.py`, `grounding/html.py` |
+
+### The restated gate: **Crucible does NOT pass**
+
+| Criterion | Required | Crucible | Result |
+|---|---|---|---|
+| Candidates | 15 | **9** | **fail** |
+| Killing tests | 5+ | 8 | pass |
+| Modules | 3+ | 9 | pass |
+
+The gate is not loosened.
+
+**The blocker is the same concentration measured in round 2, now made binding.** Without the diversity cap, 13 of the
+20 clean kills come from one golden-fixture test. With it, clean kills arrive at about 9 per 400 validations, roughly
+2.25%. At that rate 15 would need on the order of 670 validations, about 2.6 hours on this machine.
+
+Raising the validation cap would only search longer. It might reach 15, but this round did not run it, and it does not
+change the finding: outside one test, Crucible's suite kills a non-telegraphing, lint-clean, plausible mutation rarely.
+
+### Plausibility of the 9, read honestly
+
+- **Plausible:**
+  - `fonts.py:44` (`>`→`<=`);
+  - `pdf_security.py:123` (`< 4`→`>= 4`);
+  - `target.py:187` (`continue`→`break`);
+  - `analyze.py:165` (`if ocr_done`→`if not ocr_done`);
+  - `html.py:45` (`>=`→`<=`).
+- **Semi-plausible:** `question_surface.py:149` (`<`→`!=`); `split.py:178` (`sec_index += 1`→`+= 0`). A human forgets
+  an increment; they rarely write `+= 0`.
+- **A form fingerprint:** `blame.py:120` (`ranges[-1]`→`ranges[- 0]`) and `resolve.py:171` (`candidates[0]`→
+  `candidates[ -1]`).
+  - cosmic-ray's `NumberReplacer` writes `" " + str(val)` (its source), so every number mutation leaves a stray space:
+    `[ -1]`, `[- 0]`, `( 404, 429)`. A hunter scanning for odd spacing finds it without understanding the code.
+  - Neither the lint gate nor the telegraph check catches it.
+  - **Recorded, not fixed:** the pool generator should normalise the mutated literal's spacing, or reject number
+    mutations whose rendered form differs from the file's style.
+
+## Status
+
+| Part | State |
+|---|---|
+| Part A | Done: the stranger with search and a 40-action ceiling, the budget curve, the per-candidate table, round 2 and 3 compared. **1/10 found** |
+| Part B | Done: diversity and lint gate in; Crucible **fails the restated gate on size (9 < 15)** |
+| Part C | Built and tested; ready to demo |
+| Part D | Fixed and tested |
+
+Not built this round: the characterization / record-replay oracle (it needs its own spec), and the cosmic-ray spacing
+fingerprint fix.

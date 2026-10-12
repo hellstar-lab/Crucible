@@ -32,6 +32,7 @@ def _empty(pool: dict, reason: str, **detail) -> dict:
 
 def generate_pool(repo: Path, emails: list[str], *, source: str = "backend", python: str | None = None,
                   behaviour_modules: int = 7, target: int = 20, max_validations: int = 300, seed: int = 0,
+                  max_per_killing_test: int = 2, max_per_module: int = 3,
                   time_budget_s: float = 3 * 3600, second_tier=None, log=print) -> dict:
     """A pool of pre-validated bug candidates for ``repo`` at HEAD, or an EMPTY pool with the reason recorded.
 
@@ -42,7 +43,8 @@ def generate_pool(repo: Path, emails: list[str], *, source: str = "backend", pyt
     cand_emails = {e.lower() for e in emails}
     pool = {"version": POOL_VERSION, "repo": str(repo), "head_sha": _git(repo, "rev-parse", "HEAD"), "source": source,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "identity_emails": sorted(cand_emails),
-            "params": {"behaviour_modules": behaviour_modules, "target": target, "max_validations": max_validations, "seed": seed},
+            "params": {"behaviour_modules": behaviour_modules, "target": target, "max_validations": max_validations, "seed": seed,
+                       "max_per_killing_test": max_per_killing_test, "max_per_module": max_per_module},
             "second_tier": SECOND_TIER_NOTE if second_tier is None else "supplied", "stats": {}}
     tmp = Path(tempfile.mkdtemp(prefix="bugpool-wt-"))
     wt = tmp / "wt"
@@ -76,11 +78,16 @@ def generate_pool(repo: Path, emails: list[str], *, source: str = "backend", pyt
             return _empty(pool, "no authored line is covered by a behaviour test", filters=steps)
         order = random.Random(seed).sample(kept, len(kept))
         seen_lines, out, tried = set(), [], {}
+        per_test: dict[str, int] = {}
+        per_module: dict[str, int] = {}
+        diversity_dropped = 0
         for c in order:
             if len(out) >= target or sum(tried.values()) >= max_validations or time.monotonic() - t0 > time_budget_s:
                 break
             if (c.path, c.start[0]) in seen_lines:
                 continue  # one candidate per line
+            if per_module.get(c.path, 0) >= max_per_module:
+                continue  # diversity: this module is full; skip before paying for validation
             seen_lines.add((c.path, c.start[0]))
             v = validate(wt, c, python)
             tried[v.cls] = tried.get(v.cls, 0) + 1
@@ -88,16 +95,25 @@ def generate_pool(repo: Path, emails: list[str], *, source: str = "backend", pyt
             if v.cls != CLEAN:
                 continue
             f = v.failed[0]
+            if per_test.get(f["test"], 0) >= max_per_killing_test:
+                diversity_dropped += 1  # diversity: this killing test already anchors its share of the pool
+                log(f"      dropped for diversity: {f['test']} already kills {per_test[f['test']]}")
+                continue
+            per_test[f["test"]] = per_test.get(f["test"], 0) + 1
+            per_module[c.path] = per_module.get(c.path, 0) + 1
             minus = next((ln[1:] for ln in v.diff.splitlines() if ln.startswith("-") and not ln.startswith("---")), "")
             plus = next((ln[1:] for ln in v.diff.splitlines() if ln.startswith("+") and not ln.startswith("+++")), "")
-            out.append({"path": c.path, "line": c.start[0], "end_line": c.end[0], "diff": v.diff, "original_line": minus,
+            out.append({"id": None, "path": c.path, "line": c.start[0], "end_line": c.end[0], "diff": v.diff, "original_line": minus,
                         "mutated_line": plus, "operator": c.operator, "family": c.family, "killing_test": f["test"],
                         "killing_message": f["message"], "covering_tests": c.covering_tests, "behaviour_tests": c.behaviour_tests,
                         "validation_seconds": v.seconds,
                         "checks": {"clean_kill": True, "exception_at_site": False, "telegraph_hits": v.telegraph_hits,
                                    "plausibility": {"whitelisted_family": c.family,
-                                                    "integer_literal_only": True}}})  # floats were filtered out before validation
+                                                    "integer_literal_only": True,  # floats / complex never enumerated
+                                                    "lint_clean": True}}})  # no new ruff diagnostic on the line
         pool["stats"]["validated"] = tried
+        pool["stats"]["dropped_for_diversity"] = diversity_dropped
+        pool["stats"]["spread"] = {"killing_tests": per_test, "modules": per_module}
         pool["stats"]["seconds"] = round(time.monotonic() - t0, 1)
         if not out:
             if second_tier is not None:
@@ -105,6 +121,9 @@ def generate_pool(repo: Path, emails: list[str], *, source: str = "backend", pyt
             if not out:
                 return _empty(pool, f"no candidate validated as a clean, non-telegraphing kill ({sum(tried.values())} tried)",
                               validated=tried)
+        from .session import candidate_id
+        for cand in out:
+            cand["id"] = candidate_id(cand)
         pool.update(status="ok", candidates=out, reason=None, message=None)
         return pool
     finally:

@@ -271,3 +271,26 @@ Nano streamed 5 more times gave 3 distinct replies with an unchanged fingerprint
 variation. Logprobs show part of the cause: on this request Super's first value token was an exact 0.4966 / 0.4966
 tie, so tiny numerical differences pick different branches. In practice determinism is selectable by tier: route a
 decision that must be repeatable to Ultra, and measure any other tier over several runs.
+
+### 14. Our own lexical refusal detector false-positived on agent reasoning (fixed; not a platform issue)
+
+**What happened:**
+- In the first Phase 5 Q3′ run, a tool-using agent on Super wrote a 357-token free-text `thought` field.
+- The field contained the words "I cannot …", as in an agent reasoning aloud ("I cannot see which document triggered
+  it yet").
+- `backend/llm.py`'s lexical refusal detector matched `first_person_cannot` and raised `LLMRefusalError`, which crashed
+  the run.
+- Logged as `refusal_where="thought:first_person_cannot"`, 2026-10-11T16:58:08Z.
+
+The model did not refuse; the detector misread reasoning as a refusal.
+
+**The fix:**
+- In a REASONING field (`thought`, `reason`, `rationale`, `evidence_summary`, …), or in any string longer than
+  240 characters, only refusal-shaped language now counts: a first-person refusal OF THE REQUEST ("I cannot
+  help / assist / comply / fulfill / provide / answer …"), an opening apology, "as an AI", and "against my
+  guidelines".
+- Short answer fields keep the full pattern set, and every earlier refusal test still passes.
+- The exception now carries the matched excerpt, in memory only; the call log stays content-free.
+
+**Regression test:** `tests/test_llm.py::test_long_agent_reasoning_is_not_a_refusal`. It uses a labelled
+RECONSTRUCTION of the crashing text. The log stores prompt hashes only, by design, so the verbatim text was never kept.

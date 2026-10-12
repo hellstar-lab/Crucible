@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 import subprocess
 import tempfile
@@ -20,9 +21,27 @@ _FRAME = re.compile(r"^(\S+\.py):(\d+): (\w+(?:\.\w+)*)\s*$", re.M)
 CLEAN = "clean"
 
 
+LINT_SELECT = "E7,E9,F,SIM,W6"  # explicit: ruff 0.17's default selection reports nothing for `not x is None`
+
+
+def lint_new(ruff: str, path: str, original: str, mutated: str, lines: range) -> list[str]:
+    """Diagnostic codes the mutation INTRODUCES on its line(s): present in the mutated text, absent from the original.
+    Catches the unnatural spellings a human would not write (E714 `not x is None`, E713 `not x in`, E712 `== True`,
+    SIM201 `not a == b` ...), which a careful hunter could spot by form alone."""
+    def diags(text):
+        r = subprocess.run([ruff, "check", "--no-cache", "--select", LINT_SELECT, "--output-format", "json", "--stdin-filename",
+                            path, "-"], input=text, capture_output=True, text=True)
+        try:
+            return {(d["code"], d["location"]["row"]) for d in json.loads(r.stdout or "[]")}
+        except json.JSONDecodeError:
+            return set()
+    before = {code for code, row in diags(original) if row in lines}
+    return sorted({code for code, row in diags(mutated) if row in lines} - before)
+
+
 @dataclass
 class Validation:
-    cls: str  # clean | survivor | noisy | exception_at_site | telegraphed | broken
+    cls: str  # clean | survivor | noisy | exception_at_site | telegraphed | lint | broken
     diff: str = ""
     failed: list[dict] = field(default_factory=list)
     telegraph_hits: list[str] = field(default_factory=list)
@@ -75,12 +94,18 @@ def validate(repo: Path, cand, python: str, timeout_s: int = 600) -> Validation:
     if not tree_clean(repo):
         raise RuntimeError("refusing to mutate a dirty tree")
     cr = str(Path(python).with_name("cosmic-ray"))
+    ruff = Path(python).with_name("ruff")
     terms = telegraph_terms(repo, cand.path, cand.start[0], cand.end[0])
+    original = (repo / cand.path).read_text()
     try:
         r = subprocess.run([cr, "apply", cand.path, cand.operator, str(cand.occurrence)], cwd=repo, capture_output=True, text=True)
         diff = subprocess.run(["git", "diff", "-U2", "--", cand.path], cwd=repo, capture_output=True, text=True).stdout
         if r.returncode != 0 or not diff:
             return Validation("broken", diff, detail=f"apply failed: {(r.stderr or r.stdout)[-200:]}")
+        if ruff.exists():  # the lint gate runs before any test: cheap, and a lint-visible bug is not a fair hunt
+            new = lint_new(str(ruff), cand.path, original, (repo / cand.path).read_text(), cand.lines)
+            if new:
+                return Validation("lint", diff, detail=f"the mutation introduces {', '.join(new)}")
         with tempfile.TemporaryDirectory(prefix="bugpool-v-") as tmp:
             xml = Path(tmp) / "j.xml"
             t0 = time.monotonic()

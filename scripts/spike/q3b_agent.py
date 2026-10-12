@@ -85,7 +85,7 @@ def tool(wt: Path, act: dict) -> tuple[str, str | None]:
 
 
 def run_agent(wt: Path, cand: dict, budget: int) -> dict:
-    hist, opened, calls, cost, answer, refusals, turns = [], [], 0, 0.0, None, 0, 0
+    hist, opened, calls, cost, answer, turns = [], [], 0, 0.0, None, 0
     t0 = time.monotonic()
     while answer is None:
         forced = calls >= budget
@@ -99,14 +99,9 @@ def run_agent(wt: Path, cand: dict, budget: int) -> dict:
             act, c = r.get("data") or {}, r.get("cost_usd") or 0.0
         except llm.LLMJSONError:
             act, c = {"action": "unparseable"}, 0.0
-        except llm.LLMRefusalError:
-            # measured: the router's lexical refusal detector fired on the agent's own "thought" text. A false
-            # positive for this use; recorded as a turn with no tool call, not a crash
-            act, c = {"action": "refused_by_detector"}, 0.0
-            refusals += 1
         cost += c
         turns += 1
-        if act.get("action") in ("unparseable", "refused_by_detector") and turns < 3 * budget:
+        if act.get("action") == "unparseable" and turns < 3 * budget:
             continue  # no tool call made; ask again (bounded)
         if act.get("action") == "answer" or forced:
             answer = {"path": act.get("path"), "line": act.get("line"), "forced": forced and act.get("action") != "answer"}
@@ -119,7 +114,7 @@ def run_agent(wt: Path, cand: dict, budget: int) -> dict:
     found = answer["path"] == cand["path"] and isinstance(answer["line"], int) and cand["line"] <= answer["line"] <= cand["end_line"]
     return {"found": found, "answer": answer, "files_opened": opened, "distinct_files_opened": len(opened), "tool_calls": calls,
             "cost_usd": round(cost, 5), "wall_clock_s": round(time.monotonic() - t0, 1),
-            "actions": [h["act"].get("action") for h in hist], "model_turns": turns, "detector_refusals": refusals}
+            "actions": [h["act"].get("action") for h in hist], "model_turns": turns}
 
 
 def main():
