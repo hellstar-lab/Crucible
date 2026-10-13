@@ -256,3 +256,11 @@ def test_burn_text_resolves_bare_names_to_every_matching_file(tmp_path):
     reg = burned.Registry(tmp_path / "r.json")
     assert burned.burn_text(reg, repo, "see ledger.py:2 and app/report.py:5", "doc", source="app") == 3
     assert reg.burned("app/ledger.py", 2) and reg.burned("app/sub/ledger.py", 2) and reg.burned("app/report.py", 5)
+
+
+def test_burn_json_reads_report_citations(tmp_path):
+    """A claim-evidence report cites code as {path, start_line}: those lines have been shown, so they are burned."""
+    from bugpool import burned
+    reg = burned.Registry(tmp_path / "b.json")
+    rep = {"rows": [{"citation": {"repo": "o/r", "path": "backend/x.py", "start_line": 12, "end_line": 14}}]}
+    assert burned.burn_json(reg, rep, "report") == 1 and reg.burned("backend/x.py", 12)

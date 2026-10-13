@@ -1,6 +1,66 @@
 {
  "lines": [
   [
+   "app/database.py",
+   14
+  ],
+  [
+   "app/os_layer/bounded_queue.py",
+   3
+  ],
+  [
+   "app/os_layer/bounded_queue.py",
+   18
+  ],
+  [
+   "app/os_layer/bounded_queue.py",
+   32
+  ],
+  [
+   "app/os_layer/db_semaphore.py",
+   11
+  ],
+  [
+   "app/os_layer/db_semaphore.py",
+   14
+  ],
+  [
+   "app/os_layer/worker_pool.py",
+   14
+  ],
+  [
+   "app/os_layer/worker_pool.py",
+   27
+  ],
+  [
+   "app/registration_service.py",
+   34
+  ],
+  [
+   "app/registration_service.py",
+   49
+  ],
+  [
+   "app/registration_service.py",
+   105
+  ],
+  [
+   "app/registration_service.py",
+   107
+  ],
+  [
+   "app/registration_service.py",
+   111
+  ],
+  [
+   "app/seed.py",
+   18
+  ],
+  [
+   "backend/claims/__init__.py",
+   520
+  ],
+  [
    "backend/claims/config.py",
    69
   ],
@@ -29,12 +89,28 @@
    58
   ],
   [
+   "backend/claims/ensemble.py",
+   59
+  ],
+  [
+   "backend/claims/ensemble.py",
+   60
+  ],
+  [
    "backend/claims/entries.py",
    34
   ],
   [
    "backend/claims/entries.py",
    36
+  ],
+  [
+   "backend/claims/entries.py",
+   37
+  ],
+  [
+   "backend/claims/guards.py",
+   25
   ],
   [
    "backend/claims/guards.py",
@@ -70,6 +146,10 @@
   ],
   [
    "backend/claims/pipeline.py",
+   160
+  ],
+  [
+   "backend/claims/pipeline.py",
    202
   ],
   [
@@ -94,6 +174,10 @@
   ],
   [
    "backend/claims/pipeline.py",
+   242
+  ],
+  [
+   "backend/claims/pipeline.py",
    258
   ],
   [
@@ -103,6 +187,10 @@
   [
    "backend/claims/pipeline.py",
    263
+  ],
+  [
+   "backend/claims/pipeline.py",
+   310
   ],
   [
    "backend/claims/pipeline.py",
@@ -130,6 +218,10 @@
   ],
   [
    "backend/claims/pipeline.py",
+   341
+  ],
+  [
+   "backend/claims/pipeline.py",
    352
   ],
   [
@@ -138,11 +230,19 @@
   ],
   [
    "backend/claims/pipeline.py",
+   366
+  ],
+  [
+   "backend/claims/pipeline.py",
    369
   ],
   [
    "backend/claims/pipeline.py",
    380
+  ],
+  [
+   "backend/claims/pipeline.py",
+   383
   ],
   [
    "backend/claims/pipeline.py",
@@ -167,6 +267,14 @@
   [
    "backend/claims/pipeline.py",
    485
+  ],
+  [
+   "backend/claims/pipeline.py",
+   493
+  ],
+  [
+   "backend/claims/routing.py",
+   59
   ],
   [
    "backend/claims/routing.py",
@@ -202,7 +310,15 @@
   ],
   [
    "backend/claims/routing.py",
+   150
+  ],
+  [
+   "backend/claims/routing.py",
    155
+  ],
+  [
+   "backend/claims/skills.py",
+   36
   ],
   [
    "backend/claims/skills.py",
@@ -218,7 +334,15 @@
   ],
   [
    "backend/claims/skills.py",
+   69
+  ],
+  [
+   "backend/claims/skills.py",
    72
+  ],
+  [
+   "backend/claims/split.py",
+   116
   ],
   [
    "backend/claims/split.py",
@@ -238,7 +362,15 @@
   ],
   [
    "backend/claims/split.py",
+   129
+  ],
+  [
+   "backend/claims/split.py",
    133
+  ],
+  [
+   "backend/claims/split.py",
+   141
   ],
   [
    "backend/claims/split.py",
@@ -302,11 +434,19 @@
   ],
   [
    "backend/claims/support.py",
+   76
+  ],
+  [
+   "backend/claims/support.py",
    104
   ],
   [
    "backend/claims/support.py",
    105
+  ],
+  [
+   "backend/claims/support.py",
+   107
   ],
   [
    "backend/claims/support.py",
@@ -333,12 +473,48 @@
    113
   ],
   [
+   "backend/claims/verbs.py",
+   119
+  ],
+  [
+   "backend/contracts.py",
+   2
+  ],
+  [
+   "backend/contracts.py",
+   18
+  ],
+  [
+   "backend/contracts.py",
+   21
+  ],
+  [
+   "backend/contracts.py",
+   67
+  ],
+  [
+   "backend/contracts.py",
+   86
+  ],
+  [
    "backend/contracts.py",
    119
   ],
   [
    "backend/contracts.py",
    120
+  ],
+  [
+   "backend/contracts.py",
+   650
+  ],
+  [
+   "backend/contracts.py",
+   786
+  ],
+  [
+   "backend/contracts.py",
+   972
   ],
   [
    "backend/evidence/__init__.py",
@@ -351,6 +527,10 @@
   [
    "backend/evidence/__init__.py",
    103
+  ],
+  [
+   "backend/evidence/__init__.py",
+   119
   ],
   [
    "backend/evidence/__init__.py",
@@ -378,6 +558,10 @@
   ],
   [
    "backend/evidence/__init__.py",
+   195
+  ],
+  [
+   "backend/evidence/__init__.py",
    207
   ],
   [
@@ -394,11 +578,27 @@
   ],
   [
    "backend/evidence/__init__.py",
+   283
+  ],
+  [
+   "backend/evidence/__init__.py",
    289
   ],
   [
    "backend/evidence/__init__.py",
+   303
+  ],
+  [
+   "backend/evidence/__init__.py",
+   312
+  ],
+  [
+   "backend/evidence/__init__.py",
    351
+  ],
+  [
+   "backend/evidence/__init__.py",
+   359
   ],
   [
    "backend/evidence/__init__.py",
@@ -407,6 +607,14 @@
   [
    "backend/evidence/__init__.py",
    365
+  ],
+  [
+   "backend/evidence/__init__.py",
+   520
+  ],
+  [
+   "backend/evidence/authorship.py",
+   49
   ],
   [
    "backend/evidence/authorship.py",
@@ -434,6 +642,10 @@
   ],
   [
    "backend/evidence/authorship.py",
+   84
+  ],
+  [
+   "backend/evidence/authorship.py",
    97
   ],
   [
@@ -442,11 +654,23 @@
   ],
   [
    "backend/evidence/authorship.py",
+   118
+  ],
+  [
+   "backend/evidence/authorship.py",
    145
   ],
   [
    "backend/evidence/authorship.py",
+   171
+  ],
+  [
+   "backend/evidence/authorship.py",
    175
+  ],
+  [
+   "backend/evidence/authorship.py",
+   191
   ],
   [
    "backend/evidence/authorship.py",
@@ -462,6 +686,10 @@
   ],
   [
    "backend/evidence/authorship.py",
+   207
+  ],
+  [
+   "backend/evidence/authorship.py",
    212
   ],
   [
@@ -470,7 +698,15 @@
   ],
   [
    "backend/evidence/authorship.py",
+   234
+  ],
+  [
+   "backend/evidence/authorship.py",
    252
+  ],
+  [
+   "backend/evidence/blame.py",
+   65
   ],
   [
    "backend/evidence/blame.py",
@@ -479,6 +715,14 @@
   [
    "backend/evidence/blame.py",
    102
+  ],
+  [
+   "backend/evidence/blame.py",
+   107
+  ],
+  [
+   "backend/evidence/blame.py",
+   119
   ],
   [
    "backend/evidence/blame.py",
@@ -502,11 +746,31 @@
   ],
   [
    "backend/evidence/blame.py",
+   140
+  ],
+  [
+   "backend/evidence/blame.py",
    159
   ],
   [
    "backend/evidence/blame.py",
    165
+  ],
+  [
+   "backend/evidence/blame.py",
+   166
+  ],
+  [
+   "backend/evidence/cache.py",
+   1
+  ],
+  [
+   "backend/evidence/cache.py",
+   4
+  ],
+  [
+   "backend/evidence/cache.py",
+   34
   ],
   [
    "backend/evidence/clone.py",
@@ -537,6 +801,14 @@
    69
   ],
   [
+   "backend/evidence/degraded.py",
+   83
+  ],
+  [
+   "backend/evidence/dependencies.py",
+   28
+  ],
+  [
    "backend/evidence/dependencies.py",
    49
   ],
@@ -550,7 +822,15 @@
   ],
   [
    "backend/evidence/exclusions.py",
+   90
+  ],
+  [
+   "backend/evidence/exclusions.py",
    127
+  ],
+  [
+   "backend/evidence/exclusions.py",
+   166
   ],
   [
    "backend/evidence/exclusions.py",
@@ -559,6 +839,10 @@
   [
    "backend/evidence/exclusions.py",
    198
+  ],
+  [
+   "backend/evidence/exclusions.py",
+   199
   ],
   [
    "backend/evidence/functions.py",
@@ -574,6 +858,10 @@
   ],
   [
    "backend/evidence/functions.py",
+   98
+  ],
+  [
+   "backend/evidence/functions.py",
    111
   ],
   [
@@ -586,11 +874,19 @@
   ],
   [
    "backend/evidence/functions.py",
+   133
+  ],
+  [
+   "backend/evidence/functions.py",
    135
   ],
   [
    "backend/evidence/functions.py",
    136
+  ],
+  [
+   "backend/evidence/functions.py",
+   137
   ],
   [
    "backend/evidence/functions.py",
@@ -631,6 +927,10 @@
   [
    "backend/evidence/github_client.py",
    95
+  ],
+  [
+   "backend/evidence/github_client.py",
+   100
   ],
   [
    "backend/evidence/github_client.py",
@@ -685,6 +985,14 @@
    66
   ],
   [
+   "backend/evidence/gitutil.py",
+   127
+  ],
+  [
+   "backend/evidence/identity.py",
+   38
+  ],
+  [
    "backend/evidence/identity.py",
    55
   ],
@@ -694,7 +1002,15 @@
   ],
   [
    "backend/evidence/identity.py",
+   109
+  ],
+  [
+   "backend/evidence/identity.py",
    135
+  ],
+  [
+   "backend/evidence/question_surface.py",
+   57
   ],
   [
    "backend/evidence/question_surface.py",
@@ -706,7 +1022,15 @@
   ],
   [
    "backend/evidence/question_surface.py",
+   123
+  ],
+  [
+   "backend/evidence/question_surface.py",
    128
+  ],
+  [
+   "backend/evidence/question_surface.py",
+   134
   ],
   [
    "backend/evidence/question_surface.py",
@@ -746,6 +1070,10 @@
   ],
   [
    "backend/evidence/repo_signals.py",
+   46
+  ],
+  [
+   "backend/evidence/repo_signals.py",
    55
   ],
   [
@@ -766,11 +1094,19 @@
   ],
   [
    "backend/evidence/repo_signals.py",
+   92
+  ],
+  [
+   "backend/evidence/repo_signals.py",
    95
   ],
   [
    "backend/evidence/repo_signals.py",
    101
+  ],
+  [
+   "backend/evidence/repo_signals.py",
+   106
   ],
   [
    "backend/evidence/resolve.py",
@@ -779,6 +1115,10 @@
   [
    "backend/evidence/resolve.py",
    51
+  ],
+  [
+   "backend/evidence/resolve.py",
+   67
   ],
   [
    "backend/evidence/resolve.py",
@@ -802,7 +1142,15 @@
   ],
   [
    "backend/evidence/resolve.py",
+   146
+  ],
+  [
+   "backend/evidence/resolve.py",
    149
+  ],
+  [
+   "backend/evidence/resolve.py",
+   151
   ],
   [
    "backend/evidence/resolve.py",
@@ -814,7 +1162,15 @@
   ],
   [
    "backend/evidence/resolve.py",
+   161
+  ],
+  [
+   "backend/evidence/resolve.py",
    171
+  ],
+  [
+   "backend/evidence/resolve.py",
+   174
   ],
   [
    "backend/evidence/resolve.py",
@@ -830,7 +1186,19 @@
   ],
   [
    "backend/evidence/snapshot.py",
+   55
+  ],
+  [
+   "backend/evidence/snapshot.py",
    75
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   82
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   86
   ],
   [
    "backend/evidence/snapshot.py",
@@ -843,6 +1211,22 @@
   [
    "backend/evidence/snapshot.py",
    89
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   110
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   112
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   134
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   148
   ],
   [
    "backend/evidence/snapshot.py",
@@ -871,6 +1255,10 @@
   [
    "backend/evidence/structure.py",
    58
+  ],
+  [
+   "backend/evidence/structure.py",
+   65
   ],
   [
    "backend/evidence/structure.py",
@@ -910,11 +1298,23 @@
   ],
   [
    "backend/evidence/target.py",
+   63
+  ],
+  [
+   "backend/evidence/target.py",
+   72
+  ],
+  [
+   "backend/evidence/target.py",
    86
   ],
   [
    "backend/evidence/target.py",
    110
+  ],
+  [
+   "backend/evidence/target.py",
+   111
   ],
   [
    "backend/evidence/target.py",
@@ -946,6 +1346,10 @@
   ],
   [
    "backend/evidence/target.py",
+   314
+  ],
+  [
+   "backend/evidence/target.py",
    318
   ],
   [
@@ -963,6 +1367,10 @@
   [
    "backend/grounding/__init__.py",
    37
+  ],
+  [
+   "backend/grounding/__init__.py",
+   39
   ],
   [
    "backend/grounding/__init__.py",
@@ -994,6 +1402,10 @@
   ],
   [
    "backend/grounding/__init__.py",
+   77
+  ],
+  [
+   "backend/grounding/__init__.py",
    81
   ],
   [
@@ -1010,6 +1422,10 @@
   ],
   [
    "backend/grounding/__init__.py",
+   107
+  ],
+  [
+   "backend/grounding/__init__.py",
    114
   ],
   [
@@ -1021,12 +1437,24 @@
    123
   ],
   [
+   "backend/grounding/__init__.py",
+   520
+  ],
+  [
    "backend/grounding/html.py",
    42
   ],
   [
    "backend/grounding/html.py",
    45
+  ],
+  [
+   "backend/grounding/html.py",
+   66
+  ],
+  [
+   "backend/grounding/html.py",
+   95
   ],
   [
    "backend/grounding/html.py",
@@ -1043,6 +1471,10 @@
   [
    "backend/grounding/html.py",
    150
+  ],
+  [
+   "backend/grounding/html.py",
+   229
   ],
   [
    "backend/grounding/html.py",
@@ -1086,6 +1518,10 @@
   ],
   [
    "backend/grounding/html.py",
+   396
+  ],
+  [
+   "backend/grounding/html.py",
    400
   ],
   [
@@ -1106,11 +1542,19 @@
   ],
   [
    "backend/grounding/html.py",
+   447
+  ],
+  [
+   "backend/grounding/html.py",
    456
   ],
   [
    "backend/grounding/html.py",
    463
+  ],
+  [
+   "backend/grounding/html.py",
+   480
   ],
   [
    "backend/grounding/html.py",
@@ -1137,8 +1581,20 @@
    604
   ],
   [
+   "backend/grounding/html.py",
+   646
+  ],
+  [
    "backend/grounding/report.py",
    49
+  ],
+  [
+   "backend/grounding/report.py",
+   56
+  ],
+  [
+   "backend/grounding/report.py",
+   58
   ],
   [
    "backend/grounding/report.py",
@@ -1158,6 +1614,18 @@
   ],
   [
    "backend/grounding/report.py",
+   94
+  ],
+  [
+   "backend/grounding/report.py",
+   123
+  ],
+  [
+   "backend/grounding/report.py",
+   142
+  ],
+  [
+   "backend/grounding/report.py",
    165
   ],
   [
@@ -1170,11 +1638,19 @@
   ],
   [
    "backend/llm.py",
+   29
+  ],
+  [
+   "backend/llm.py",
    312
   ],
   [
    "backend/llm.py",
    381
+  ],
+  [
+   "backend/llm.py",
+   400
   ],
   [
    "backend/llm.py",
@@ -1187,6 +1663,14 @@
   [
    "backend/llm.py",
    505
+  ],
+  [
+   "backend/llm.py",
+   661
+  ],
+  [
+   "backend/questions/__init__.py",
+   83
   ],
   [
    "backend/questions/__init__.py",
@@ -1218,6 +1702,10 @@
   ],
   [
    "backend/questions/__init__.py",
+   161
+  ],
+  [
+   "backend/questions/__init__.py",
    174
   ],
   [
@@ -1234,7 +1722,23 @@
   ],
   [
    "backend/questions/__init__.py",
+   200
+  ],
+  [
+   "backend/questions/__init__.py",
+   204
+  ],
+  [
+   "backend/questions/__init__.py",
    216
+  ],
+  [
+   "backend/questions/__init__.py",
+   218
+  ],
+  [
+   "backend/questions/__init__.py",
+   222
   ],
   [
    "backend/questions/__init__.py",
@@ -1277,6 +1781,18 @@
    334
   ],
   [
+   "backend/questions/__init__.py",
+   335
+  ],
+  [
+   "backend/questions/__init__.py",
+   345
+  ],
+  [
+   "backend/questions/__init__.py",
+   520
+  ],
+  [
    "backend/retrieval/__init__.py",
    47
   ],
@@ -1290,7 +1806,19 @@
   ],
   [
    "backend/retrieval/__init__.py",
+   74
+  ],
+  [
+   "backend/retrieval/__init__.py",
+   86
+  ],
+  [
+   "backend/retrieval/__init__.py",
    116
+  ],
+  [
+   "backend/retrieval/__init__.py",
+   119
   ],
   [
    "backend/retrieval/__init__.py",
@@ -1299,6 +1827,10 @@
   [
    "backend/retrieval/__init__.py",
    131
+  ],
+  [
+   "backend/retrieval/__init__.py",
+   520
   ],
   [
    "backend/retrieval/config.py",
@@ -1346,11 +1878,23 @@
   ],
   [
    "backend/retrieval/rules.py",
+   76
+  ],
+  [
+   "backend/retrieval/rules.py",
    84
   ],
   [
    "backend/retrieval/rules.py",
+   93
+  ],
+  [
+   "backend/retrieval/rules.py",
    127
+  ],
+  [
+   "backend/retrieval/rules.py",
+   134
   ],
   [
    "backend/retrieval/rules.py",
@@ -1359,6 +1903,14 @@
   [
    "backend/retrieval/rules.py",
    149
+  ],
+  [
+   "backend/retrieval/rules.py",
+   162
+  ],
+  [
+   "backend/retrieval/rules.py",
+   165
   ],
   [
    "backend/retrieval/rules.py",
@@ -1393,6 +1945,10 @@
    271
   ],
   [
+   "backend/retrieval/rules.py",
+   356
+  ],
+  [
    "backend/retrieval/sources.py",
    70
   ],
@@ -1418,6 +1974,10 @@
   ],
   [
    "backend/retrieval/sources.py",
+   175
+  ],
+  [
+   "backend/retrieval/sources.py",
    176
   ],
   [
@@ -1438,6 +1998,10 @@
   ],
   [
    "backend/safety.py",
+   55
+  ],
+  [
+   "backend/safety.py",
    58
   ],
   [
@@ -1445,8 +2009,44 @@
    66
   ],
   [
+   "backend/safety.py",
+   75
+  ],
+  [
+   "backend/shield/__init__.py",
+   10
+  ],
+  [
+   "backend/shield/__init__.py",
+   35
+  ],
+  [
+   "backend/shield/__init__.py",
+   42
+  ],
+  [
+   "backend/shield/__init__.py",
+   169
+  ],
+  [
+   "backend/shield/__init__.py",
+   224
+  ],
+  [
+   "backend/shield/__init__.py",
+   240
+  ],
+  [
    "backend/shield/__init__.py",
    293
+  ],
+  [
+   "backend/shield/__init__.py",
+   314
+  ],
+  [
+   "backend/shield/__init__.py",
+   341
   ],
   [
    "backend/shield/__init__.py",
@@ -1463,6 +2063,18 @@
   [
    "backend/shield/__init__.py",
    434
+  ],
+  [
+   "backend/shield/__init__.py",
+   520
+  ],
+  [
+   "backend/shield/analyze.py",
+   25
+  ],
+  [
+   "backend/shield/analyze.py",
+   88
   ],
   [
    "backend/shield/analyze.py",
@@ -1506,11 +2118,27 @@
   ],
   [
    "backend/shield/config.py",
+   13
+  ],
+  [
+   "backend/shield/config.py",
    69
   ],
   [
    "backend/shield/doc_kind.py",
    21
+  ],
+  [
+   "backend/shield/doc_kind.py",
+   27
+  ],
+  [
+   "backend/shield/doc_kind.py",
+   32
+  ],
+  [
+   "backend/shield/doc_kind.py",
+   33
   ],
   [
    "backend/shield/document.py",
@@ -1526,7 +2154,15 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   75
+  ],
+  [
+   "backend/shield/docx_scan.py",
    84
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   93
   ],
   [
    "backend/shield/docx_scan.py",
@@ -1550,6 +2186,10 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   123
+  ],
+  [
+   "backend/shield/docx_scan.py",
    125
   ],
   [
@@ -1562,7 +2202,15 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   137
+  ],
+  [
+   "backend/shield/docx_scan.py",
    147
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   152
   ],
   [
    "backend/shield/docx_scan.py",
@@ -1606,11 +2254,19 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   233
+  ],
+  [
+   "backend/shield/docx_scan.py",
    242
   ],
   [
    "backend/shield/docx_scan.py",
    243
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   250
   ],
   [
    "backend/shield/docx_scan.py",
@@ -1626,11 +2282,23 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   271
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   282
+  ],
+  [
+   "backend/shield/docx_scan.py",
    284
   ],
   [
    "backend/shield/docx_scan.py",
    286
+  ],
+  [
+   "backend/shield/errors.py",
+   8
   ],
   [
    "backend/shield/evaluate.py",
@@ -1650,6 +2318,10 @@
   ],
   [
    "backend/shield/extract.py",
+   80
+  ],
+  [
+   "backend/shield/extract.py",
    120
   ],
   [
@@ -1662,7 +2334,15 @@
   ],
   [
    "backend/shield/extract.py",
+   129
+  ],
+  [
+   "backend/shield/extract.py",
    212
+  ],
+  [
+   "backend/shield/extract.py",
+   222
   ],
   [
    "backend/shield/fonts.py",
@@ -1682,6 +2362,10 @@
   ],
   [
    "backend/shield/fonts.py",
+   50
+  ],
+  [
+   "backend/shield/fonts.py",
    54
   ],
   [
@@ -1690,11 +2374,19 @@
   ],
   [
    "backend/shield/fonts.py",
+   69
+  ],
+  [
+   "backend/shield/fonts.py",
    76
   ],
   [
    "backend/shield/fonts.py",
    80
+  ],
+  [
+   "backend/shield/fonts.py",
+   88
   ],
   [
    "backend/shield/fonts.py",
@@ -1714,6 +2406,10 @@
   ],
   [
    "backend/shield/geometry.py",
+   50
+  ],
+  [
+   "backend/shield/geometry.py",
    55
   ],
   [
@@ -1722,7 +2418,15 @@
   ],
   [
    "backend/shield/geometry.py",
+   68
+  ],
+  [
+   "backend/shield/geometry.py",
    73
+  ],
+  [
+   "backend/shield/geometry.py",
+   93
   ],
   [
    "backend/shield/hygiene.py",
@@ -1743,6 +2447,10 @@
   [
    "backend/shield/lines.py",
    82
+  ],
+  [
+   "backend/shield/lines.py",
+   84
   ],
   [
    "backend/shield/lines.py",
@@ -1794,6 +2502,14 @@
   ],
   [
    "backend/shield/lines.py",
+   167
+  ],
+  [
+   "backend/shield/lines.py",
+   168
+  ],
+  [
+   "backend/shield/lines.py",
    179
   ],
   [
@@ -1810,11 +2526,27 @@
   ],
   [
    "backend/shield/lines.py",
+   188
+  ],
+  [
+   "backend/shield/lines.py",
    190
   ],
   [
    "backend/shield/lines.py",
    192
+  ],
+  [
+   "backend/shield/lines.py",
+   197
+  ],
+  [
+   "backend/shield/lines.py",
+   199
+  ],
+  [
+   "backend/shield/lines.py",
+   200
   ],
   [
    "backend/shield/lines.py",
@@ -1878,7 +2610,15 @@
   ],
   [
    "backend/shield/linkcheck.py",
+   120
+  ],
+  [
+   "backend/shield/linkcheck.py",
    121
+  ],
+  [
+   "backend/shield/metadata_scan.py",
+   32
   ],
   [
    "backend/shield/pdf_security.py",
@@ -1886,7 +2626,15 @@
   ],
   [
    "backend/shield/pdf_security.py",
+   26
+  ],
+  [
+   "backend/shield/pdf_security.py",
    52
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   70
   ],
   [
    "backend/shield/pdf_security.py",
@@ -1926,6 +2674,10 @@
   ],
   [
    "backend/shield/pdf_security.py",
+   190
+  ],
+  [
+   "backend/shield/pdf_security.py",
    193
   ],
   [
@@ -1935,6 +2687,18 @@
   [
    "backend/shield/pdf_security.py",
    198
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   208
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   214
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   218
   ],
   [
    "backend/shield/pdf_security.py",
@@ -1954,6 +2718,10 @@
   ],
   [
    "backend/shield/pdf_security.py",
+   259
+  ],
+  [
+   "backend/shield/pdf_security.py",
    269
   ],
   [
@@ -1967,6 +2735,14 @@
   [
    "backend/shield/pdf_security.py",
    300
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   310
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   347
   ],
   [
    "backend/shield/pdf_security.py",
@@ -1989,6 +2765,10 @@
    406
   ],
   [
+   "backend/shield/pdf_security.py",
+   414
+  ],
+  [
    "backend/shield/resume.py",
    106
   ],
@@ -1998,11 +2778,27 @@
   ],
   [
    "backend/shield/resume.py",
+   112
+  ],
+  [
+   "backend/shield/resume.py",
+   121
+  ],
+  [
+   "backend/shield/resume.py",
+   129
+  ],
+  [
+   "backend/shield/resume.py",
    174
   ],
   [
    "backend/shield/resume.py",
    175
+  ],
+  [
+   "backend/shield/resume.py",
+   187
   ],
   [
    "backend/shield/resume.py",
@@ -2015,6 +2811,14 @@
   [
    "backend/shield/resume.py",
    208
+  ],
+  [
+   "backend/shield/resume.py",
+   210
+  ],
+  [
+   "backend/shield/resume.py",
+   212
   ],
   [
    "backend/shield/resume.py",
@@ -2058,6 +2862,10 @@
   ],
   [
    "backend/shield/resume.py",
+   277
+  ],
+  [
+   "backend/shield/resume.py",
    279
   ],
   [
@@ -2071,6 +2879,10 @@
   [
    "backend/shield/resume.py",
    326
+  ],
+  [
+   "backend/shield/resume.py",
+   327
   ],
   [
    "backend/shield/resume.py",
@@ -2126,6 +2938,10 @@
   ],
   [
    "backend/shield/structure.py",
+   106
+  ],
+  [
+   "backend/shield/structure.py",
    111
   ],
   [
@@ -2147,6 +2963,10 @@
   [
    "backend/shield/structure.py",
    121
+  ],
+  [
+   "backend/shield/structure.py",
+   124
   ],
   [
    "backend/shield/structure.py",
@@ -2202,6 +3022,10 @@
   ],
   [
    "backend/shield/structure.py",
+   188
+  ],
+  [
+   "backend/shield/structure.py",
    191
   ],
   [
@@ -2215,6 +3039,10 @@
   [
    "backend/shield/structure.py",
    207
+  ],
+  [
+   "backend/shield/structure.py",
+   209
   ],
   [
    "backend/shield/structure.py",
@@ -2258,6 +3086,14 @@
   ],
   [
    "backend/shield/structure.py",
+   296
+  ],
+  [
+   "backend/shield/structure.py",
+   298
+  ],
+  [
+   "backend/shield/structure.py",
    299
   ],
   [
@@ -2266,11 +3102,23 @@
   ],
   [
    "backend/shield/structure.py",
+   306
+  ],
+  [
+   "backend/shield/structure.py",
    307
   ],
   [
    "backend/shield/structure.py",
    311
+  ],
+  [
+   "backend/shield/structure.py",
+   312
+  ],
+  [
+   "backend/shield/structure.py",
+   315
   ],
   [
    "backend/shield/structure.py",
@@ -2330,6 +3178,10 @@
   ],
   [
    "backend/shield/structure.py",
+   384
+  ],
+  [
+   "backend/shield/structure.py",
    390
   ],
   [
@@ -2343,6 +3195,10 @@
   [
    "backend/shield/structure.py",
    398
+  ],
+  [
+   "backend/shield/structure.py",
+   400
   ],
   [
    "backend/shield/structure.py",
@@ -2378,6 +3234,10 @@
   ],
   [
    "backend/shield/structure.py",
+   428
+  ],
+  [
+   "backend/shield/structure.py",
    429
   ],
   [
@@ -2398,6 +3258,10 @@
   ],
   [
    "backend/shield/structure.py",
+   475
+  ],
+  [
+   "backend/shield/structure.py",
    476
   ],
   [
@@ -2415,6 +3279,14 @@
   [
    "backend/shield/structure.py",
    533
+  ],
+  [
+   "backend/shield/structure.py",
+   540
+  ],
+  [
+   "backend/shield/structure.py",
+   548
   ],
   [
    "backend/shield/structure.py",
@@ -2443,6 +3315,10 @@
   [
    "backend/shield/structure.py",
    602
+  ],
+  [
+   "backend/shield/structure.py",
+   603
   ],
   [
    "backend/shield/structure.py",
@@ -2514,6 +3390,10 @@
   ],
   [
    "backend/verdicts/__init__.py",
+   164
+  ],
+  [
+   "backend/verdicts/__init__.py",
    166
   ],
   [
@@ -2542,11 +3422,23 @@
   ],
   [
    "backend/verdicts/__init__.py",
+   208
+  ],
+  [
+   "backend/verdicts/__init__.py",
    217
+  ],
+  [
+   "backend/verdicts/__init__.py",
+   520
   ],
   [
    "backend/verdicts/config.py",
    69
+  ],
+  [
+   "backend/verdicts/judge.py",
+   19
   ],
   [
    "backend/verdicts/judge.py",
@@ -2555,6 +3447,10 @@
   [
    "backend/verdicts/matrix.py",
    90
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   91
   ],
   [
    "backend/verdicts/matrix.py",
@@ -2578,6 +3474,14 @@
   ],
   [
    "backend/verdicts/matrix.py",
+   141
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   172
+  ],
+  [
+   "backend/verdicts/matrix.py",
    174
   ],
   [
@@ -2590,11 +3494,31 @@
   ],
   [
    "backend/verdicts/matrix.py",
+   183
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   185
+  ],
+  [
+   "backend/verdicts/matrix.py",
    193
   ],
   [
    "backend/verdicts/matrix.py",
+   194
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   207
+  ],
+  [
+   "backend/verdicts/matrix.py",
    212
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   213
   ],
   [
    "backend/verdicts/matrix.py",
@@ -2613,6 +3537,10 @@
    223
   ],
   [
+   "scripts/analyze.py",
+   39
+  ],
+  [
    "scripts/doc_eval.py",
    92
   ],
@@ -2621,15 +3549,67 @@
    31
   ],
   [
+   "src/billing/ledger.py",
+   1
+  ],
+  [
+   "src/cache.py",
+   1
+  ],
+  [
+   "src/cache.py",
+   4
+  ],
+  [
+   "tests/test_concurrency.py",
+   45
+  ],
+  [
+   "tests/test_concurrency.py",
+   88
+  ],
+  [
+   "tests/test_document.py",
+   22
+  ],
+  [
    "tests/test_document.py",
    54
   ],
   [
    "tests/test_document.py",
    55
+  ],
+  [
+   "tests/test_evidence.py",
+   9
+  ],
+  [
+   "tests/test_os_components.py",
+   94
+  ],
+  [
+   "tests/test_os_components.py",
+   302
+  ],
+  [
+   "tests/test_os_request_pipeline.py",
+   152
+  ],
+  [
+   "workload/workload_generator.py",
+   4
   ]
  ],
  "texts": [
+  [
+   "backend/claims/config.py",
+   "guarantee always never fully"
+  ],
+  [
+   "backend/claims/ensemble.py",
+   "\"reason\": samples[0].get(\"reason\")}"
+  ],
   [
    "backend/claims/ensemble.py",
    "first = samples[0].get(\"clarified_text\")"
@@ -2655,12 +3635,24 @@
    "return {\"verdict\": REFUSED, \"clarified_text\": None, \"unanimous\": True,"
   ],
   [
+   "backend/claims/ensemble.py",
+   "return {\"verdict\": RESOLVED, \"clarified_text\": first, \"unanimous\": True, \"failed_referent\": None,"
+  ],
+  [
    "backend/claims/entries.py",
    "if kind == \"entry_heading\":"
   ],
   [
    "backend/claims/entries.py",
+   "if not t or t.endswith((\".\", \"!\", \"?\")) or len(t.split()) > MAX_ENTRY_WORDS or verbs.has_verb(t, source=True):"
+  ],
+  [
+   "backend/claims/entries.py",
    "t = (text or \"\").strip()"
+  ],
+  [
+   "backend/claims/guards.py",
+   "def content_words(text: str) -> list[str]:"
   ],
   [
    "backend/claims/guards.py",
@@ -2696,7 +3688,19 @@
   ],
   [
    "backend/claims/pipeline.py",
+   "cu.dropped_claims.append(c[\"text\"])"
+  ],
+  [
+   "backend/claims/pipeline.py",
+   "cu.dropped_text = r.data.get(\"dropped_text\")"
+  ],
+  [
+   "backend/claims/pipeline.py",
    "f\"the unit states no verb{amb}, but the claim {fab[0]!r} asserts one\")"
+  ],
+  [
+   "backend/claims/pipeline.py",
+   "f\"{' '.join(u.text.split())[:160]!r}: it names an activity, it does not state that it was done\"))"
   ],
   [
    "backend/claims/pipeline.py",
@@ -2712,6 +3716,10 @@
   ],
   [
    "backend/claims/pipeline.py",
+   "if leak:"
+  ],
+  [
+   "backend/claims/pipeline.py",
    "if missing:"
   ],
   [
@@ -2721,6 +3729,10 @@
   [
    "backend/claims/pipeline.py",
    "if not self.derivable(u, cu, c[\"text\"] + \" \" + \" \".join(c.get(\"qualifiers\") or []), source, \"decomposition\","
+  ],
+  [
+   "backend/claims/pipeline.py",
+   "if person and attribution.names_another(person, self.candidate):  # Stage 1: not the candidate's work"
   ],
   [
    "backend/claims/pipeline.py",
@@ -2756,6 +3768,10 @@
   ],
   [
    "backend/claims/pipeline.py",
+   "items = skills.split_items(self.text, u.start, u.end)"
+  ],
+  [
+   "backend/claims/pipeline.py",
    "lines, pos = [], 0"
   ],
   [
@@ -2776,7 +3792,15 @@
   ],
   [
    "backend/claims/pipeline.py",
+   "return json.dumps(entries, sort_keys=True, ensure_ascii=False, indent=1) + \"\\n\""
+  ],
+  [
+   "backend/claims/pipeline.py",
    "return text[:SHIELD_SPAN_CAP], len(text) > SHIELD_SPAN_CAP"
+  ],
+  [
+   "backend/claims/pipeline.py",
+   "self.counters[\"bare_date_claims_dropped\"] += 1"
   ],
   [
    "backend/claims/pipeline.py",
@@ -2792,7 +3816,23 @@
   ],
   [
    "backend/claims/pipeline.py",
+   "self.fail(u, stage, *hit)"
+  ],
+  [
+   "backend/claims/pipeline.py",
    "self.key_orders.append(r.key_order == list(stages.schema_for(name, self.reason_first)[\"properties\"]))"
+  ],
+  [
+   "backend/claims/pipeline.py",
+   "why_not_checkable=rt[\"why_not_checkable\"], checkability_note=rt[\"checkability_note\"], decomposition_tier=\"deterministic\","
+  ],
+  [
+   "backend/claims/routing.py",
+   "OSDBMS phase-II report: 22 such claims were 'other', so never searched.\"\"\""
+  ],
+  [
+   "backend/claims/routing.py",
+   "def _concept_kind(claim_text: str) -> str | None:"
   ],
   [
    "backend/claims/routing.py",
@@ -2809,6 +3849,10 @@
   [
    "backend/claims/routing.py",
    "label = _LABEL_PREFIX.match(unit_text or \"\")"
+  ],
+  [
+   "backend/claims/routing.py",
+   "r\"endpoints|modules|tables|files|packages|libraries|servers|nodes|clusters|pipelines)\\b\")),"
   ],
   [
    "backend/claims/routing.py",
@@ -2837,6 +3881,14 @@
   [
    "backend/claims/skills.py",
    "depth += 1"
+  ],
+  [
+   "backend/claims/skills.py",
+   "if any(SKILLS_HEADING.search(h) for h in headings):"
+  ],
+  [
+   "backend/claims/skills.py",
+   "if len(seg.split()) > MAX_ITEM_WORDS:"
   ],
   [
    "backend/claims/skills.py",
@@ -2876,6 +3928,10 @@
   ],
   [
    "backend/claims/split.py",
+   "if m:"
+  ],
+  [
+   "backend/claims/split.py",
    "if not u.context_before and i > 0 and units[i - 1].section == u.section:"
   ],
   [
@@ -2888,7 +3944,15 @@
   ],
   [
    "backend/claims/split.py",
+   "list_glyph = None if not prev or not prev[\"bullet\"] else list_glyph"
+  ],
+  [
+   "backend/claims/split.py",
    "n = 0"
+  ],
+  [
+   "backend/claims/split.py",
+   "parent_id, parent_text = (last_parent if g[\"bullet\"] and g[\"level\"] == 2 and last_parent else (None, None))"
   ],
   [
    "backend/claims/split.py",
@@ -2920,11 +3984,19 @@
   ],
   [
    "backend/claims/support.py",
+   "if i + n <= len(words):"
+  ],
+  [
+   "backend/claims/support.py",
    "if i in used or not w[:1].isupper() or w.casefold() in STOPWORDS or w[:1].isdigit() or w.casefold().rstrip(\".\") in _CALENDAR:"
   ],
   [
    "backend/claims/support.py",
    "return round(fuzz.token_set_ratio(\" \".join(c), \" \".join(s)) / 100, 4) if c else 0.0"
+  ],
+  [
+   "backend/claims/verbs.py",
+   "def is_fragment(text: str) -> bool:"
   ],
   [
    "backend/claims/verbs.py",
@@ -2948,11 +4020,43 @@
   ],
   [
    "backend/contracts.py",
+   "\"contact_info\", \"cost_cap\", \"model_unavailable\", \"list_cap\", \"fabricated_assertion\","
+  ],
+  [
+   "backend/contracts.py",
+   "* Prefix lock-in: told the honest verdict is \"unclear\" but offered only supported | unsupported |"
+  ],
+  [
+   "backend/contracts.py",
+   "* The generated value can be the minority: offered \"unclear\", nano generated it at p=0.302 while \"unsupported\" held"
+  ],
+  [
+   "backend/contracts.py",
+   "arxiv_ids: list[str]"
+  ],
+  [
+   "backend/contracts.py",
+   "class SecurityFinding(CrucibleModel):"
+  ],
+  [
+   "backend/contracts.py",
    "if self.location_kind != \"page\" and self.page == 0:"
   ],
   [
    "backend/contracts.py",
+   "retrieval_version: str"
+  ],
+  [
+   "backend/contracts.py",
    "self.location_kind = \"metadata\" if m == \"metadata\" else (\"docx_run\" if m.startswith(\"docx\") else \"page\")"
+  ],
+  [
+   "backend/contracts.py",
+   "self.location_kind = \"page\" if self.page else \"document\""
+  ],
+  [
+   "backend/evidence/__init__.py",
+   "and size <= config.MAX_BLAME_FILE_BYTES and path in text):"
   ],
   [
    "backend/evidence/__init__.py",
@@ -2968,6 +4072,10 @@
   ],
   [
    "backend/evidence/__init__.py",
+   "empty_lines=blame.counted(\"empty\") if measured else None,"
+  ],
+  [
+   "backend/evidence/__init__.py",
    "excluded.append((path, raw.get(path, 0), reason))"
   ],
   [
@@ -2977,6 +4085,10 @@
   [
    "backend/evidence/__init__.py",
    "if (authorship_only is not None and reason == ex.VENDORED_PATH and ex.authorship_only(path, attrs) and 0 < size"
+  ],
+  [
+   "backend/evidence/__init__.py",
+   "if (meta.get(\"size\") or 0) > config.MAX_REPO_MB * 1024:"
   ],
   [
    "backend/evidence/__init__.py",
@@ -2996,6 +4108,10 @@
   ],
   [
    "backend/evidence/__init__.py",
+   "if owned is None or is_fork is None:"
+  ],
+  [
+   "backend/evidence/__init__.py",
    "if p.is_absolute() or \"..\" in p.parts or not p.parts:"
   ],
   [
@@ -3005,6 +4121,14 @@
   [
    "backend/evidence/__init__.py",
    "if size > config.MAX_REPO_MB:"
+  ],
+  [
+   "backend/evidence/__init__.py",
+   "largest_commit_share=round(share, 6) if share is not None else None,"
+  ],
+  [
+   "backend/evidence/__init__.py",
+   "owned = (owner.lower() == identity.login.lower()) if owner else None"
   ],
   [
    "backend/evidence/__init__.py",
@@ -3028,11 +4152,23 @@
   ],
   [
    "backend/evidence/authorship.py",
+   "authored_ratio_meaningful=level != \"none\" and headline is not None,"
+  ],
+  [
+   "backend/evidence/authorship.py",
    "authors = history.get(\"distinct_author_count\") or 0"
   ],
   [
    "backend/evidence/authorship.py",
    "days = history.get(\"span_days\") or 0.0"
+  ],
+  [
+   "backend/evidence/authorship.py",
+   "def canonical_identity_emails(identity: IdentitySet, mailmap_text: str) -> set[str]:"
+  ],
+  [
+   "backend/evidence/authorship.py",
+   "delta_total = delta_authored = 0"
   ],
   [
    "backend/evidence/authorship.py",
@@ -3044,11 +4180,23 @@
   ],
   [
    "backend/evidence/authorship.py",
+   "hot.append(HotFile(path=path, authored_lines=f_auth, total_lines=f_total, ratio=round(f_auth / f_total, 4)))"
+  ],
+  [
+   "backend/evidence/authorship.py",
    "if authors <= 1:"
   ],
   [
    "backend/evidence/authorship.py",
+   "if authors == 1 and span_s < HOUR:"
+  ],
+  [
+   "backend/evidence/authorship.py",
    "if days >= 7:"
+  ],
+  [
+   "backend/evidence/authorship.py",
+   "if fork_error is not None or fork_ahead is None:"
   ],
   [
    "backend/evidence/authorship.py",
@@ -3065,6 +4213,10 @@
   [
    "backend/evidence/authorship.py",
    "if n <= 1:"
+  ],
+  [
+   "backend/evidence/authorship.py",
+   "local = (email or \"\").split(\"@\", 1)[0].lower()"
   ],
   [
    "backend/evidence/authorship.py",
@@ -3104,11 +4256,23 @@
   ],
   [
    "backend/evidence/blame.py",
+   "if len(head) >= 3 and len(head[0]) in (40, 64) and all(c in b\"0123456789abcdef\" for c in head[0]):"
+  ],
+  [
+   "backend/evidence/blame.py",
    "if len(lines) != len(marks):"
   ],
   [
    "backend/evidence/blame.py",
    "if len(lines) > len(marks) and all(ln.blank for ln in extra):"
+  ],
+  [
+   "backend/evidence/blame.py",
+   "if ranges:"
+  ],
+  [
+   "backend/evidence/blame.py",
+   "if time.monotonic() > deadline:"
   ],
   [
    "backend/evidence/blame.py",
@@ -3120,7 +4284,27 @@
   ],
   [
    "backend/evidence/blame.py",
+   "return sum(f.source_lines for f in self.files)"
+  ],
+  [
+   "backend/evidence/blame.py",
+   "source = {i + 1 for i, m in enumerate(marks) if m in SOURCE_MARKS}"
+  ],
+  [
+   "backend/evidence/blame.py",
    "start, end = ranges[-1]"
+  ],
+  [
+   "backend/evidence/cache.py",
+   "\"\"\"On-disk cache of identity-free snapshots."
+  ],
+  [
+   "backend/evidence/cache.py",
+   "return h.hexdigest()[:16]"
+  ],
+  [
+   "backend/evidence/cache.py",
+   "ruleset version hashes everything that changes what is counted (the"
   ],
   [
    "backend/evidence/clone.py",
@@ -3144,11 +4328,19 @@
   ],
   [
    "backend/evidence/degraded.py",
+   "files_touched_truncated=n > len(detail),"
+  ],
+  [
+   "backend/evidence/degraded.py",
    "level = \"none\" if n <= 1 else \"low\""
   ],
   [
    "backend/evidence/dependencies.py",
    "line = line.split(\";\", 1)[0].strip()"
+  ],
+  [
+   "backend/evidence/dependencies.py",
+   "out += _deps(path, \"npm\", (data.get(section) or {}).items())"
   ],
   [
    "backend/evidence/exclusions.py",
@@ -3160,11 +4352,23 @@
   ],
   [
    "backend/evidence/exclusions.py",
+   "if ov.get(\"linguist-vendored\") is True or ov.get(\"linguist-generated\") is True:"
+  ],
+  [
+   "backend/evidence/exclusions.py",
    "if pat.endswith(\"/\"):"
   ],
   [
    "backend/evidence/exclusions.py",
    "if pat.endswith(\"/**\"):"
+  ],
+  [
+   "backend/evidence/exclusions.py",
+   "if tok.startswith((\"-\", \"!\")):"
+  ],
+  [
+   "backend/evidence/exclusions.py",
+   "return path.startswith(pat[:-3] + \"/\")"
   ],
   [
    "backend/evidence/exclusions.py",
@@ -3185,6 +4389,18 @@
   [
    "backend/evidence/functions.py",
    "if best is not None and best_cost is not None and best_cost < 1000:"
+  ],
+  [
+   "backend/evidence/functions.py",
+   "if best_cost is None or cost < best_cost:"
+  ],
+  [
+   "backend/evidence/functions.py",
+   "if f.end_line < span.start_line or f.start_line > span.end_line:"
+  ],
+  [
+   "backend/evidence/functions.py",
+   "if spec is None:"
   ],
   [
    "backend/evidence/functions.py",
@@ -3252,6 +4468,10 @@
   ],
   [
    "backend/evidence/github_client.py",
+   "next_url = m.group(1) if m else None"
+  ],
+  [
+   "backend/evidence/github_client.py",
    "page += 1"
   ],
   [
@@ -3280,6 +4500,10 @@
   ],
   [
    "backend/evidence/gitutil.py",
+   "chunk = proc.stdout.read(min(remaining, 65536))"
+  ],
+  [
+   "backend/evidence/gitutil.py",
    "if proc.returncode != 0:"
   ],
   [
@@ -3292,6 +4516,10 @@
   ],
   [
    "backend/evidence/identity.py",
+   "client = client or GitHubClient()"
+  ],
+  [
+   "backend/evidence/identity.py",
    "if evidence not in self.emails[key] and len(same_signal) < MAX_EVIDENCE_PER_SIGNAL:"
   ],
   [
@@ -3300,7 +4528,15 @@
   ],
   [
    "backend/evidence/identity.py",
+   "if not m:"
+  ],
+  [
+   "backend/evidence/identity.py",
    "same_signal = [e for e in self.emails[key] if e.split(\":\")[0] == evidence.split(\":\")[0]]"
+  ],
+  [
+   "backend/evidence/question_surface.py",
+   "\"OpenAI\": {\"deps\": (\"openai\",), \"imports\": (\"openai\",)},"
   ],
   [
    "backend/evidence/question_surface.py",
@@ -3336,6 +4572,14 @@
   ],
   [
    "backend/evidence/question_surface.py",
+   "if not lines:"
+  ],
+  [
+   "backend/evidence/question_surface.py",
+   "if not structure.get(\"ci_files\"):"
+  ],
+  [
+   "backend/evidence/question_surface.py",
    "if not structure.get(\"test_dirs\") and not structure.get(\"test_files\"):"
   ],
   [
@@ -3352,7 +4596,15 @@
   ],
   [
    "backend/evidence/repo_signals.py",
+   "committer dates to the rewrite time while author dates keep their spread."
+  ],
+  [
+   "backend/evidence/repo_signals.py",
    "committer_date_span_days=round(span(c_times), 3),"
+  ],
+  [
+   "backend/evidence/repo_signals.py",
+   "current += int(fields[0])"
   ],
   [
    "backend/evidence/repo_signals.py",
@@ -3372,6 +4624,10 @@
   ],
   [
    "backend/evidence/repo_signals.py",
+   "name_by_author={e: c.most_common(1)[0][0] for e, c in names.items()},"
+  ],
+  [
+   "backend/evidence/repo_signals.py",
    "return (c_span / a_span) < config.CLUSTER_SPAN_FRACTION, None"
   ],
   [
@@ -3385,6 +4641,14 @@
   [
    "backend/evidence/resolve.py",
    "from pydantic import BaseModel"
+  ],
+  [
+   "backend/evidence/resolve.py",
+   "if context == \"account\":"
+  ],
+  [
+   "backend/evidence/resolve.py",
+   "if len(candidates) == 1:"
   ],
   [
    "backend/evidence/resolve.py",
@@ -3404,6 +4668,10 @@
   ],
   [
    "backend/evidence/resolve.py",
+   "if not parts:"
+  ],
+  [
+   "backend/evidence/resolve.py",
    "if self.kind == \"repo\":"
   ],
   [
@@ -3412,11 +4680,19 @@
   ],
   [
    "backend/evidence/resolve.py",
+   "kind, tail = rest[0], rest[1:]"
+  ],
+  [
+   "backend/evidence/resolve.py",
    "owner, repo = segments[0], segments[1]"
   ],
   [
    "backend/evidence/resolve.py",
    "ref, scoped = candidates[0]"
+  ],
+  [
+   "backend/evidence/resolve.py",
+   "repo = repo[:-4]"
   ],
   [
    "backend/evidence/resolve.py",
@@ -3448,11 +4724,39 @@
   ],
   [
    "backend/evidence/snapshot.py",
+   "\"sha\": parts[0], \"author_time\": int(parts[1]), \"committer_time\": int(parts[2]),"
+  ],
+  [
+   "backend/evidence/snapshot.py",
    "\"single_commit_import\": (share > config.SINGLE_COMMIT_IMPORT_RATIO) if share is not None else None,"
   ],
   [
    "backend/evidence/snapshot.py",
+   "def extract_imports(path: str, text: str) -> list[str]:"
+  ],
+  [
+   "backend/evidence/snapshot.py",
    "for fc, (path, result, problem) in zip(ao, _blame_counted(repo, ao, deadline)):"
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   "if found:"
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   "if len(lines) != len(marks):"
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   "if len(lines) > len(marks) and all(ln.blank for ln in extra):"
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   "if len(parts) < 6:"
+  ],
+  [
+   "backend/evidence/snapshot.py",
+   "if scoped_path and not files:"
   ],
   [
    "backend/evidence/snapshot.py",
@@ -3476,6 +4780,10 @@
   ],
   [
    "backend/evidence/structure.py",
+   "test_files=sorted(p for p in paths if is_test_path(p))[:200],"
+  ],
+  [
+   "backend/evidence/structure.py",
    "top = sorted({PurePosixPath(p).parts[0] + \"/\" for p in paths if len(PurePosixPath(p).parts) > 1})"
   ],
   [
@@ -3492,7 +4800,15 @@
   ],
   [
    "backend/evidence/target.py",
+   "if head is None and size_kb == 0:"
+  ],
+  [
+   "backend/evidence/target.py",
    "if identity is None and unresolved is None:"
+  ],
+  [
+   "backend/evidence/target.py",
+   "if requested is not None and analyzed is not None and requested != analyzed:"
   ],
   [
    "backend/evidence/target.py",
@@ -3524,7 +4840,15 @@
   ],
   [
    "backend/evidence/target.py",
+   "source_full_name=(meta.get(\"source\") or {}).get(\"full_name\") if meta.get(\"fork\") else None,"
+  ],
+  [
+   "backend/evidence/target.py",
    "status = \"archived_ok\" if meta.get(\"archived\") else \"resolved\""
+  ],
+  [
+   "backend/evidence/target.py",
+   "top = [ExcludedFile(path=p, lines=n, reason=r) for p, n, r in sorted(excluded, key=lambda e: (-e[1], e[0]))]"
   ],
   [
    "backend/grounding/__init__.py",
@@ -3533,6 +4857,10 @@
   [
    "backend/grounding/__init__.py",
    "elif start is None or start < 1 or end < start or end > n:"
+  ],
+  [
+   "backend/grounding/__init__.py",
+   "elif verdict.verdict == \"supported\" and verdict.claim_kind == \"technology_use\":"
   ],
   [
    "backend/grounding/__init__.py",
@@ -3545,6 +4873,10 @@
   [
    "backend/grounding/__init__.py",
    "first = failed[0]"
+  ],
+  [
+   "backend/grounding/__init__.py",
+   "for c in CHECKS[1:]:"
   ],
   [
    "backend/grounding/__init__.py",
@@ -3584,6 +4916,10 @@
   ],
   [
    "backend/grounding/__init__.py",
+   "mine = sum(1 for a in source if a)"
+  ],
+  [
+   "backend/grounding/__init__.py",
    "present = view.in_snapshot(item.path) if view else None"
   ],
   [
@@ -3592,7 +4928,27 @@
   ],
   [
    "backend/grounding/html.py",
+   "'not read for claims, or its claims were not judged: absence from this report says nothing about it.</p></section>')"
+  ],
+  [
+   "backend/grounding/html.py",
    "+ (' <span class=\"muted\">(cited item)</span>' if r.get(\"claim_kind\") == \"technology_use\" else \"\") + '</div>',"
+  ],
+  [
+   "backend/grounding/html.py",
+   "def _mismatch(self) -> bool:"
+  ],
+  [
+   "backend/grounding/html.py",
+   "f'<div style=\"margin-top:4px\">confidence reason: {self.val(b + (\"authorship_confidence_reason\",))}</div>']"
+  ],
+  [
+   "backend/grounding/html.py",
+   "f'{self.val(b + (\"model_tier\",))} agreement {self.val(b + (\"agreement\",))}')"
+  ],
+  [
+   "backend/grounding/html.py",
+   "for j in range(len(e[\"top_excluded\"]))) + \"</ul>\")"
   ],
   [
    "backend/grounding/html.py",
@@ -3608,11 +4964,19 @@
   ],
   [
    "backend/grounding/html.py",
+   "ic = (\"header\", \"identity_check\")"
+  ],
+  [
+   "backend/grounding/html.py",
    "if a[\"kind\"] == \"function\":"
   ],
   [
    "backend/grounding/html.py",
    "if cand is None:"
+  ],
+  [
+   "backend/grounding/html.py",
+   "if e.get(\"top_excluded\"):"
   ],
   [
    "backend/grounding/html.py",
@@ -3660,6 +5024,10 @@
   ],
   [
    "backend/grounding/html.py",
+   "if tag in (\"br\", \"hr\", \"meta\", \"img\", \"input\", \"link\", \"path\", \"circle\", \"rect\", \"line\", \"polyline\"):"
+  ],
+  [
+   "backend/grounding/html.py",
    "if value is _MISSING or value is None:"
   ],
   [
@@ -3676,6 +5044,18 @@
   ],
   [
    "backend/grounding/html.py",
+   "out.append(\"</tbody></table></div></section>\")"
+  ],
+  [
+   "backend/grounding/html.py",
+   "out.append('<p class=\"warn small\">Possible identity gap: one unmatched author wrote most lines. The candidate may have '"
+  ],
+  [
+   "backend/grounding/html.py",
+   "out.append(f\"<dt>languages</dt><dd>{self.val(base + ('languages',))}</dd>\")"
+  ],
+  [
+   "backend/grounding/html.py",
    "out.append(f\"<dt>ref analysed</dt><dd><code>{self.val(base + ('ref',))}</code> at \""
   ],
   [
@@ -3684,11 +5064,27 @@
   ],
   [
    "backend/grounding/html.py",
+   "rc = self.get(\"header\", \"rejected_claims\") or []"
+  ],
+  [
+   "backend/grounding/html.py",
    "reason += (f'<div class=\"small\" style=\"margin-top:6px\">reason before grounding replaced it: '"
   ],
   [
    "backend/grounding/html.py",
+   "reason += f'<div class=\"small muted\" style=\"margin-top:6px\">model\\'s reading of the evidence: {self.val(b + (\"content_reason\",))}</div>'"
+  ],
+  [
+   "backend/grounding/html.py",
    "refs = self.get(\"header\", \"references\") or []"
+  ],
+  [
+   "backend/grounding/html.py",
+   "return \", \".join(str(x) for x in v) if v else \"none\""
+  ],
+  [
+   "backend/grounding/html.py",
+   "return f\"<tr>{claim}{''.join(verdict)}{reason}{cite}{auth}{ground}</tr>\""
   ],
   [
    "backend/grounding/html.py",
@@ -3700,7 +5096,15 @@
   ],
   [
    "backend/grounding/html.py",
+   "sev = f\" \u00b7 severity {self.val(ib + ('severity',))}\" if it.get(\"severity\") else \"\""
+  ],
+  [
+   "backend/grounding/html.py",
    "verdict.append(f'decided by code, no model: <code>{self.val(b + (\"matrix_row\",))}</code>')"
+  ],
+  [
+   "backend/grounding/report.py",
+   "\"model_requests\": run.calls if run is not None else None,"
   ],
   [
    "backend/grounding/report.py",
@@ -3708,7 +5112,27 @@
   ],
   [
    "backend/grounding/report.py",
+   "\"skip_reason\": es.skip_reason, \"source\": \"4B\"} for es in evidence_sets if not es.retrieval_performed]"
+  ],
+  [
+   "backend/grounding/report.py",
+   "authorship_confidence_reason=ra.authorship_confidence_reason if ra else None,"
+  ],
+  [
+   "backend/grounding/report.py",
+   "c = run.counters if run is not None else None"
+  ],
+  [
+   "backend/grounding/report.py",
    "citation=citation, authored_by_candidate=item.authored_by_candidate if item else None,"
+  ],
+  [
+   "backend/grounding/report.py",
+   "def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, grounding_failures=None, run=None,"
+  ],
+  [
+   "backend/grounding/report.py",
+   "excluded.append({\"repo\": rf.full_name, \"files_by_reason\": {k: n for k, n in rf.excluded_files_by_reason.items() if n},"
   ],
   [
    "backend/grounding/report.py",
@@ -3736,6 +5160,10 @@
   ],
   [
    "backend/llm.py",
+   "\"claim_disambiguation\": \"ultra\",  # Phase 4A C1: ensemble unanimity 6/6 ultra, 5/6 super, 1/6 nano (provisional)"
+  ],
+  [
+   "backend/llm.py",
    "def expand(k, prefix, logp, first):"
   ],
   [
@@ -3745,6 +5173,10 @@
   [
    "backend/llm.py",
    "elif tok == gen_tok and k + 1 < len(tokens):"
+  ],
+  [
+   "backend/llm.py",
+   "except LLMUnavailableError as exc:"
   ],
   [
    "backend/llm.py",
@@ -3768,6 +5200,10 @@
   ],
   [
    "backend/llm.py",
+   "key, expecting_key = None, False"
+  ],
+  [
+   "backend/llm.py",
    "lead = tokens[i][\"token\"][: offset - starts[i]]"
   ],
   [
@@ -3788,7 +5224,19 @@
   ],
   [
    "backend/questions/__init__.py",
+   "anchor = QuestionAnchor(kind=\"claim\", artifact=_artifact(row) if ask_as == \"contradicted\" else None)"
+  ],
+  [
+   "backend/questions/__init__.py",
    "ask_as = \"contradicted\" if near_miss else verdict"
+  ],
+  [
+   "backend/questions/__init__.py",
+   "continue"
+  ],
+  [
+   "backend/questions/__init__.py",
+   "files.insert(0, cite[\"path\"])"
   ],
   [
    "backend/questions/__init__.py",
@@ -3801,6 +5249,10 @@
   [
    "backend/questions/__init__.py",
    "if a.kind == \"function\":"
+  ],
+  [
+   "backend/questions/__init__.py",
+   "if best is None or key > best[0]:"
   ],
   [
    "backend/questions/__init__.py",
@@ -3820,7 +5272,19 @@
   ],
   [
    "backend/questions/__init__.py",
+   "if person is None:"
+  ],
+  [
+   "backend/questions/__init__.py",
+   "if person is not None and anchor is None:  # G6: a student's sheet holds only questions anchored in THEIR code"
+  ],
+  [
+   "backend/questions/__init__.py",
    "if row.get(\"claim_kind\") != \"technology_use\" or es is None:"
+  ],
+  [
+   "backend/questions/__init__.py",
+   "if row.get(\"claim_kind\") == \"ownership\" and cite.get(\"start_line\") and cite.get(\"path\") == f.path:"
   ],
   [
    "backend/questions/__init__.py",
@@ -3860,11 +5324,19 @@
   ],
   [
    "backend/questions/__init__.py",
+   "texts = {q.get(\"id\"): (q.get(\"question\") or \"\").strip() for q in ((r.get(\"data\") or {}).get(\"questions\") or [])}"
+  ],
+  [
+   "backend/questions/__init__.py",
    "view = next((v for v in views if v.full_name == a.repo), None)"
   ],
   [
    "backend/retrieval/__init__.py",
    "\"authored_files\": None if (unknown and not authored) else len(authored)}"
+  ],
+  [
+   "backend/retrieval/__init__.py",
+   "elif name == \"r_history\":"
   ],
   [
    "backend/retrieval/__init__.py",
@@ -3880,6 +5352,10 @@
   ],
   [
    "backend/retrieval/__init__.py",
+   "if kind == \"technology_use\":"
+  ],
+  [
+   "backend/retrieval/__init__.py",
    "mine = [it for it in items if it.rule == \"r_import\" and it.technology == tech and it.repo_full_name == view.full_name]"
   ],
   [
@@ -3887,8 +5363,16 @@
    "scope = c[\"scope\"] or scope_of(c[\"text\"] or \"\", kind)[0]"
   ],
   [
+   "backend/retrieval/__init__.py",
+   "unknown = any(it.authored_by_candidate is None for it in mine)"
+  ],
+  [
    "backend/retrieval/config.py",
    "return f\"{RETRIEVAL_VERSION_BASE}+{h.hexdigest()[:10]}\""
+  ],
+  [
+   "backend/retrieval/lexicon.py",
+   "d = pattern.rstrip(\"/\")"
   ],
   [
    "backend/retrieval/lexicon.py",
@@ -3897,6 +5381,10 @@
   [
    "backend/retrieval/lexicon.py",
    "if module == pre or module.startswith((pre + \".\", pre + \"/\", pre + \":\")):"
+  ],
+  [
+   "backend/retrieval/lexicon.py",
+   "m = rx.search(text or \"\")"
   ],
   [
    "backend/retrieval/lexicon.py",
@@ -3920,11 +5408,31 @@
   ],
   [
    "backend/retrieval/rules.py",
+   "for pat in entry[\"files\"]:"
+  ],
+  [
+   "backend/retrieval/rules.py",
+   "if best[0] < config.DEP_FUZZY_CUTOFF:"
+  ],
+  [
+   "backend/retrieval/rules.py",
    "if line is None:"
   ],
   [
    "backend/retrieval/rules.py",
+   "if not entry.get(\"code_artifacts\", True):"
+  ],
+  [
+   "backend/retrieval/rules.py",
    "if not keys:"
+  ],
+  [
+   "backend/retrieval/rules.py",
+   "if not lang:"
+  ],
+  [
+   "backend/retrieval/rules.py",
+   "if not pre:"
   ],
   [
    "backend/retrieval/rules.py",
@@ -3968,6 +5476,10 @@
   ],
   [
    "backend/retrieval/rules.py",
+   "overlap = (min(ce, last) - max(cs, first)).days + 1"
+  ],
+  [
+   "backend/retrieval/rules.py",
    "res.items.append(_item(view, path=path, kind=\"file_presence\", rule=\"r_ownership\", match=\"exact\" if score == 100 else \"fuzzy\","
   ],
   [
@@ -4008,11 +5520,19 @@
   ],
   [
    "backend/retrieval/sources.py",
+   "r = subprocess.run([\"git\", \"show\", f\"{self.head_sha}:{path}\"], cwd=self.checkout, capture_output=True, timeout=30)"
+  ],
+  [
+   "backend/retrieval/sources.py",
    "return (ratio or 0) > 0, ratio, gap"
   ],
   [
    "backend/retrieval/sources.py",
    "return {**self.counted, **self.authorship_only}"
+  ],
+  [
+   "backend/safety.py",
+   "(log.warning if \"ignored\" in why else log.info)(\"wrap_untrusted nonce mode: %s (%s)\", mode, why)"
   ],
   [
    "backend/safety.py",
@@ -4023,8 +5543,24 @@
    "if len(key) < MIN_KEY_BYTES:"
   ],
   [
+   "backend/safety.py",
+   "if not raw:"
+  ],
+  [
+   "backend/shield/__init__.py",
+   "clean              nothing found"
+  ],
+  [
    "backend/shield/__init__.py",
    "errors = errors if errors is not None else []"
+  ],
+  [
+   "backend/shield/__init__.py",
+   "from .geometry import Box, PageBoxes, detect_offpage, page_boxes"
+  ],
+  [
+   "backend/shield/__init__.py",
+   "if needs_review or any(f.severity in (\"medium\", \"high\") for f in findings):"
   ],
   [
    "backend/shield/__init__.py",
@@ -4036,11 +5572,23 @@
   ],
   [
    "backend/shield/__init__.py",
+   "import pypdfium2.raw as pdfium_c"
+  ],
+  [
+   "backend/shield/__init__.py",
    "needs_review = bool(errors) or bool(reasons)  # a partial or errored scan is never \"clean\""
   ],
   [
    "backend/shield/__init__.py",
+   "reasons = _char_reasons(c, measure.chars.get(pos), page_box)"
+  ],
+  [
+   "backend/shield/__init__.py",
    "return _guarded(Path(path), keep=True, with_fonts=with_fonts, max_seconds=max_seconds)"
+  ],
+  [
+   "backend/shield/__init__.py",
+   "sum(1 for c in chars if c.unmapped), images, paths)"
   ],
   [
    "backend/shield/analyze.py",
@@ -4053,6 +5601,10 @@
   [
    "backend/shield/analyze.py",
    "ex = errors.run(\"structure\", lambda: structure.extract(str(path), shield.pages, link_obs, text_pages, deadline)) if text_pages else None"
+  ],
+  [
+   "backend/shield/analyze.py",
+   "from . import ShieldEncryptedError, ShieldError, rollup_status, scan_pdf_detailed"
   ],
   [
    "backend/shield/analyze.py",
@@ -4076,6 +5628,10 @@
   ],
   [
    "backend/shield/analyze.py",
+   "new_ex = structure.Extracted(merged, full_text, units, {}, ex.mojibake_fixed if ex else False, ex.text_pages if ex else [],"
+  ],
+  [
+   "backend/shield/analyze.py",
    "quality = ExtractionQuality(chars_total=total if text_pages else None, chars_unmapped_ratio=ratio,"
   ],
   [
@@ -4084,7 +5640,23 @@
   ],
   [
    "backend/shield/config.py",
+   "# Rendered size in points at or below which text is flagged (INCLUSIVE)."
+  ],
+  [
+   "backend/shield/config.py",
    "TABLE_MIN_NONEMPTY = 0.6  # fraction of non-empty cells"
+  ],
+  [
+   "backend/shield/doc_kind.py",
+   "elif landscape and body is not None and body >= config.SLIDE_MIN_BODY_SIZE and n <= config.SLIDE_MAX_CHARS:"
+  ],
+  [
+   "backend/shield/doc_kind.py",
+   "kind = \"image_only\" if pd.images > 0 else \"blank\""
+  ],
+  [
+   "backend/shield/doc_kind.py",
+   "shown = [c for c in pd.chars if not c.is_generated and c.text.isprintable() and c.index not in pd.hidden]"
   ],
   [
    "backend/shield/doc_kind.py",
@@ -4120,6 +5692,10 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   "if c is not None and c.rgb is not None:"
+  ],
+  [
+   "backend/shield/docx_scan.py",
    "if child.tag != f\"{W}p\":"
   ],
   [
@@ -4128,11 +5704,31 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   "if colour is not None and not shaded and _lum_dist(colour, self.background) <= config.BG_MATCH_DIST:"
+  ],
+  [
+   "backend/shield/docx_scan.py",
    "if cur and cur[-1][1] == raw_reasons:"
   ],
   [
    "backend/shield/docx_scan.py",
+   "if has_hidden_unicode(raw):  # detect on RAW text before ftfy/cleaning erases the evidence"
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   "if id(cell._tc) in seen:  # merged cell repeated by python-docx"
+  ],
+  [
+   "backend/shield/docx_scan.py",
    "if len(infos) > config.DOCX_MAX_MEMBERS or total > config.DOCX_MAX_UNCOMPRESSED_MB * 1_048_576:"
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   "if level is not None and len(text) <= 200:"
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   "if low.endswith(\"vbaproject.bin\"):"
   ],
   [
    "backend/shield/docx_scan.py",
@@ -4141,6 +5737,10 @@
   [
    "backend/shield/docx_scan.py",
    "if name == \"title\":"
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   "if not text.strip():"
   ],
   [
    "backend/shield/docx_scan.py",
@@ -4180,11 +5780,19 @@
   ],
   [
    "backend/shield/docx_scan.py",
+   "return 1"
+  ],
+  [
+   "backend/shield/docx_scan.py",
    "return int(m.group(1))"
   ],
   [
    "backend/shield/docx_scan.py",
    "return sum(abs(a - b) for a, b in zip(rgb, bg))"
+  ],
+  [
+   "backend/shield/docx_scan.py",
+   "self.background = tuple(int(fill[i:i + 2], 16) for i in (0, 2, 4)) if fill and re.fullmatch(r\"[0-9A-Fa-f]{6}\", fill) else (255, 255, 255)"
   ],
   [
    "backend/shield/docx_scan.py",
@@ -4207,12 +5815,28 @@
    "units.append(structure.Unit(\"paragraph\", text, 1, float(len(units)), 0.0, [SimpleNamespace(text=text)]))"
   ],
   [
+   "backend/shield/errors.py",
+   "class ShieldEncryptedError(ShieldError):"
+  ],
+  [
    "backend/shield/extract.py",
    "counts = {\"image\": 0, \"path\": 0}"
   ],
   [
    "backend/shield/extract.py",
+   "elif kind == pdfium_c.FPDF_PAGEOBJ_FORM:"
+  ],
+  [
+   "backend/shield/extract.py",
+   "if n <= 0:"
+  ],
+  [
+   "backend/shield/extract.py",
    "n = pdfium_c.FPDFText_GetFontInfo(tp, i, None, 0, ctypes.byref(flags))"
+  ],
+  [
+   "backend/shield/extract.py",
+   "rotated = 0.2 < angle < 3.141592653589793 - 0.2"
   ],
   [
    "backend/shield/extract.py",
@@ -4240,7 +5864,15 @@
   ],
   [
    "backend/shield/fonts.py",
+   "counts[c.font_name] = counts.get(c.font_name, 0) + 1"
+  ],
+  [
+   "backend/shield/fonts.py",
    "embedded_by_name[name] = sub == \"/Type3\" or any(k in desc for k in (\"/FontFile\", \"/FontFile2\", \"/FontFile3\"))"
+  ],
+  [
+   "backend/shield/fonts.py",
+   "fonts = (page.get(\"/Resources\") or {}).get(\"/Font\") if page.get(\"/Resources\") is not None else None"
   ],
   [
    "backend/shield/fonts.py",
@@ -4249,6 +5881,10 @@
   [
    "backend/shield/fonts.py",
    "if body is None or abs(ln.size - body) > BODY_SIZE_TOLERANCE_PT:"
+  ],
+  [
+   "backend/shield/fonts.py",
+   "if len(fams) >= 2:"
   ],
   [
    "backend/shield/fonts.py",
@@ -4272,7 +5908,19 @@
   ],
   [
    "backend/shield/geometry.py",
+   "continue"
+  ],
+  [
+   "backend/shield/geometry.py",
    "l, bt, r, t = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])"
+  ],
+  [
+   "backend/shield/geometry.py",
+   "return (l, bt, r, t) if r > l and t > bt else None"
+  ],
+  [
+   "backend/shield/geometry.py",
+   "return not c.is_generated and r > l and t > b"
   ],
   [
    "backend/shield/geometry.py",
@@ -4292,11 +5940,31 @@
   ],
   [
    "backend/shield/lines.py",
+   "centre = size = 0.0"
+  ],
+  [
+   "backend/shield/lines.py",
+   "centre, size = ymid, sz"
+  ],
+  [
+   "backend/shield/lines.py",
+   "clusters: list[list] = []"
+  ],
+  [
+   "backend/shield/lines.py",
+   "def build_lines(pd, chars: list[CharInfo] | None = None) -> list[Line]:"
+  ],
+  [
+   "backend/shield/lines.py",
    "elif d[0] - prev[1][2] > WORD_GAP_EM * max(c.font_size, 1):"
   ],
   [
    "backend/shield/lines.py",
    "elif gap > WORD_GAP_EM * med and c.text != \" \" and not (segs[-1] and segs[-1][-1].endswith(\" \")):"
+  ],
+  [
+   "backend/shield/lines.py",
+   "else:"
   ],
   [
    "backend/shield/lines.py",
@@ -4336,7 +6004,15 @@
   ],
   [
    "backend/shield/lines.py",
+   "if prev.hyphen_end and ln.text[:1].islower():"
+  ],
+  [
+   "backend/shield/lines.py",
    "if rot == 180:"
+  ],
+  [
+   "backend/shield/lines.py",
+   "if rot == 270:"
   ],
   [
    "backend/shield/lines.py",
@@ -4349,6 +6025,18 @@
   [
    "backend/shield/lines.py",
    "lines.append(Line(page=pd.page, text=\" \".join(seg_texts), x0=min(d[0] for _y, d, _c in cl),"
+  ],
+  [
+   "backend/shield/lines.py",
+   "med = statistics.median(sizes)"
+  ],
+  [
+   "backend/shield/lines.py",
+   "out += \"-\" + ln.text"
+  ],
+  [
+   "backend/shield/lines.py",
+   "out, prev = [], None"
   ],
   [
    "backend/shield/lines.py",
@@ -4368,11 +6056,19 @@
   ],
   [
    "backend/shield/lines.py",
+   "runs: list[Run] = []"
+  ],
+  [
+   "backend/shield/lines.py",
    "same_line = abs((d[1] + d[3]) / 2 - (prev[1][1] + prev[1][3]) / 2) < max(c.font_size, 1) * 0.8"
   ],
   [
    "backend/shield/lines.py",
    "size = max(size, sz) if n < 3 else statistics.median(cc.font_size for _y, _d, cc in clusters[-1])"
+  ],
+  [
+   "backend/shield/lines.py",
+   "text_parts: list[str] = []"
   ],
   [
    "backend/shield/lines.py",
@@ -4412,6 +6108,10 @@
   ],
   [
    "backend/shield/linkcheck.py",
+   "if len(parts) >= 2 and re.fullmatch(r\"[A-Za-z0-9._-]+\", parts[1]):"
+  ],
+  [
+   "backend/shield/linkcheck.py",
    "if not re.match(r\"(?i)^(https?://)?(www\\.)?github\\.com/\", url.strip()):"
   ],
   [
@@ -4437,6 +6137,10 @@
   [
    "backend/shield/linkcheck.py",
    "return (urlsplit(uri.strip()).hostname or \"\").lower() or None"
+  ],
+  [
+   "backend/shield/metadata_scan.py",
+   "class MetadataFinding:"
   ],
   [
    "backend/shield/pdf_security.py",
@@ -4468,7 +6172,15 @@
   ],
   [
    "backend/shield/pdf_security.py",
+   "evidence={\"revision_count\": len(markers), \"eof_offsets\": markers[:20], \"prev_links\": prev_links,"
+  ],
+  [
+   "backend/shield/pdf_security.py",
    "excerpt=_js_text(a)[:JS_EXCERPT_CHARS] if s == \"JavaScript\" else None)"
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   "facts = {\"has_form\": n_fields > 0, \"acroform_fields\": n_fields}"
   ],
   [
    "backend/shield/pdf_security.py",
@@ -4481,6 +6193,14 @@
   [
    "backend/shield/pdf_security.py",
    "from pypdf import PdfReader"
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   "from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject, PdfObject"
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   "hit(\"open_action\", action=s, excerpt=_js_text(act)[:JS_EXCERPT_CHARS] if s == \"JavaScript\" else None)"
   ],
   [
    "backend/shield/pdf_security.py",
@@ -4504,6 +6224,10 @@
   ],
   [
    "backend/shield/pdf_security.py",
+   "if not m:"
+  ],
+  [
+   "backend/shield/pdf_security.py",
    "if not r or len(r) < 4:"
   ],
   [
@@ -4520,6 +6244,10 @@
   ],
   [
    "backend/shield/pdf_security.py",
+   "if stream is None:"
+  ],
+  [
+   "backend/shield/pdf_security.py",
    "if sub == \"RichMedia\":"
   ],
   [
@@ -4532,7 +6260,19 @@
   ],
   [
    "backend/shield/pdf_security.py",
+   "return (int(declared) if declared is not None else len(raw) if not filters else None), head.hex(), len(raw), None"
+  ],
+  [
+   "backend/shield/pdf_security.py",
    "return kind, _file_spec(act.get(\"/F\") or act.get(\"/Win\"))"
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   "seen += 1"
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   "seen = 0"
   ],
   [
    "backend/shield/pdf_security.py",
@@ -4541,6 +6281,10 @@
   [
    "backend/shield/pdf_security.py",
    "while stack and n_fields < 5000:"
+  ],
+  [
+   "backend/shield/pdf_security.py",
+   "while todo and len(out) < MAX_ACTION_CHAIN:"
   ],
   [
    "backend/shield/pdf_security.py",
@@ -4576,11 +6320,23 @@
   ],
   [
    "backend/shield/resume.py",
+   "head = ex.full_text[:4000]"
+  ],
+  [
+   "backend/shield/resume.py",
    "if b and e.start and b[3] < b[0] and e.raw != e.start:"
   ],
   [
    "backend/shield/resume.py",
    "if canon not in found:"
+  ],
+  [
+   "backend/shield/resume.py",
+   "if i + n <= len(words):"
+  ],
+  [
+   "backend/shield/resume.py",
+   "if key not in seen:"
   ],
   [
    "backend/shield/resume.py",
@@ -4600,11 +6356,19 @@
   ],
   [
    "backend/shield/resume.py",
+   "if not any(a <= m.start() < b for a, b in spans):"
+  ],
+  [
+   "backend/shield/resume.py",
    "if ok and (ok.year, ok.month) == (y, mo):"
   ],
   [
    "backend/shield/resume.py",
    "if re.search(pat, ed.context, re.I) and _bounds(e)[1] < _bounds(ed)[2]:"
+  ],
+  [
+   "backend/shield/resume.py",
+   "if re.search(pat, title, re.I):"
   ],
   [
    "backend/shield/resume.py",
@@ -4628,6 +6392,10 @@
   ],
   [
    "backend/shield/resume.py",
+   "log.debug(\"contact block: %d emails, %d phones, %d urls\", len(emails), len(phones), len(urls))"
+  ],
+  [
+   "backend/shield/resume.py",
    "ok = [e for e in entries if _is_experience(e) and _full_time(e) and (b := _bounds(e)) and b[3] >= b[0]]"
   ],
   [
@@ -4640,11 +6408,19 @@
   ],
   [
    "backend/shield/resume.py",
+   "return TimelineEntry(raw=raw, start=s[0].isoformat(), end=e[1].isoformat(), start_precision=s[2], end_precision=e[2],"
+  ],
+  [
+   "backend/shield/resume.py",
    "return bool(e.section) and heading_kind(e.section) == \"experience\""
   ],
   [
    "backend/shield/resume.py",
    "return date(y, mo, 1), _last_day(y, mo), \"month\""
+  ],
+  [
+   "backend/shield/resume.py",
+   "return round(conf, 3), found"
   ],
   [
    "backend/shield/resume.py",
@@ -4668,7 +6444,35 @@
   ],
   [
    "backend/shield/structure.py",
+   "\"\"\"Top-to-bottom for single-column pages. For two columns, full-width lines act as separators and,"
+  ],
+  [
+   "backend/shield/structure.py",
+   "\"\"\"pdfplumber's text strategy derives column edges from word left edges, which splits right-aligned"
+  ],
+  [
+   "backend/shield/structure.py",
+   "# --------------------------------------------------------------------------"
+  ],
+  [
+   "backend/shield/structure.py",
+   "# headings"
+  ],
+  [
+   "backend/shield/structure.py",
+   "(> STACK_GAP pitches) separates items. The ANCHOR column is the one with the most items (leftmost on a tie)."
+  ],
+  [
+   "backend/shield/structure.py",
    "aligned = len(cols) == len(prev_cols) and all(abs(a[1] - b[1]) <= 6 or abs(a[0] - b[0]) <= 6 for a, b in zip(cols, prev_cols))"
+  ],
+  [
+   "backend/shield/structure.py",
+   "anchor = max(range(len(blocks)), key=lambda j: (len(blocks[j]), -j))"
+  ],
+  [
+   "backend/shield/structure.py",
+   "and len(ln.segments) == 1 and ln.size >= body * 0.95 and not ln.text.rstrip().endswith((\",\", \";\", \":\"))):"
   ],
   [
    "backend/shield/structure.py",
@@ -4676,7 +6480,15 @@
   ],
   [
    "backend/shield/structure.py",
+   "band = config.RUNNING_BAND_FRACTION * heights[page]"
+  ],
+  [
+   "backend/shield/structure.py",
    "best = (run_start + x) / 2 if best is None or abs((run_start + x) / 2 - width / 2) < abs(best - width / 2) else best"
+  ],
+  [
+   "backend/shield/structure.py",
+   "best, run_start = None, None"
   ],
   [
    "backend/shield/structure.py",
@@ -4697,6 +6509,10 @@
   [
    "backend/shield/structure.py",
    "both = sum(1 for ln in body if any(r.x1 <= best + 2 for r in ln.runs) and any(r.x0 >= best - 2 for r in ln.runs))"
+  ],
+  [
+   "backend/shield/structure.py",
+   "bucket += build_lines(pd, chars)"
   ],
   [
    "backend/shield/structure.py",
@@ -4724,11 +6540,27 @@
   ],
   [
    "backend/shield/structure.py",
+   "def _gutter(lines: list[Line], width: float) -> float | None:"
+  ],
+  [
+   "backend/shield/structure.py",
    "def find_tables(path: str, pages: list, lines_by_page: dict[int, list[Line]], deadline: float, notes: list[str],"
   ],
   [
    "backend/shield/structure.py",
+   "def split_stacked(col_lines: list[list[Line]]) -> list[list[list[Line]]] | None:"
+  ],
+  [
+   "backend/shield/structure.py",
+   "def validate_table(rows: list[list[str]]) -> bool:"
+  ],
+  [
+   "backend/shield/structure.py",
    "elif (ln.bold_fraction >= config.HEADING_BOLD_MIN_FRACTION and len(ln.text) < config.HEADING_BOLD_MAX_CHARS"
+  ],
+  [
+   "backend/shield/structure.py",
+   "entries += [\" \".join(p.split()) for p in parts if p.strip()]"
   ],
   [
    "backend/shield/structure.py",
@@ -4740,7 +6572,15 @@
   ],
   [
    "backend/shield/structure.py",
+   "for i, ln in enumerate(lines):"
+  ],
+  [
+   "backend/shield/structure.py",
    "for nxt in lines[i + 1:]:"
+  ],
+  [
+   "backend/shield/structure.py",
+   "for r in runs[1:]:"
   ],
   [
    "backend/shield/structure.py",
@@ -4764,6 +6604,10 @@
   ],
   [
    "backend/shield/structure.py",
+   "heights = [ln.height for col in col_lines for ln in col]"
+  ],
+  [
+   "backend/shield/structure.py",
    "if (ln.top < band or ln.bottom > heights[page] - band) and _norm_running(ln.text) in repeating:"
   ],
   [
@@ -4781,6 +6625,10 @@
   [
    "backend/shield/structure.py",
    "if len(block) >= 3:"
+  ],
+  [
+   "backend/shield/structure.py",
+   "if len(body) < 8:"
   ],
   [
    "backend/shield/structure.py",
@@ -4812,6 +6660,10 @@
   ],
   [
    "backend/shield/structure.py",
+   "if method is None:"
+  ],
+  [
+   "backend/shield/structure.py",
    "if n_pages < config.RUNNING_LINE_MIN_PAGES:"
   ],
   [
@@ -4828,11 +6680,19 @@
   ],
   [
    "backend/shield/structure.py",
+   "if not real:"
+  ],
+  [
+   "backend/shield/structure.py",
    "if o.action != \"URI\" or not o.target:"
   ],
   [
    "backend/shield/structure.py",
    "if r.x0 - cur[-1].x1 > max(1.5 * ln.size, 10.0):"
+  ],
+  [
+   "backend/shield/structure.py",
+   "if ref is None:"
   ],
   [
    "backend/shield/structure.py",
@@ -4920,11 +6780,27 @@
   ],
   [
    "backend/shield/structure.py",
+   "out = []"
+  ],
+  [
+   "backend/shield/structure.py",
+   "out = set()"
+  ],
+  [
+   "backend/shield/structure.py",
    "out.add((page, id(ln)))"
   ],
   [
    "backend/shield/structure.py",
    "out.append(spanning[i - 1])"
+  ],
+  [
+   "backend/shield/structure.py",
+   "out: list[Line] = []"
+  ],
+  [
+   "backend/shield/structure.py",
+   "return None"
   ],
   [
    "backend/shield/structure.py",
@@ -4937,6 +6813,14 @@
   [
    "backend/shield/structure.py",
    "return pd.rotation % 360 == 0 and m[0] == 0 and m[1] == 0 and e == m"
+  ],
+  [
+   "backend/shield/structure.py",
+   "return set()"
+  ],
+  [
+   "backend/shield/structure.py",
+   "rows = []"
   ],
   [
    "backend/shield/structure.py",
@@ -4976,6 +6860,14 @@
   ],
   [
    "backend/shield/structure.py",
+   "synth = []"
+  ],
+  [
+   "backend/shield/structure.py",
+   "text = \"; \".join(parts)"
+  ],
+  [
+   "backend/shield/structure.py",
    "unit, value = m.group(\"unit\"), m.group(1)"
   ],
   [
@@ -5000,6 +6892,10 @@
   ],
   [
    "backend/verdicts/__init__.py",
+   "content_supported=\"supported\", cited_item_index=idx, cited_item=es.items[idx],"
+  ],
+  [
+   "backend/verdicts/__init__.py",
    "counters[\"contradictions_not_confirmed\"] += 1"
   ],
   [
@@ -5016,11 +6912,19 @@
   ],
   [
    "backend/verdicts/__init__.py",
+   "elif label in (\"supported\", \"contradicted\") and cited is None:"
+  ],
+  [
+   "backend/verdicts/__init__.py",
    "elif low is not None and low < config.ESCALATION_MIN_TOP_PROB:"
   ],
   [
    "backend/verdicts/__init__.py",
    "escalated = True"
+  ],
+  [
+   "backend/verdicts/__init__.py",
+   "f\"Ultra gave {finals(judged)}. Both sample sets are recorded\")"
   ],
   [
    "backend/verdicts/__init__.py",
@@ -5041,6 +6945,10 @@
   [
    "backend/verdicts/__init__.py",
    "if super_contra and ultra_contra:"
+  ],
+  [
+   "backend/verdicts/__init__.py",
+   "judged = [_judge_sample(s, es, kind, scope, target, counters, set_auth) for s in j[\"samples\"]]"
   ],
   [
    "backend/verdicts/__init__.py",
@@ -5080,11 +6988,23 @@
   ],
   [
    "backend/verdicts/judge.py",
+   "from backend import llm"
+  ],
+  [
+   "backend/verdicts/judge.py",
    "kw = {\"n\": n, \"temperature\": temperature} if n > 1 else {\"temperature\": 0}"
   ],
   [
    "backend/verdicts/matrix.py",
    "\"authored_example\": None if not yes else {\"path\": yes[0].path, \"start_line\": yes[0].start_line,"
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   "any(it.likely_identity_gap is True for it in no), None, summary)"
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   "first = no[0] if no else None"
   ],
   [
    "backend/verdicts/matrix.py",
@@ -5116,7 +7036,19 @@
   ],
   [
    "backend/verdicts/matrix.py",
+   "if confidence == \"none\":"
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   "if content != \"supported\":"
+  ],
+  [
+   "backend/verdicts/matrix.py",
    "if not ok:"
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   "if out.verdict == \"contradicted\":"
   ],
   [
    "backend/verdicts/matrix.py",
@@ -5136,7 +7068,19 @@
   ],
   [
    "backend/verdicts/matrix.py",
+   "return False, \"no_target_or_scope\", None"
+  ],
+  [
+   "backend/verdicts/matrix.py",
    "return SetAuthorship(None, unknown[0].authorship_confidence, unknown[0].likely_identity_gap,"
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   "return True, \"\", \"\", f\"{cited.rule}:{rule}\" if claim_kind == \"ownership\" else rule, score"
+  ],
+  [
+   "backend/verdicts/matrix.py",
+   "unknown = [it for it in items if it.authored_by_candidate is None]"
   ],
   [
    "backend/verdicts/matrix.py",
@@ -5219,6 +7163,96 @@
   "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q2/sample3.json: 50 entries",
   "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q2/all.json: 100 entries",
   "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q2b/sample60.json: 60 entries",
+  "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/crucible_pool.json: 15 entries",
+  "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/crucible_pool_v2.json: 9 entries",
+  "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q3.json: 50 entries",
+  "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q3b.json: 13 entries",
+  "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q3c.json: 18 entries",
+  "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q3d.json: 30 entries",
+  "commit messages: 0 mentions",
+  "/Users/abhinavbansal/.claude/projects/-Users-abhinavbansal-hackathon/0293ad82-459e-4b4b-ad87-8ee13638a407.jsonl: 0 mentions",
+  "/Users/abhinavbansal/.claude/projects/-Users-abhinavbansal-hackathon/623103df-319a-4549-b039-913af808ec4c.jsonl: 0 mentions",
+  "/Users/abhinavbansal/.claude/projects/-Users-abhinavbansal-hackathon/7a0bb737-7301-4efc-b3eb-983c5e3288b8.jsonl: 0 mentions",
+  "/Users/abhinavbansal/.claude/projects/-Users-abhinavbansal-hackathon/b24520cb-6fe0-467f-a4e8-a5c5520e1b86.jsonl: 4 mentions",
+  "/Users/abhinavbansal/.claude/projects/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e.jsonl: 1243 mentions",
+  "/Users/abhinavbansal/hackathon/FEEDBACK.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/authorship-limitations.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/claim-extraction.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/claim-track-osdbms-phase2.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/classifier-experiment.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/document-analyzer.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/evidence-retrieval.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/grounding.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/nebius-capabilities.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/nli-gate-rejected.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/phase-5-spike.md: 115 mentions",
+  "/Users/abhinavbansal/hackathon/docs/questions.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/docs/verdicts.md: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/claim_targeted_session_example.html: 1 mentions",
+  "/Users/abhinavbansal/hackathon/reports/clean_small_run1.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/clean_small_run2.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/clean_small_run3.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_abhinav.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_abhinav.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_final.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_final.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_kasak.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_kasak.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage1.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage1.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage1b.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage1b.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2b.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2b.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2c.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2c.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage3.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage3.log: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/degraded.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_clean_resume.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_G_run1.html: 6 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_G_run2.html: 6 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_G_run3.html: 6 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_L_run1.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_L_run2.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_L_run3.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_M_run1.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_M_run2.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_M_run3.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_run1.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_run2.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_run3.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/e2e_hidden_text.html: 0 mentions",
+  "/Users/abhinavbansal/hackathon/reports/sealed/generate.log: 171 mentions",
+  "/Users/abhinavbansal/hackathon/reports/clean_small_run1.json: 2 entries",
+  "/Users/abhinavbansal/hackathon/reports/clean_small_run2.json: 2 entries",
+  "/Users/abhinavbansal/hackathon/reports/clean_small_run3.json: 2 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_abhinav.json: 1 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_final.json: 18 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_kasak.json: 3 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage1.json: 3 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage1b.json: 3 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2.json: 6 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2b.json: 8 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage2c.json: 9 entries",
+  "/Users/abhinavbansal/hackathon/reports/creg_phase2_stage3.json: 9 entries",
+  "/Users/abhinavbansal/hackathon/reports/degraded.json: 1 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_clean_resume.json: 0 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_G_run1.json: 19 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_G_run2.json: 20 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_G_run3.json: 19 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_L_run1.json: 14 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_L_run2.json: 12 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_L_run3.json: 12 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_M_run1.json: 12 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_M_run2.json: 12 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_M_run3.json: 13 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_run1.json: 7 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_run2.json: 6 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_crucible_run3.json: 6 entries",
+  "/Users/abhinavbansal/hackathon/reports/e2e_hidden_text.json: 0 entries",
   "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/crucible_pool.json: 15 entries",
   "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/crucible_pool_v2.json: 9 entries",
   "/private/tmp/claude-501/-Users-abhinavbansal-hackathon/d878da21-a8d1-4a2a-8686-928bb6242b6e/scratchpad/q3.json: 50 entries",

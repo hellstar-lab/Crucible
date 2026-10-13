@@ -71,6 +71,8 @@ def burn_json(reg: Registry, data, label: str) -> int:
             line = x.get("line")
             if not isinstance(line, int) and isinstance(x.get("start"), list) and x["start"] and isinstance(x["start"][0], int):
                 line = x["start"][0]  # a cosmic-ray candidate: start = [line, col]
+            if not isinstance(line, int) and isinstance(x.get("start_line"), int):
+                line = x["start_line"]  # a claim-report citation / evidence item: {path, start_line, end_line}
             if isinstance(x.get("path"), str) and x["path"].endswith(".py") and isinstance(line, int) and line > 0:
                 reg.add(x["path"], line, x.get("original_line") or x.get("line_text"), x.get("id") or x.get("candidate_id"))
                 n += 1
