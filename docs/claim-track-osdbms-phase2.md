@@ -775,3 +775,59 @@ Full suite: 985 passed, 1 skipped.
 | I2 High load test: Pending | stated as not yet done (status_cell), no verdict ✓ |
 | I3 Load Benchmarking: Pending | stated as not yet done (status_line), no verdict ✓ |
 | I4 concurrent request test: In progress | stated as not yet done (status_cell), no verdict ✓ |
+
+## Close-out (2026-10-13): final fixes and the last run
+
+**1. M2 is structural.** It fires only on a short line (≤ 12 words) with no clause boundary (a sentence end, a
+semicolon, a subordinator), when the claim adds a content word or turns a bare word into an -ed verb. There is no verb
+list.
+- The 4M fixtures still fire.
+- The 25-word rollback sentence passes.
+- On 93 recorded résumé claims, against the old verb-list M2: 21 fire under both, and the 12 old-only firings were false
+  ("Engineer, Contoso Freight", a summary sentence verbatim). The 19 new-only firings are true: 18 × "Proficient in X"
+  from a bare skills list, and "Attended …".
+- A table row has semicolons, so it is never a fragment, and the row special case is gone.
+
+**2. Guarantees over a found mechanism.**
+- `gate:guarantee_over_mechanism` (4C, no model call): a claim with "guarantee(s) / never / always / fully" whose named
+  code concept was found is inconclusive, citing the implementing line.
+- The ungrounded-qualifier check was NOT wired into this route (its list held only résumé intensifiers). The guarantee
+  words are now in it, so a claim that ADDS one is excluded at 4A.
+- `r_artifact` now cites the implementing line, and skips docstrings and comments. The first fix-up cited
+  `registration_service.py:106`, the docstring "SELECT ... FOR UPDATE"; the final run cites the `with_for_update()` call
+  on **line 107**.
+
+**3. FEEDBACK #17:** replace a lexical proxy with the structural test it stands in for. It covers four lists, each with
+its measured cost.
+
+**4. Final run: same PDF, `f9b6725`, candidate Abhinav ($0.051)**
+- 74 of 74 units, 63 of 63 claims judged (the most of any run).
+- Stage 3 refusals: 1 (MD-ACC).
+- The tense guard rejected 8 (7 tense, 1 negation).
+- **0 contradicted, 0 supported.**
+
+| Expected | supported | contradicted | inconclusive | no_evidence | unverifiable |
+|---|---|---|---|---|---|
+| supported | 0 | 0 | 21 | 2 | 0 |
+| not supported | 0 | 0 | 0 | 4 | 2 |
+| inconclusive (I1) | 0 | 0 | 2 | 1 | 0 |
+| unverifiable | 0 | 0 | 0 | 0 | 1 |
+
+**The four canaries:**
+- **I1 "automatic rollback triggers": judged from its own sentence for the first time.** Decomposed into four claims:
+  - "Queries reach our MySQL instance after being cleared through OS filters." → inconclusive;
+  - "Transactions execute under strict isolation." → inconclusive;
+  - "Automatic rollback triggers are in place for full classes." → inconclusive (the model said contradicted; the
+    scope gate held it);
+  - "Automatic rollback triggers are in place for race conditions." → **no_evidence**. The `rollback()` calls were
+    found, but the model judged they do not bear on "triggers".
+
+  None was contradicted, the operator's hard criterion. The label (inconclusive: mechanism yes, name no) is met by three
+  of four. The Transaction-test row stays inconclusive (`gate:test_status`).
+- **I2, I3, I4:** stated as not yet done, with no verdict.
+
+**Not done, recorded for later:**
+- M1 (`entries.reference_kind`) still asks the verb-list `has_verb` (FEEDBACK #17).
+- A "mechanism found, name absent" route for I1-type claims would give the last no_evidence an inconclusive.
+
+The claim track stops here.
