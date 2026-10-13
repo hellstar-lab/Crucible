@@ -12,6 +12,9 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import tool
+from .fingerprint import format_gate
+
 GENERIC = set("""self none true false return items item result results list dict text path line lines name names data value
 values key keys test tests with from import else elif lambda len str int float get set append extend join split strip
 lower upper format range enumerate sorted isinstance kind type count index start end first last left right page pages
@@ -41,12 +44,13 @@ def lint_new(ruff: str, path: str, original: str, mutated: str, lines: range) ->
 
 @dataclass
 class Validation:
-    cls: str  # clean | survivor | noisy | exception_at_site | telegraphed | lint | broken
+    cls: str  # clean | survivor | noisy | exception_at_site | telegraphed | lint | format | broken | unstable
     diff: str = ""
     failed: list[dict] = field(default_factory=list)
     telegraph_hits: list[str] = field(default_factory=list)
     seconds: float = 0.0
     detail: str = ""
+    kill_runs: list[list[str]] = field(default_factory=list)  # failing tests, per run
 
 
 def tree_clean(repo: Path) -> bool:
@@ -89,12 +93,43 @@ def telegraph_hits(terms: set[str], test: str, message: str) -> list[str]:
     return sorted(t for t in terms if t in name or t in msg or (len(t) >= 6 and t in message.lower()))
 
 
-def validate(repo: Path, cand, python: str, timeout_s: int = 600) -> Validation:
+def _run_covering(repo: Path, python: str, tests: list[str], timeout_s: int):
+    """(exit code or None on timeout, {test key: failure}, collection error, seconds)."""
+    with tempfile.TemporaryDirectory(prefix="bugpool-v-") as tmp:
+        xml = Path(tmp) / "j.xml"
+        t0 = time.monotonic()
+        try:
+            p = subprocess.run([python, "-m", "pytest", "-q", "-p", "no:cacheprovider", f"--junitxml={xml}", *tests],
+                               cwd=repo, capture_output=True, text=True, timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            return None, {}, False, float(timeout_s)
+        secs = round(time.monotonic() - t0, 1)
+        failed: dict[str, dict] = {}
+        collection_error = False
+        if xml.exists():
+            for tc in ET.parse(xml).getroot().iter("testcase"):
+                bad = tc.find("failure") if tc.find("failure") is not None else tc.find("error")
+                if bad is None:
+                    continue
+                if not tc.get("name"):
+                    collection_error = True
+                    continue
+                func = _PARAMS.sub("", tc.get("name"))
+                key = f"{tc.get('classname', '').replace('.', '/')}.py::{func}"
+                frames = _FRAME.findall(bad.text or "")
+                failed.setdefault(key, {"test": key, "message": (bad.get("message") or "")[:500],
+                                        "innermost": list(frames[-1]) if frames else None})
+        return p.returncode, failed, collection_error, secs
+
+
+def validate(repo: Path, cand, python: str, timeout_s: int = 600, kill_runs: int = 3) -> Validation:
+    """``python`` runs the repository's tests; cosmic-ray and ruff come from bugpool's own environment (``tool``).
+    A clean kill must REPEAT: the same single test fails on ``kill_runs`` consecutive runs, else "unstable"."""
     repo = Path(repo)
     if not tree_clean(repo):
         raise RuntimeError("refusing to mutate a dirty tree")
-    cr = str(Path(python).with_name("cosmic-ray"))
-    ruff = Path(python).with_name("ruff")
+    cr = tool("cosmic-ray")
+    ruff = Path(tool("ruff"))
     terms = telegraph_terms(repo, cand.path, cand.start[0], cand.end[0])
     original = (repo / cand.path).read_text()
     try:
@@ -102,35 +137,16 @@ def validate(repo: Path, cand, python: str, timeout_s: int = 600) -> Validation:
         diff = subprocess.run(["git", "diff", "-U2", "--", cand.path], cwd=repo, capture_output=True, text=True).stdout
         if r.returncode != 0 or not diff:
             return Validation("broken", diff, detail=f"apply failed: {(r.stderr or r.stdout)[-200:]}")
-        if ruff.exists():  # the lint gate runs before any test: cheap, and a lint-visible bug is not a fair hunt
+        if ruff.exists():  # the lint and format gates run before any test: a bug visible by its form is not a fair hunt
             new = lint_new(str(ruff), cand.path, original, (repo / cand.path).read_text(), cand.lines)
             if new:
                 return Validation("lint", diff, detail=f"the mutation introduces {', '.join(new)}")
-        with tempfile.TemporaryDirectory(prefix="bugpool-v-") as tmp:
-            xml = Path(tmp) / "j.xml"
-            t0 = time.monotonic()
-            try:
-                p = subprocess.run([python, "-m", "pytest", "-q", "-p", "no:cacheprovider", f"--junitxml={xml}", *cand.covering_tests],
-                                   cwd=repo, capture_output=True, text=True, timeout=timeout_s)
-                rc = p.returncode
-            except subprocess.TimeoutExpired:
-                return Validation("broken", diff, seconds=timeout_s, detail="hang (timeout)")
-            secs = round(time.monotonic() - t0, 1)
-            failed: dict[str, dict] = {}
-            collection_error = False
-            if xml.exists():
-                for tc in ET.parse(xml).getroot().iter("testcase"):
-                    bad = tc.find("failure") if tc.find("failure") is not None else tc.find("error")
-                    if bad is None:
-                        continue
-                    if not tc.get("name"):
-                        collection_error = True
-                        continue
-                    func = _PARAMS.sub("", tc.get("name"))
-                    key = f"{tc.get('classname', '').replace('.', '/')}.py::{func}"
-                    frames = _FRAME.findall(bad.text or "")
-                    failed.setdefault(key, {"test": key, "message": (bad.get("message") or "")[:500],
-                                            "innermost": list(frames[-1]) if frames else None})
+            ok, why = format_gate(str(ruff), cr, cand.path, original, cand.operator, cand.occurrence)
+            if not ok:
+                return Validation("format", diff, detail=why)
+        rc, failed, collection_error, secs = _run_covering(repo, python, cand.covering_tests, timeout_s)
+        if rc is None:
+            return Validation("broken", diff, seconds=timeout_s, detail="hang (timeout)")
         if rc in (2, 3, 4) or collection_error:
             return Validation("broken", diff, list(failed.values()), seconds=secs, detail="collection / import / syntax error")
         if not failed:
@@ -144,7 +160,15 @@ def validate(repo: Path, cand, python: str, timeout_s: int = 600) -> Validation:
         hits = telegraph_hits(terms, f["test"], f["message"])
         if hits:
             return Validation("telegraphed", diff, [f], hits, seconds=secs)
-        return Validation(CLEAN, diff, [f], [], seconds=secs)
+        runs = [[f["test"]]]
+        for k in range(2, kill_runs + 1):  # stability: the kill must repeat, identically
+            rc2, failed2, ce2, s2 = _run_covering(repo, python, cand.covering_tests, timeout_s)
+            secs = round(secs + s2, 1)
+            runs.append(sorted(failed2) if rc2 is not None else ["<timeout>"])
+            if rc2 is None or ce2 or sorted(failed2) != [f["test"]]:
+                return Validation("unstable", diff, [f], seconds=secs, kill_runs=runs,
+                                  detail=f"run {k} of {kill_runs} failed {runs[-1] or 'nothing'}, run 1 failed {f['test']}")
+        return Validation(CLEAN, diff, [f], [], seconds=secs, kill_runs=runs)
     finally:
         subprocess.run(["git", "checkout", "--", cand.path], cwd=repo, check=True)
         if not tree_clean(repo):

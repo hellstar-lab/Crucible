@@ -23,4 +23,18 @@ Second tier (planned, NOT built): characterization tests generated for authored 
 repository with sparse tests can still get a validated bug. ``generate_pool(second_tier=...)`` is the seam.
 """
 
+import sys
+from pathlib import Path
+
 INSUFFICIENT = "insufficient coverage to plant a validated bug in authored code"
+
+# the two refusal classes, never conflated: an environment that cannot run the suite says nothing about its coverage
+COULD_NOT_RUN = "could not run the test suite"
+COVERAGE_INSUFFICIENT = "suite ran, coverage insufficient"
+AUTHORSHIP_UNKNOWN = "authorship not established"
+
+
+def tool(name: str) -> str:
+    """A console script of THIS interpreter's environment (cosmic-ray, ruff). The repository's tests may run under a
+    different interpreter (``python=``): the target's own venv, which need not have the bugpool tools installed."""
+    return str(Path(sys.executable).with_name(name))

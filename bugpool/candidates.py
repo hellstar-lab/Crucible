@@ -49,14 +49,17 @@ class Candidate:
         return range(self.start[0], self.end[0] + 1)
 
 
-def enumerate_candidates(repo: Path, source: str, python_bin: Path) -> tuple[list[Candidate], dict]:
-    """cosmic-ray init into a temporary session: every candidate mutation of ``source``; nothing is executed."""
+def enumerate_candidates(repo: Path, sources: list[str]) -> tuple[list[Candidate], dict]:
+    """cosmic-ray init into a temporary session: every candidate mutation of ``sources``; nothing is executed."""
     from cosmic_ray.work_db import WorkDB, use_db
 
-    cr = python_bin.with_name("cosmic-ray")
+    from . import tool
+
+    cr = tool("cosmic-ray")
     with tempfile.TemporaryDirectory(prefix="bugpool-cr-") as tmp:
         cfg, db = Path(tmp) / "cr.toml", Path(tmp) / "session.sqlite"
-        cfg.write_text(f'[cosmic-ray]\nmodule-path = "{source}"\ntimeout = 120.0\nexcluded-modules = []\n'
+        paths = ", ".join(f'"{s}"' for s in sources)
+        cfg.write_text(f'[cosmic-ray]\nmodule-path = [{paths}]\ntimeout = 120.0\nexcluded-modules = []\n'
                        'test-command = "python -m pytest -q -x"\n\n[cosmic-ray.distributor]\nname = "local"\n')
         r = subprocess.run([str(cr), "init", str(cfg), str(db)], cwd=repo, capture_output=True, text=True)
         if r.returncode != 0 or not db.exists():
@@ -90,7 +93,9 @@ def integer_literal_at(repo: Path, c: Candidate) -> bool:
     return bool(re.fullmatch(r"\d+", lit.strip()))
 
 
-def filter_candidates(repo: Path, cands: list[Candidate], cmap, is_candidate, behaviour_modules: int) -> tuple[list[Candidate], dict]:
+def filter_candidates(repo: Path, cands: list[Candidate], cmap, is_candidate, behaviour_modules: int,
+                      oracle: set[str] | None = None) -> tuple[list[Candidate], dict]:
+    """``oracle``: the tests that may cover or kill (stable and passing at baseline); None = every test."""
     steps = {"raw": len(cands)}
     cands = [c for c in cands if c.family]
     steps["whitelist"] = len(cands)
@@ -105,9 +110,11 @@ def filter_candidates(repo: Path, cands: list[Candidate], cmap, is_candidate, be
              and exclusions.content_reason(c.path, (repo / c.path).read_text()) is None]
     steps["not_excluded"] = len(cands)
     behaviour = cmap.behaviour_tests(behaviour_modules)
+    if oracle is not None:
+        behaviour &= oracle
     kept = []
     for c in cands:
-        tests = sorted(cmap.tests_for(c.path, c.start[0], c.end[0]))
+        tests = sorted(t for t in cmap.tests_for(c.path, c.start[0], c.end[0]) if oracle is None or t in oracle)
         beh = [t for t in tests if t in behaviour]
         if beh:
             c.covering_tests, c.behaviour_tests = tests, beh

@@ -28,6 +28,7 @@ class CoverageMap:
     statements: dict[str, int] = field(default_factory=dict)  # test key -> statements covered
     collected: int = 0
     exit_code: int | None = None
+    error: str | None = None  # the run could not happen (exit 2-4): the tail of its output
 
     def tests_for(self, path: str, start: int, end: int) -> set[str]:
         return {t for ln in range(start, end + 1) for t in self.lines.get(path, {}).get(ln, ())}
@@ -39,18 +40,22 @@ class CoverageMap:
         return {p: {str(ln): sorted(ts) for ln, ts in m.items()} for p, m in sorted(self.lines.items())}
 
 
-def build(repo: Path, source: str, python: str, test_args: list[str] | None = None, timeout_s: int = 3600) -> CoverageMap:
-    """Run the repository's suite once with coverage contexts (--cov-context=test) and read the database."""
+def build(repo: Path, source: str | list[str], python: str, test_args: list[str] | None = None, timeout_s: int = 3600) -> CoverageMap:
+    """Run the repository's suite once with coverage contexts (--cov-context=test) and read the database. ``source``:
+    one directory or several ("app,workload" or a list)."""
+    sources = [x.strip().rstrip("/") for x in (source.split(",") if isinstance(source, str) else source) if x.strip()]
     from coverage import CoverageData
 
     repo = Path(repo).resolve()
     with tempfile.TemporaryDirectory(prefix="bugpool-cov-") as tmp:
         data_file = Path(tmp) / ".coverage"
-        env = {**os.environ, "COVERAGE_FILE": str(data_file)}
-        p = subprocess.run([python, "-m", "pytest", "-q", "-p", "no:cacheprovider", f"--cov={source}", "--cov-context=test",
+        # ctrace: on Python 3.12+ coverage may default to core=sysmon, which does not support dynamic contexts; measured on
+        # concurrent_reg (3.14): 35 of 107 test functions got any context, 1 touched more than 2 modules
+        env = {**os.environ, "COVERAGE_FILE": str(data_file), "COVERAGE_CORE": "ctrace"}
+        p = subprocess.run([python, "-m", "pytest", "-q", "-p", "no:cacheprovider", *(f"--cov={x}" for x in sources), "--cov-context=test",
                             "--cov-report=", *(test_args or [])], cwd=repo, env=env, capture_output=True, text=True,
                            timeout=timeout_s)
-        cmap = CoverageMap(exit_code=p.returncode)
+        cmap = CoverageMap(exit_code=p.returncode, error=(p.stdout + p.stderr)[-1500:] if p.returncode in (2, 3, 4) else None)
         summary = next((ln for ln in reversed(p.stdout.splitlines()) if re.search(r" in [\d.]+s", ln)), "")
         cmap.collected = sum(int(x) for x in re.findall(r"(\d+) (?:passed|failed|errors?|skipped|xfailed|xpassed)", summary))
         if not data_file.exists():
@@ -65,7 +70,7 @@ def build(repo: Path, source: str, python: str, test_args: list[str] | None = No
             if not fp.is_relative_to(repo):
                 continue
             rel = fp.relative_to(repo).as_posix()
-            if not rel.startswith(source.rstrip("/") + "/") and rel != source:
+            if not any(rel.startswith(x + "/") or rel == x for x in sources):
                 continue
             for ln, ctxs in data.contexts_by_lineno(f).items():
                 for c in ctxs:

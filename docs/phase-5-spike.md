@@ -796,3 +796,238 @@ change the finding: outside one test, Crucible's suite kills a non-telegraphing,
 
 Not built this round: the characterization / record-replay oracle (it needs its own spec), and the cosmic-ray spacing
 fingerprint fix.
+
+---
+
+# Phase 5, round 4: the format gate, scoring, the session report (2026-10-12)
+
+## Part A: the format gate (`bugpool/fingerprint.py`)
+
+**Generator (`format_gate`).** Format the file with ruff, apply the same mutation (operator and occurrence) to the
+formatted copy, then format again. If the second format changes anything, the mutation introduced non-canonical form
+and the candidate is rejected (validation class `format`). Formatting preserves the order of AST nodes, so occurrence
+N in the original is occurrence N in the formatted file. The gate runs after the lint gate and before any test.
+
+**Plant time (`check_diff`, called by `plant()`).** It requires:
+- exactly one changed line;
+- no whitespace-only hunk;
+- token spacing identical outside the changed tokens.
+
+Otherwise it raises `PlantError` and plants nothing, and `Session.start` destroys its worktree before re-raising. The
+token-spacing rule is what catches `candidates[0]`→`candidates[ -1]`: that hunk is not whitespace-only, so the literal
+rule alone would pass it.
+- Tested with that exact case as the negative fixture: `test_plant_refuses_a_spacing_fingerprint_loudly`.
+- Also tested: `test_check_diff` (5 cases) and `test_format_gate_rejects_the_cosmic_ray_spacing_and_passes_a_clean_swap`.
+
+**Re-screen of the existing 9-candidate pool: 7 of 9 survive. 2 FAIL, and they are bugs that would have been findable
+without reading the code:**
+
+| Pooled line | Mutated to | Format gate | Plant check |
+|---|---|---|---|
+| `backend/evidence/blame.py:120` `start, end = ranges[-1]` | `ranges[- 0]` | formatter rewrites it to `ranges[-0]` | spacing before `0` changed |
+| `backend/evidence/resolve.py:171` `ref, scoped = candidates[0]` | `candidates[ -1]` | formatter rewrites it to `candidates[-1]` | spacing before `-` changed |
+
+Round 3's ten stranger candidates (the older pool) contain **three more** such fingerprints:
+- `lines.py:137` (`prev[1][ 3]`);
+- `lines.py:205` (`d[ -1]`);
+- `lines.py:179` (`prev[ 1]`).
+
+A real session now refuses all three. They were planted in round 4 only through an explicit, measurement-only
+`form_check=False`, to keep the ten comparable, and are marked below. The stranger never even opened the file for any
+of the three.
+
+## Part B: scoring and the localisation metric
+
+**Statement granularity (`tools.statement_span`).** The answered line is mapped through the AST to its innermost
+statement, and any line of the mutated statement is a hit. A compound statement's header (`if a < b and (…):`) is its
+own span, so a line inside the if-body is not a hit for a mutation in the condition.
+
+| | Exact line | Statement |
+|---|---|---|
+| Round 3 (re-scored from its saved answers) | 1/10 | **1/10** |
+| Round 4 (re-run, same 10 candidates) | 2/10 | **2/10** |
+
+Statement granularity changed nothing here. The near misses (`html.py:328` for 329; `rules.py:174` for 171) are
+separate statements.
+
+**Localisation cost** is the number of actions between first opening the correct file and answering correctly; a run
+that never localised the bug is `unbounded`. Round 3 did not keep per-action paths, so these numbers are from a
+**re-run (round 4)** of the same ten candidates with full action logs. Super, budget 40, the same four actions,
+$3.09 in total.
+
+| Candidate | Fingerprinted* | Found | Localisation cost | First opened the file at action | Files opened | Actions used |
+|---|---|---|---|---|---|---|
+| `shield/docx_scan.py:266` | | no | **unbounded** | 8 | 5 | 41 (forced) |
+| `shield/structure.py:255` | | **yes** | **37** | 4 | 4 | 41 (forced, correct) |
+| `shield/lines.py:137` | yes | no | **unbounded** | never | 3 | 41 (forced) |
+| `shield/lines.py:205` | yes | no | **unbounded** | never | 6 | 41 (forced) |
+| `grounding/html.py:329` | | no | **unbounded** | 4 | 4 | 41 (answered 328) |
+| `grounding/html.py:246` | | no | **unbounded** | 3 | 4 | 41 (forced) |
+| `shield/doc_kind.py:21` | | **yes** | **13** | 4 | 5 | 17 |
+| `retrieval/rules.py:171` | | no | **unbounded** | 2 | 4 | 26 (answered 174) |
+| `shield/lines.py:179` | yes | no | **unbounded** | never | 7 | 41 (forced) |
+| `shield/structure.py:242` | | no | **unbounded** | 11 | 4 | 27 (answered 367) |
+
+*Would be refused at plant time under round-4 rules; planted here only through the measurement-only bypass.
+
+**Found-rate by budget** (round 4; the budget counts actions before the answer):
+
+| Budget b | 1–15 | 16–39 | 40 |
+|---|---|---|---|
+| Found | 0/10 | 1/10 | **2/10** |
+
+Two ways to read localisation cost:
+- **It separates where files-opened did not.** Both finds opened 4–5 files, as did most misses. What differs is that
+  the stranger opened the right file early in 7 of 10 runs (actions 2–11) and then could not localise the line within
+  the budget: 13 actions in one find, 37 in the other, unbounded in every miss.
+- **In the session record it is now the headline**, set beside the stranger's on the same candidate. Files opened is a
+  recorded field under the outcome. Found-rate-by-budget stays in the stranger's curve.
+
+**Is a pooled line's unmutated form distinguishable by a cheap signal?** Measured on all 24 pooled lines of both pools
+(`scripts/spike/q4_fingerprint.py`), against the other lines of the same file at the pool's commit:
+- **The whitelist narrows only to about half the file.** A median **43%** of a file's code lines carry a token the
+  whitelist can mutate (a comparison, `not`/`and`/`or`, `True`/`False`, `break`/`continue`, an integer literal), so a
+  hunter who knows the generator's rules narrows a file only to about 2.3× fewer lines.
+- **Within those lines, a pooled line is unremarkable.** Its length percentile ranges from 0 to 94 (median 32), its
+  indentation percentile from 16 to 87 (median 46.5), and its enclosing function's complexity percentile from 14 to 85
+  (median 42).
+- **None of the signals tested gives the bug away.** No cheap static signal tested here picks pooled lines out. The one
+  signal that does narrow the search, coverage by the failing test, costs a coverage run and is exactly the code-reading
+  work being measured.
+- **This is a fingerprint check, not a guarantee.** Signals not tested, such as blame recency on a repository with a
+  long history, could still leak.
+
+## Part C: the session report (`bugpool/report.py`, `python -m bugpool report record.json --out page.html`)
+
+A session record rendered as one self-contained page in the style of the Phase 4 claim evidence report. It reuses
+that page's CSS and its traceability check, so every number on the page is a field of the record and the render fails
+otherwise.
+
+The sections, in order:
+1. **Candidate:** module, operator and family, killing test, candidate id.
+2. **Localisation on this candidate:** participant and stranger side by side, each with found or not found (a word
+   and a shape) and localisation cost (or "unbounded: the bug was not localised within the budget").
+3. **Participant actions:** the action log as a timeline: seconds since start, type, path, pattern or selector.
+4. **The planted change:** the diff, marked reviewer-facing, "shown only after the session ended; the participant
+   never saw it".
+5. **Recorded, not compared:** status, answer, granularity and statement span, exact-line hit, actions used, files
+   opened, the participant's elapsed time.
+
+**Hard rules, each enforced by a test:**
+- no score, rank, hire, percentile, faster, slower, beat, rating or grade anywhere on the page;
+- elapsed time appears only in the recorded section, never in the outcome section beside the stranger's (the
+  stranger's elapsed time is not shown at all);
+- no aggregate across candidates;
+- a refused session renders as the recorded refusal, with nothing planted.
+
+Checked in a browser at phone width in dark mode: no horizontal scroll, no external resources.
+
+**Session record changes:**
+- a `headline` block with `localisation_cost` and `found` for both sides, and its definition;
+- `candidate.module`, `line` and `statement_span`;
+- `planted_diff`, reviewer-facing, written at the end;
+- the outcome adds `granularity: "statement"`, `correct_exact_line` and `localisation_cost`;
+- `distinct_files_opened` stays as a recorded field;
+- the stranger's curve now counts the budget as actions before the answer.
+
+Not built this round, as instructed: the characterization / record-replay oracle.
+
+# Phase 5, round 5: claim-targeted bug selection (2026-10-13)
+
+The two tracks are joined. Phase 4 says what the résumé claims about which code; Phase 5 now plants the bug there.
+Module: `bugpool/claims.py`.
+
+## How it works
+
+**Input.** The Phase 4 claim-verdict record: the same `ClaimEvidenceReport` JSON the evidence table renders from. It is
+passed to `generate_pool(claims=...)` / `bugpool generate --claims`, and to `Session.start(claims=...)` /
+`bugpool session --claims`.
+
+**Marking.** A pool candidate is *claim-cited* when its module (path) is a row's cited path. Each candidate gets a
+`claim_target` holding:
+- whether its module is cited;
+- every citing claim's id, kind, verdict and cited lines;
+- whether the bug is inside the cited span.
+
+The candidate carries no claim text.
+
+**Ranking, strongest claim first:**
+- rank 0: supported;
+- rank 1: inconclusive;
+- rank 2: any other verdict that cites the module (contradicted, ...);
+- rank 3: uncited.
+
+Within a rank:
+- a bug inside the cited lines comes before one elsewhere in the module;
+- then claims about the work itself (ownership, metric, other) come before technology_use citations. A "Python" row
+  cites one file among many.
+
+The session picks at random (seeded) *within the best tier*.
+
+**Generation.** `generate_pool` validates claimed modules first, which matters under the validation cap. Every gate
+is unchanged, including the diversity caps.
+
+**No claimed module.** When no candidate lands in a claimed module, the session plants nothing. It records
+`result: "no_claimed_module"` and the message "no validated bug available in a module this résumé claims." This is a
+result, not a failure. Planting elsewhere needs an explicit `--allow-uncited`, and the record then says so.
+
+**On the report.** A **Claim targeted** section sits beside the candidate. It says what the résumé said (the claim
+text, its kind and id), gives the Phase 4 verdict and the cited module and lines, then where the bug was planted
+(inside or outside the cited lines) and what happened (status and localisation cost).
+
+**The Shield rule.** Claim text never reaches the hunt:
+- Candidates and the pool carry claim ids only. The text is looked up from the record when the session record is
+  written, after the hunt.
+- `Session.view()` refuses (`ShieldError`) if any claim text of 20 or more characters appears in what the participant
+  is shown. A sentence the repository itself contains is repository content, not a leak.
+- The stranger's prompt is built only from `view()`.
+
+**Tests** (`bugpool/tests/test_claims.py`, 6):
+- the ranking;
+- planting in the strongest tier, with the claim on the record and the report;
+- no claimed module, which plants nothing and leaves no worktree; `--allow-uncited` plants only when asked;
+- the Shield guard, which catches a planted claim text and spares the repository's own words;
+- generation validating the cited span first under three seeds;
+- a failed start leaving no worktree.
+
+## Measured on the Crucible pool
+
+The pool is the 7 candidates of the round-4 re-screen: the 9-candidate pool `c6cf5d52`, minus the 2 the plant check
+refuses. The claim record is `reports/e2e_crucible_G_run3.json`.
+
+**1 of 7 lands in a claimed module.** It is the same in all three G runs.
+- Record commit `2bffef4a` is an ancestor of the pool commit `c6cf5d52`.
+- The cited modules are unchanged between the two commits.
+
+| Rank | Candidates |
+|---|---|
+| supported | 1: `backend/shield/pdf_security.py:123` |
+| inconclusive | 0 |
+| other cited verdict | 0 |
+| uncited | 6: `claims/split.py`, `shield/fonts.py`, `evidence/question_surface.py`, `evidence/target.py`, `shield/analyze.py`, `grounding/html.py` |
+
+**The one hit is weak.**
+- **What the claim is.** It is the "pypdf" technology_use row (`s3u0.c7`, supported). That row cites line 25 of
+  `pdf_security.py`, an import, while the bug is at line 123, outside the cited span.
+- **The strong claims go untargeted.** The résumé's ownership claims cite `evidence/blame.py` (supported) and
+  `shield/unicode_scan.py` (contradicted), and no surviving candidate is in either. The pool did hold a `blame.py`
+  candidate, but it was one of the 2 the round-4 form check removed, along with `resolve.py` (cited by the Pydantic
+  row).
+- **The cause.** The pool was generated with no knowledge of the claims and capped at 3 per module, so it spread
+  across uncited modules. Generating with `--claims` validates the cited modules first; that run is not done yet.
+
+One live session ran end to end on this pool with the claim record:
+- It planted at `pdf_security.py:123`, claim-targeted.
+- No claim text reached the view.
+- The record's `target` names the claim, the verdict, the cited lines and the outcome.
+- The report rendered with its traceability check, at `reports/claim_targeted_session_example.html`.
+
+## Fixed on the way
+
+- **A relative test interpreter.** `Session.start` failed on one (`--python .venv/bin/python`), because tests run
+  with the worktree as their working directory. Fix: the path is made absolute at start.
+- **A stray worktree.** A failure after the worktree was created left it behind. Fix: any exception during start now
+  destroys it.
+- **Writing into the target repo.** The stranger's `Session.end()` burned its planted lines into
+  `<target repo>/.bugpool/`. That wrote into concurrent_reg; I removed it, and tracked files were never touched. Fix:
+  `end(burn=False)` is the stranger's path. A line shown to a model is not a line a participant has seen.

@@ -29,7 +29,9 @@ def _git(repo, *args, env=None):
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, env=env)
 
 
-def make_repo(tmp: Path, files: dict[str, str]) -> Path:
+def make_repo(tmp: Path, files: dict[str, str], commits: int = 2) -> Path:
+    """A fixture repo authored by ME. Two commits by default: a single-commit repo is refused (authorship cannot be
+    established from blame), which test_a_single_commit_repo_is_refused_unless_overridden covers on its own."""
     import os
     repo = tmp / "repo"
     repo.mkdir()
@@ -41,6 +43,9 @@ def make_repo(tmp: Path, files: dict[str, str]) -> Path:
            "GIT_COMMITTER_EMAIL": ME[1], "GIT_AUTHOR_DATE": "2024-01-01T10:00:00", "GIT_COMMITTER_DATE": "2024-01-01T10:00:00"}
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "init", env=env)
+    if commits > 1 and (repo / "app/__init__.py").exists():
+        (repo / "app/__init__.py").write_text("# the app package\n")
+        _git(repo, "commit", "-q", "-am", "package comment", env=env)
     return repo
 
 
@@ -147,3 +152,17 @@ def test_diversity_caps_killing_tests_and_modules(tmp_path):
     assert pool["stats"]["dropped_for_diversity"] >= 1
     assert pool["stats"]["spread"]["killing_tests"] == {"tests/test_flow.py::test_month_end_flow": 1}
     assert all(c["id"] and c["checks"]["plausibility"]["lint_clean"] for c in pool["candidates"])
+
+
+def test_format_gate_rejects_the_cosmic_ray_spacing_and_passes_a_clean_swap():
+    from pathlib import Path as P
+    from bugpool.fingerprint import format_gate
+    ruff, cr = str(P(PY).with_name("ruff")), str(P(PY).with_name("cosmic-ray"))
+    if not P(ruff).exists():
+        pytest.skip("ruff not installed in this environment")
+    src = "def f(c, n):\n    if n < 4:\n        return c[0]\n    return None\n"
+    # NumberReplacer: occurrence 0/1 = 4 -> 5 / 3, occurrence 2/3 = 0 -> 1 / -1; c[0] -> c[ -1] is the fingerprint
+    ok, why = format_gate(ruff, cr, "a.py", src, "core/NumberReplacer", 3)
+    assert not ok and "rewrites the mutated line" in why
+    ok, _ = format_gate(ruff, cr, "a.py", src, "core/ReplaceComparisonOperator_Lt_LtE", 0)
+    assert ok
