@@ -78,6 +78,24 @@ _ACTION_VERB = re.compile(r"(?i)\b(built|build|implemented|wrote|written|authore
                           r"automated|added|used|worked)\b")
 
 
+_PERSON_AGENT = re.compile(r"(?i)\b(i|me|we|us|he|she|they|them|someone|everyone|team|teams|engineers?|developers?|"
+                           r"managers?|leads?|people|staff|students?|members?|colleagues?|contractors?|interns?|admins?|"
+                           r"administrators?|users?|customers?|clients?|owners?|founders?|reviewers?|maintainers?)\b")
+_BY_AGENT = re.compile(r"(?i)\s+by\s+((?:the|a|an|its|our|their|this|that)\s+[^,.;:]{1,60})")
+
+
+def _person_role(claim_text: str) -> bool:
+    """Stage 2 follow-up: a role word counts only when its agent is a person or a team. One condition: a role word
+    followed by "by <determiner> <agent>" whose agent names no person or team ("a buffer managed by the OS layer") is
+    an artifact, not a role. Every other use (no "by", or a person / team agent, or a bare name) is a role, as before."""
+    rx = dict(_RX)["role_or_team"]
+    for m in rx.finditer(claim_text or ""):
+        agent = _BY_AGENT.match(claim_text[m.end():])
+        if not agent or _PERSON_AGENT.search(agent.group(1)):
+            return True
+    return False
+
+
 def is_title_line(text: str) -> bool:
     return bool(_TITLE_LINE.match(text or "")) and len((text or "").split()) <= 12 and not _ACTION_VERB.search(text or "")
 
@@ -102,15 +120,38 @@ def route(claim_text: str) -> dict:
         return {"kind": "role_or_team", "secondary_kinds": [], "checkable_from_code": checkable, "evidence_kind": evidence,
                 "why_not_checkable": why, "checkability_note": None}
     kinds: list[str] = [k for k, rx in _RX if rx.search(claim_text)]
+    if "role_or_team" in kinds and not _person_role(claim_text):
+        kinds.remove("role_or_team")
+        if not kinds:
+            kinds = ["artifact_exists"]  # a non-person agent: the claim is about an artifact
     if any(_is_tech(e) for e in support.entities(claim_text)):
         kinds.append("technology_use")
     order = ["role_or_team", "outcome", "metric", "scale", "timeline", "artifact_exists", "technology_use", "ownership"]
     kinds = sorted(dict.fromkeys(kinds), key=order.index)
+    if not kinds:
+        concept = _concept_kind(claim_text)  # Stage 2: a named code concept is searchable in the code itself
+        if concept:
+            kinds = [concept]
     # ownership (a generic verb) is primary only when nothing more specific applies
     primary: ClaimKind = kinds[0] if kinds else "other"  # type: ignore[assignment]
     checkable, evidence, why = ROUTES[primary]
     return {"kind": primary, "secondary_kinds": [k for k in kinds[1:]], "checkable_from_code": checkable,
             "evidence_kind": evidence, "why_not_checkable": why, "checkability_note": NOTES.get(primary)}
+
+
+_BUILT = re.compile(r"(?i)^\s*(deployed|built|implemented|wrote|designed|developed|created|added|introduced|engineered|"
+                    r"set up|configured|integrated|coded|programmed|constructed)\b")
+
+
+def _concept_kind(claim_text: str) -> str | None:
+    """Stage 2: a claim that would route to "other" but names a code concept (thread pools, semaphores, row locks ...;
+    backend/retrieval/data/code_concepts.json) is routed to ownership when it states building it ("Deployed worker
+    thread pools"), else to artifact_exists ("Row locks prevent conflicts"). Both kinds run r_artifact. Measured on the
+    OSDBMS phase-II report: 22 such claims were 'other', so never searched."""
+    from backend.retrieval.lexicon import recognise_concepts  # lazy: retrieval's data, not a 4A dependency at import
+    if not recognise_concepts(claim_text):
+        return None
+    return "ownership" if _BUILT.search(claim_text) else "artifact_exists"
 
 
 def _is_tech(entity: str) -> bool:

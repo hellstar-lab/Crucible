@@ -110,10 +110,34 @@ class Line:
     runs: list[Run]
     n_chars: int
     chars: list[CharInfo] = field(default_factory=list, repr=False)
+    hyphen_end: bool = False  # the line ends in a hyphen pdfium reports as U+0002 (a word broken across lines)
+    table_row: bool = False  # a table row rewritten as one line (structure.split_stacked); always its own paragraph
 
     @property
     def height(self) -> float:
         return self.bottom - self.top
+
+
+LINE_END_HYPHEN = "\x02"  # pdfium's code for a hyphen at the end of a line; not printable, so it never reaches text
+
+
+def join_lines(lines: list[Line]) -> str:
+    """The lines' text joined with spaces, except across a line-end hyphen: "synchro-" + "nization" -> "synchronization".
+    A hyphen before an upper-case letter or a digit is kept ("OS-" + "DBMS" -> "OS-DBMS"): that is a compound, not a
+    broken word. Measured on a pdfTeX report (OSDBMS phase-II): pdfium returned "synchro nization", "man agement"."""
+    out = ""
+    for i, ln in enumerate(lines):
+        if i == 0:
+            out = ln.text
+            continue
+        prev = lines[i - 1]
+        if prev.hyphen_end and ln.text[:1].islower():
+            out += ln.text
+        elif prev.hyphen_end:
+            out += "-" + ln.text
+        else:
+            out += " " + ln.text
+    return out
 
 
 def _usable(c: CharInfo, hidden: frozenset[int]) -> bool:
@@ -150,6 +174,8 @@ def build_lines(pd, chars: list[CharInfo] | None = None) -> list[Line]:
             d = display_box(c.bbox, pd)
             items.append(((d[1] + d[3]) / 2, d, c))
     items.sort(key=lambda it: it[0])
+    hyphens = [display_box(c.bbox, pd) for c in (pd.chars if chars is None else chars)
+               if c.text == LINE_END_HYPHEN and c.index not in pd.hidden]
     clusters: list[list] = []
     centre = size = 0.0
     for ymid, d, c in items:
@@ -202,8 +228,10 @@ def build_lines(pd, chars: list[CharInfo] | None = None) -> list[Line]:
             continue
         nonspace = [c for _y, _d, c in cl if c.text != " "]
         bold_fraction = sum(1 for c in nonspace if is_bold(c.font_name)) / len(nonspace) if nonspace else 0.0
+        x1, top, bottom = max(d[2] for _y, d, _c in cl), min(d[1] for _y, d, _c in cl), max(d[3] for _y, d, _c in cl)
+        hyph = any(top <= (h[1] + h[3]) / 2 <= bottom and abs(h[0] - x1) <= 1.0 for h in hyphens)
         lines.append(Line(page=pd.page, text=" ".join(seg_texts), x0=min(d[0] for _y, d, _c in cl),
-                          x1=max(d[2] for _y, d, _c in cl), top=min(d[1] for _y, d, _c in cl),
-                          bottom=max(d[3] for _y, d, _c in cl), size=med, bold_fraction=bold_fraction,
-                          segments=seg_texts, runs=runs, n_chars=len(nonspace), chars=[c for _y, _d, c in cl]))
+                          x1=x1, top=top, bottom=bottom, size=med, bold_fraction=bold_fraction,
+                          segments=seg_texts, runs=runs, n_chars=len(nonspace), chars=[c for _y, _d, c in cl],
+                          hyphen_end=hyph))
     return lines

@@ -9,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path, PurePosixPath
 
 DATA = Path(__file__).resolve().parent / "data" / "tech_artifacts.json"
+CONCEPTS = Path(__file__).resolve().parent / "data" / "code_concepts.json"
 # Aliases that are also ordinary words (or very short) only match with their exact capitalisation.
 _CASE_SENSITIVE_MAX_LEN = 4
 _COMMON_WORDS = frozenset({"go", "express", "lambda", "vault", "consul", "react", "rust", "node", "rest", "c", "s3", "elk", "unix",
@@ -63,3 +64,30 @@ def import_matches(module: str, prefixes: list[str]) -> str | None:
         if module == pre or module.startswith((pre + ".", pre + "/", pre + ":")):
             return pre
     return None
+
+
+def _concept_alias(alias: str) -> re.Pattern:
+    """Whole words, case-insensitive; a space in the alias matches a space or a hyphen ("row level" ~ "row-level")."""
+    body = re.escape(alias).replace(r"\ ", r"[\s-]")
+    return re.compile(r"(?i)(?<![\w-])" + body + r"(?![\w-])")
+
+
+@lru_cache(maxsize=1)
+def concepts() -> dict[str, dict]:
+    """Stage 2: code concepts (thread pool, semaphore, row lock ...) -> claim aliases and code patterns."""
+    data = json.loads(CONCEPTS.read_text(encoding="utf-8"))["concepts"]
+    for entry in data.values():
+        entry["_aliases"] = [_concept_alias(a) for a in entry["aliases"]]
+        entry["_patterns"] = [re.compile(p) for p in entry["patterns"]]
+    return data
+
+
+def recognise_concepts(text: str) -> list[str]:
+    """Concept keys a claim names, in order of first appearance."""
+    hits: dict[str, int] = {}
+    for key, entry in concepts().items():
+        for rx in entry["_aliases"]:
+            m = rx.search(text or "")
+            if m and (key not in hits or m.start() < hits[key]):
+                hits[key] = m.start()
+    return sorted(hits, key=hits.get)

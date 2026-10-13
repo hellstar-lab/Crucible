@@ -8,6 +8,14 @@ STAGE_MAX_TOKENS = 600  # thinking is off, so this budget is for the JSON answer
 # Over the cap the result is PARTIAL with truncated=True; the units not reached are listed, never dropped silently.
 NANO_REFERENCE_CALL_USD = llm.estimate_cost("nano", 900, 300)
 DEFAULT_COST_CAP_USD = round(40 * NANO_REFERENCE_CALL_USD, 6)
+# Stage 1 item 4: the default cap scales with document size. A unit costs up to three stage calls, Stage 3 on Ultra
+# (~3.3x Nano); measured on the 70-unit OSDBMS phase-II report: about $0.00064 per unit, ~5 Nano-call equivalents.
+# 8 per unit leaves headroom; never below the old 40-call floor. Measured: the fixed cap analysed 13 of 74 units.
+PER_UNIT_NANO_CALLS = 8
+
+
+def cost_cap_for(n_units: int) -> float:
+    return round(max(40, PER_UNIT_NANO_CALLS * n_units) * NANO_REFERENCE_CALL_USD, 6)
 
 # Stage 3 tier: ULTRA (Phase 4A close-out, C1). Measured with the n=3 ensemble (P2-3), over w3 and the two units
 # wrongly refused in round 1, 2 repeats each: unanimous 1/6 nano, 5/6 super, 6/6 ultra; correct 3/6, 5/6, 6/6.
@@ -58,4 +66,7 @@ LEAK_NGRAM = 4  # content words in a row that make an example phrase distinctive
 UNGROUNDED_QUALIFIERS = frozenset("""
 proficient proficiency expert expertise advanced extensive extensively senior deep deeply strong strongly
 skilled seasoned highly mastery fluent fluency accomplished
+guarantee always never fully
 """.split())
+# The guarantee words (claim track close-out): a claim that ADDS "guarantees / never / always / fully" to a source that
+# does not say it is excluded here; one whose source does say it reaches 4C's gate:guarantee_over_mechanism.

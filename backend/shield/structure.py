@@ -9,7 +9,11 @@ becomes a heading, a claim or a skill) in display space (rotation-aware).
                   neither signal exists (monospaced / single-font text), numbering
                   patterns (^\\d+(\\.\\d+)*\\s+\\S) take over.
   sections        the text between headings: the unit Phase 4 consumes instead of a flat blob.
-  tables          "lines" strategy first. The "text" strategy runs ONLY inside a bounded region
+  tables          "lines" strategy first. A ruled table with NO internal row rules (LaTeX tabular without
+                  \\hline between rows) comes back from pdfplumber as one row holding every item; such a row is
+                  split by y-coordinate (split_stacked) and, because the reading-order lines interleave the
+                  columns ("...request dispatcher Rathi, Kasak coupled with..."), the table's lines in the
+                  section text are replaced by one line per row: "Task Completed: ...; Team Member: Rathi, Kasak." The "text" strategy runs ONLY inside a bounded region
                   already known to be tabular (after a "Table N" caption, or a block of >= 3 lines
                   with >= 2 aligned numeric columns). Every candidate is validated; failures are
                   discarded. Never run on a whole page: that invents a grid out of paragraphs.
@@ -33,10 +37,11 @@ import time
 from collections import Counter
 from dataclasses import dataclass, field
 
-from backend.contracts import (Heading, LinkRef, NumericClaim, ReferencesBlock, Section, StructureBlock, Table)
+from backend.contracts import (Heading, LinkRef, NumericClaim, ReferencesBlock, Section, StructureBlock, Table,
+                               TableRowLine)
 
 from . import config, hygiene, linkcheck
-from .lines import Line, build_lines, display_box
+from .lines import Line, build_lines, display_box, join_lines
 
 log = logging.getLogger(__name__)
 
@@ -255,7 +260,13 @@ def _safe_for_plumber(pd) -> bool:
     return pd.rotation % 360 == 0 and m[0] == 0 and m[1] == 0 and e == m
 
 
-def _cell_text(pd, bbox, hygiene_clean) -> tuple[str, bool]:
+PLUMBER_X_TOLERANCE = 2  # pdfplumber's default 3 merges pdfTeX's justified word gaps: "Oursystem,ConcurrentReg,handles..."
+STACK_GAP = 1.5  # in a stacked cell, a top-to-top distance over this many line pitches starts a new item
+
+
+def _cell_lines(pd, bbox) -> list[Line]:
+    """The cell's visible characters as lines, top to bottom: the same line builder as the page text. (A flat
+    character sort mis-orders glyphs whose box centres differ, measured: "i bl k l kWrote core transact on oc s".)"""
     x0, top, x1, bottom = bbox
     chars = []
     for c in pd.chars:
@@ -265,9 +276,104 @@ def _cell_text(pd, bbox, hygiene_clean) -> tuple[str, bool]:
         cx, cy = (d[0] + d[2]) / 2, (d[1] + d[3]) / 2
         if x0 <= cx <= x1 and top <= cy <= bottom:
             chars.append(c)
-    from .lines import text_from_chars
+    return sorted(build_lines(pd, chars), key=lambda ln: ln.top)
 
-    return hygiene_clean(text_from_chars(chars, pd))
+
+def _cell_text(pd, bbox, hygiene_clean) -> tuple[str, bool]:
+    return hygiene_clean(" ".join(join_lines(_cell_lines(pd, bbox)).split()))
+
+
+def _blocks(lines: list[Line], pitch: float) -> list[list[Line]]:
+    out: list[list[Line]] = []
+    for ln in lines:
+        if out and ln.top - out[-1][-1].top <= STACK_GAP * pitch:
+            out[-1].append(ln)
+        else:
+            out.append([ln])
+    return out
+
+
+def split_stacked(col_lines: list[list[Line]]) -> list[list[list[Line]]] | None:
+    """One table row whose cells each hold SEVERAL items (no rule between them) -> one row per item, or None.
+
+    The line pitch is the smallest top-to-top distance in any cell (the spacing inside one item); a larger jump
+    (> STACK_GAP pitches) separates items. The ANCHOR column is the one with the most items (leftmost on a tie).
+    Every line of another column goes to the anchor item whose y-SPAN contains the line's centre, else to the
+    nearest item above it: never by matching tops, because LaTeX centres a one-line value vertically against a
+    three-line item, so the name sits beside the item's MIDDLE line."""
+    col_lines = [sorted(c, key=lambda ln: ln.top) for c in col_lines]
+    steps = [b.top - a.top for col in col_lines for a, b in zip(col, col[1:])]
+    heights = [ln.height for col in col_lines for ln in col]
+    if not steps or not heights:
+        return None
+    floor = 0.8 * statistics.median(heights)
+    real = [d for d in steps if d >= floor]
+    if not real:
+        return None
+    pitch = min(real)
+    blocks = [_blocks(col, pitch) for col in col_lines]
+    anchor = max(range(len(blocks)), key=lambda j: (len(blocks[j]), -j))
+    if len(blocks[anchor]) < 2:
+        return None
+    spans = [(b[0].top, b[-1].bottom) for b in blocks[anchor]]
+    rows: list[list[list[Line]]] = [[[] for _ in col_lines] for _ in spans]
+    for k, b in enumerate(blocks[anchor]):
+        rows[k][anchor] = b
+    for j, col in enumerate(col_lines):
+        if j == anchor:
+            continue
+        for ln in col:
+            cy = (ln.top + ln.bottom) / 2
+            k = next((i for i, (a, b) in enumerate(spans) if a - 1 <= cy <= b + 1), None)
+            if k is None:
+                k = max([i for i, (a, _b) in enumerate(spans) if a <= cy] or [0])
+            rows[k][j].append(ln)
+    return rows
+
+
+def row_sentence(header: list[str] | None, cells: list[str]) -> str:
+    """A table row as one line of text that keeps its attribution: "Task Completed: X; Team Member: Rathi, Kasak." """
+    parts = []
+    for i, c in enumerate(cells):
+        c = c.strip()
+        if not c:
+            continue
+        if i < len(cells) - 1:
+            c = c.rstrip(".")
+        h = header[i].strip() if header and i < len(header) and header[i].strip() else None
+        parts.append(f"{h}: {c}" if h else c)
+    text = "; ".join(parts)
+    return text if text.endswith((".", "!", "?")) else text + "."
+
+
+@dataclass
+class Stacked:
+    page: int
+    bbox: tuple
+    rows: list[tuple[str, list[Line]]]  # (row sentence, the lines it came from)
+
+
+def replace_stacked(lines: list[Line], st: "Stacked") -> list[Line]:
+    """The page's reading-order lines with the stacked table's lines replaced by one line per row."""
+    x0, top, x1, bottom = st.bbox
+
+    def inside(ln):
+        cx, cy = (ln.x0 + ln.x1) / 2, (ln.top + ln.bottom) / 2
+        return x0 - 2 <= cx <= x1 + 2 and top - 2 <= cy <= bottom + 2
+
+    idx = [i for i, ln in enumerate(lines) if inside(ln)]
+    if not idx:
+        return lines
+    synth = []
+    for text, src in st.rows:
+        if not src:
+            continue
+        synth.append(Line(page=st.page, text=text, x0=x0, x1=x1, top=min(ln.top for ln in src), bottom=max(ln.bottom for ln in src),
+                          size=statistics.median(ln.size for ln in src), bold_fraction=0.0, segments=[text],
+                          runs=[r for ln in src for r in ln.runs], n_chars=sum(ln.n_chars for ln in src),
+                          chars=[c for ln in src for c in ln.chars], table_row=True))
+    keep = [ln for i, ln in enumerate(lines) if i not in set(idx)]
+    return keep[:idx[0]] + synth + keep[idx[0]:]
 
 
 def numeric_block_regions(lines: list[Line]) -> list[tuple[float, float, float, float]]:
@@ -343,7 +449,9 @@ def caption_regions(lines: list[Line], width: float, height: float, body: float 
 
 
 def find_tables(path: str, pages: list, lines_by_page: dict[int, list[Line]], deadline: float, notes: list[str],
-                body: float | None = None) -> list[Table] | None:  # lines_by_page: reading-order lines per page
+                body: float | None = None, stacked: list | None = None) -> list[Table] | None:
+    # lines_by_page: reading-order lines per page. ``stacked`` collects the tables whose rows were split by y
+    # (split_stacked), so extract() can rewrite them in the section text.
     """Validated tables, or None when no page could be measured (never an empty list for 'not measured')."""
     import pdfplumber
 
@@ -381,7 +489,8 @@ def find_tables(path: str, pages: list, lines_by_page: dict[int, list[Line]], de
                         continue
                     sub = pl.crop((x0, top, x1, bottom))
                     for t in sub.find_tables({"vertical_strategy": "text", "horizontal_strategy": "text", "snap_tolerance": 3,
-                                              "join_tolerance": 3, "intersection_tolerance": 5}):
+                                              "join_tolerance": 3, "intersection_tolerance": 5,
+                                              "text_x_tolerance": PLUMBER_X_TOLERANCE}):
                         found.append(("text_region", t.bbox, [[c for c in row.cells] for row in t.rows]))
             except Exception as exc:  # noqa: BLE001 - a page pdfplumber cannot parse is unmeasured, not empty
                 skipped.append(pd.page)
@@ -393,14 +502,34 @@ def find_tables(path: str, pages: list, lines_by_page: dict[int, list[Line]], de
             for strategy, bbox, cell_rows in found:
                 if strategy == "text_region" and any(_overlap(bbox, lb) > 0.5 for lb in line_boxes):
                     continue  # the lines strategy already found this table
-                rows = [[(_cell_text(pd, c, hygiene.clean)[0] if c else "") for c in row] for row in cell_rows]
+                split_rows: list[tuple[str, list[Line]]] = []
+                if strategy == "lines":
+                    rows = []
+                    for row in cell_rows:
+                        col_lines = [(_cell_lines(pd, c) if c else []) for c in row]
+                        parts = split_stacked(col_lines) if len(row) >= 2 else None
+                        if parts is None:
+                            rows.append([hygiene.clean(" ".join(join_lines(cl).split()))[0] for cl in col_lines])
+                            continue
+                        for item in parts:
+                            cells = [hygiene.clean(" ".join(join_lines(cl).split()))[0] for cl in item]
+                            rows.append(cells)
+                            split_rows.append((cells, [ln for cl in item for ln in cl]))
+                else:
+                    rows = [[(_cell_text(pd, c, hygiene.clean)[0] if c else "") for c in row] for row in cell_rows]
                 rows = [r for r in rows if any(c.strip() for c in r)]  # all-empty rows are text-strategy artefacts, not rows
                 if strategy == "text_region":
                     rows = _segment_cells(rows, bbox, lines_by_page.get(pd.page, []), hygiene.clean) or rows
                 if not validate_table(rows) or any(t.rows == rows for t in seen):
                     continue
                 cap = next((cl.text.strip() for cl, _r in captions if cl.top < bbox[1] and bbox[1] - cl.bottom < 40), None)
-                seen.append(Table(page=pd.page, caption=cap, strategy=strategy, n_rows=len(rows), n_cols=len(rows[0]), rows=rows))
+                header = rows[0] if split_rows and rows and rows[0] not in [c for c, _l in split_rows] else None
+                row_lines = [TableRowLine(text=hygiene.clean(row_sentence(header, c))[0], cells=c, header=header)
+                             for c, _src in split_rows]
+                seen.append(Table(page=pd.page, caption=cap, strategy=strategy, n_rows=len(rows), n_cols=len(rows[0]), rows=rows,
+                                  row_lines=row_lines))
+                if split_rows and stacked is not None:
+                    stacked.append(Stacked(pd.page, bbox, [(rl.text, src) for rl, (_c, src) in zip(row_lines, split_rows)]))
             tables.extend(seen)
     if skipped:
         notes.append(f"tables not measured on pages {skipped[:20]}: rotated or offset pages (pdfplumber coordinates unsafe)")
@@ -530,7 +659,7 @@ def _paragraphs(lines: list[Line], heading_ids: set[int]) -> list[tuple[list[Lin
         if cur:
             prev = cur[-1]
             gap = ln.top - prev.bottom
-            new = (ln.page != prev.page or ln.top < prev.top - 1 or gap > 0.55 * max(ln.size, prev.size)
+            new = (ln.table_row or prev.table_row or ln.page != prev.page or ln.top < prev.top - 1 or gap > 0.55 * max(ln.size, prev.size)
                    or _BULLET.match(ln.text) is not None or abs(ln.size - prev.size) > 1.5)
             if new:
                 units.append((cur, False))
@@ -584,6 +713,15 @@ def extract(path: str, pages: list, link_obs: list, text_page_numbers: set[int],
     for ln in ordered:
         sizes[round(ln.size * 2) / 2] += ln.n_chars
     body = sizes.most_common(1)[0][0] if sizes else None
+    stacked: list[Stacked] = []
+    tables = (find_tables(path, [pd for pd in pages if pd.page in text_page_numbers], ordered_by_page, deadline, notes, body,
+                          stacked=stacked) if text_page_numbers else None)
+    for st in stacked:  # the interleaved column text of a stacked table becomes one attributed line per row
+        ordered_by_page[st.page] = replace_stacked(ordered_by_page[st.page], st)
+    if stacked:
+        notes.append(f"{len(stacked)} table(s) without row rules split by y-coordinate into "
+                     f"{sum(len(st.rows) for st in stacked)} rows; their text is rewritten one row per line")
+        ordered = [ln for pno in sorted(ordered_by_page) for ln in ordered_by_page[pno]]
     info: dict[int, tuple[str, float]] = {}
     depth_of: dict[int, int] = {}
     if body:
@@ -597,7 +735,7 @@ def extract(path: str, pages: list, link_obs: list, text_page_numbers: set[int],
     units: list[Unit] = []
     mojibake = False
     for group, is_heading in _paragraphs(ordered, set(info)):
-        text, fixed = hygiene.clean(" ".join(l.text for l in group))
+        text, fixed = hygiene.clean(join_lines(group))
         mojibake = mojibake or fixed
         first = group[0]
         if is_heading:
@@ -609,9 +747,6 @@ def extract(path: str, pages: list, link_obs: list, text_page_numbers: set[int],
             units.append(Unit("paragraph", text, first.page, first.top, first.size, group))
 
     sections, full_text = build_sections(units)
-
-    tables = (find_tables(path, [pd for pd in pages if pd.page in text_page_numbers], ordered_by_page, deadline, notes, body)
-              if text_page_numbers else None)
     block = StructureBlock(
         headings=[u.heading for u in units if u.heading], sections=sections, tables=tables, links=build_links(link_obs, full_text),
         numeric_claims=numeric_claims(units, sections), references=references_block(units, sections, full_text),

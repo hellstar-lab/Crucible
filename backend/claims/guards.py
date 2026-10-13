@@ -51,7 +51,8 @@ def rubric_leak(output: str, source: str, examples: dict[str, list[str]] | None 
 # One canonical form per word family (the closed lexicon is small enough to list; a light stemmer does not join
 # "expert" and "expertise").
 _FAMILY = {"proficiency": "proficient", "expertise": "expert", "extensively": "extensive", "deeply": "deep",
-           "strongly": "strong", "fluency": "fluent"}
+           "strongly": "strong", "fluency": "fluent", "guarantees": "guarantee", "guaranteed": "guarantee",
+           "guaranteeing": "guarantee", "guaranteeing": "guarantee"}
 
 
 def _canon(word: str) -> str | None:

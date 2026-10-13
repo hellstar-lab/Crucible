@@ -604,6 +604,13 @@ class Section(CrucibleModel):
     text: str
 
 
+class TableRowLine(CrucibleModel):
+    """A table row as it was written into the section text (one line per row; structure.split_stacked)."""
+    text: str
+    cells: list[str]
+    header: Optional[list[str]] = None
+
+
 class Table(CrucibleModel):
     page: int
     caption: Optional[str] = None
@@ -611,6 +618,7 @@ class Table(CrucibleModel):
     n_rows: int
     n_cols: int
     rows: list[list[str]]
+    row_lines: list[TableRowLine] = []  # set when the rows were rewritten into the section text, one line each
 
 
 class LinkRef(CrucibleModel):
@@ -775,7 +783,33 @@ class ExcludedUnit(CrucibleModel):
     reason_code: Literal["no_verifiable_claims", "cannot_be_disambiguated", "model_refused", "unparseable_response",
                          "fabricated_quantity", "fabricated_entity", "injection_suspected", "qualifier_dropped", "shield_payload",
                          "rubric_leak", "ungrounded_qualifier",
-                         "contact_info", "cost_cap", "model_unavailable", "list_cap", "fabricated_assertion"]
+                         "contact_info", "cost_cap", "model_unavailable", "list_cap", "fabricated_assertion",
+                         "tense_changed", "negation_inverted", "names_another_person", "names_unresolved"]
+    detail: str
+
+
+class NonAssertion(CrucibleModel):
+    """Stage 1 item 1: text the document states as NOT YET DONE (a Pending / Planned section, a future-tense lead-in, a
+    status cell reading Pending / In progress / Scheduled / Under development). Extracted verbatim, no model call, shown
+    to the reviewer as "stated as not yet done"; never retrieved, never given a verdict."""
+    unit_id: str
+    text: str
+    source_span: tuple[int, int]
+    source_section: Optional[str] = None
+    rule: Literal["pending_heading", "future_lead_in", "status_cell", "status_line", "future_statement", "research_activity",
+                  "gerund_fragment"]
+    detail: str
+    attributed_to: Optional[str] = None
+
+
+class RejectedClaim(CrucibleModel):
+    """A Stage 4 claim rejected deterministically, with the source span: by the tense guard (backend.claims.tense), or
+    because it still contains a referent Stage 3 could not resolve (fail-open, Stage 3 item 2)."""
+    unit_id: str
+    claim_text: str
+    source_span: tuple[int, int]
+    source_text: str
+    reason_code: Literal["tense_changed", "negation_inverted", "unresolved_referent"]
     detail: str
 
 
@@ -798,6 +832,10 @@ class ExtractedClaim(CrucibleModel):
     # the claim to be about the same object (see backend/verdicts/matrix.py).
     scope: Literal["specific_artifact", "project", "career", "none"] = "none"
     scope_target: Optional[str] = None  # the named file / module / project, when scope names one
+    attributed_to: Optional[str] = None  # Stage 1: the person the document's table row names for this work
+    tense_guard: Optional[Literal["passed", "not_applicable"]] = None  # None = not a Stage 4 model claim
+    tense_guard_note: Optional[str] = None  # not_applicable: the source has no modality-bearing construction
+    test_status: Optional[str] = None  # Stage 2: from a table row whose status cell reports a test result ("Pass")
 
 
 class ShieldItem(CrucibleModel):
@@ -849,6 +887,12 @@ class ClaimExtraction(CrucibleModel):
     claims: Optional[list[ExtractedClaim]] = None
     excluded: Optional[list[ExcludedUnit]] = None
     references: list[ProjectReference] = []  # M1: entry headings / lines, not claims
+    non_assertions: list[NonAssertion] = []  # stated as not yet done: never verified
+    rejected_claims: list[RejectedClaim] = []  # Stage 4 claims the tense guard rejected
+    candidate_name: Optional[str] = None  # Stage 1: the candidate's name as the document writes it (from their --email)
+    units_total: Optional[int] = None  # Stage 1 item 4: every unit the split produced
+    units_processed: Optional[int] = None  # ... minus those a cost cap or an unavailable model left unprocessed
+    attribution_note: Optional[str] = None  # set when table rows name people but the candidate's name was not found
     counters: dict[str, int] = {}
     tiers: dict[str, str] = {}
     calls: int = 0
@@ -1001,6 +1045,7 @@ class ClaimVerdicts(CrucibleModel):
 class ReportRow(CrucibleModel):
     claim_id: str
     claim_text: str
+    attributed_to: Optional[str] = None  # Stage 1: the person the document's table row names
     claim_kind: Optional[str] = None
     verdict: FinalVerdict  # 4C, after 4D grounding
     reason: str  # 4C or 4D
@@ -1042,6 +1087,11 @@ class ReportHeader(CrucibleModel):
     not_checkable: list[dict] = []  # 4B: claims not searched, with the verbatim skip_reason
     grounding_failures: Optional[dict[str, int]] = None  # 4D: every check with its count; None = grounding not run
     excluded_units: list[dict] = []  # 4A: resume text left out of extraction, with the reason code
+    non_assertions: list[dict] = []  # 4A: stated as not yet done (no verdict)
+    rejected_claims: list[dict] = []  # 4A: claims the tense guard rejected, with their source span
+    coverage: dict = {}  # Stage 1 item 4: units analysed / total, claims judged / total, and why not all
+    tense_guard: dict = {}  # Stage 1: passed / rejected / unjudged counts and the unjudged words
+    attribution: dict = {}  # Stage 1: the candidate's name as found in the document, or why it was not
     provenance: dict = {}  # 4A/4C run accounting: model requests, cost, escalations, greedy_disagreement rate; None = not measured
     stage_versions: dict[str, Optional[str]] = {}
 

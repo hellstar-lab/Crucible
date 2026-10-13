@@ -117,7 +117,13 @@ def schema_for(stage: str, reason_first: bool = config.REASON_FIRST) -> dict:
 
 # S2: Stage 3 pre-gate. A unit with no pronoun and no definite reference to an unnamed thing has nothing to resolve:
 # it is marked resolved WITHOUT a model call. Conservative: a word that might be a reference sends the unit to the model.
-_PRONOUN = re.compile(r"\b(?:it|its|itself|they|them|their|theirs|themselves|he|him|his|she|her|hers|we|us|our|ours|"
+# First person (we, us, our, ours, I, me, my, mine) is NOT here (Stage 3, item 1). In a resume or a report it refers to
+# the document's author or the author's team, so it needs no resolution and never triggers Stage 3. This is safe: who
+# did the work is decided by git blame against the candidate's identity (4B/4C), never by reading a pronoun, so no
+# resolution of "we" could credit anyone with anything. Measured on the OSDBMS phase-II report: of the 11 sentences
+# Stage 3 refused, 4 were triggered by first person alone; in one, two of three samples returned the sentence unchanged
+# ("'Our' clearly refers to the document author's team") and the third refused.
+_PRONOUN = re.compile(r"\b(?:it|its|itself|they|them|their|theirs|themselves|he|him|his|she|her|hers|"
                       r"this|these|those|former|latter|aforementioned|same|above|such|thereof|therein)\b", re.I)
 _LEADING_THAT = re.compile(r"(?i)^(?:that|which)\b|\b(?:of|on|in|to|for|with|from|by|at|into|like)\s+that\b")
 _GENERIC_HEAD = re.compile(r"(?i)\bthe\s+(?:system|project|service|services|app|application|platform|tool|product|feature|"

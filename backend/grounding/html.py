@@ -229,15 +229,36 @@ class Page:
     def _mismatch(self) -> bool:
         return self.get("header", "identity_check", "status") == "mismatch"
 
+    def coverage_banner(self) -> str:
+        """Stage 1 item 4: a partial analysis says so FIRST: "Analysed N of M units (X%) - cost cap reached"."""
+        c = self.get("header", "coverage") or {}
+        if not c or c.get("complete"):
+            return ""
+        b = ("header", "coverage")
+        out = ['<section id="partial-analysis" class="alert" role="alert"><h2>Partial analysis</h2>']
+        if c.get("extraction_complete") is False:
+            out.append(f'<p><strong>Analysed {self.val(b + ("units_processed",))} of {self.val(b + ("units_total",))} units '
+                       f'({self.val(b + ("units_ratio",), "ratio")}) - {self.val(b + ("extraction_reason",))}</strong></p>')
+        if c.get("verdicts_complete") is False:
+            out.append(f'<p><strong>Judged {self.val(b + ("claims_judged",))} of {self.val(b + ("claims_total",))} claims '
+                       f'({self.val(b + ("claims_ratio",), "ratio")}) - {self.val(b + ("verdicts_reason",))}</strong></p>')
+        out.append('<p class="small">What follows covers only the part that was analysed. The rest of the document was '
+                   'not read for claims, or its claims were not judged: absence from this report says nothing about it.</p></section>')
+        return "".join(out)
+
     def identity_banner(self) -> str:
         """J2: a mismatch between the resume's GitHub identity and the analysed account, at the TOP of the page."""
         if not self._mismatch():
             return ""
         b = ("header", "identity_check")
+        if self.get(*b, "mismatch_on") == "repository":
+            pair = (f'<dt>GitHub repository named in the document</dt><dd class="mono">{self.val(b + ("resume_repos",))}</dd>'
+                    f'<dt>repository analysed (operator)</dt><dd class="mono">{self.val(b + ("operator_repos",))}</dd>')
+        else:
+            pair = (f'<dt>GitHub named in the resume</dt><dd class="mono">{self.val(b + ("resume_accounts",))}</dd>'
+                    f'<dt>account analysed (operator)</dt><dd class="mono">{self.val(b + ("operator_user",))}</dd>')
         return (f'<section id="identity-mismatch" class="alert" role="alert"><h2>Identity mismatch</h2>'
-                f'<p>{self.val(b + ("message",))}</p><dl class="kv small">'
-                f'<dt>GitHub named in the resume</dt><dd class="mono">{self.val(b + ("resume_accounts",))}</dd>'
-                f'<dt>account analysed (operator)</dt><dd class="mono">{self.val(b + ("operator_user",))}</dd></dl></section>')
+                f'<p>{self.val(b + ("message",))}</p><dl class="kv small">{pair}</dl></section>')
 
     def analysed(self) -> str:
         out = ['<section id="analysed"><h2>Analysed</h2>']
@@ -381,6 +402,8 @@ class Page:
         shape = VERDICT_SHAPES.get(v, UNKNOWN_SHAPE)
         claim = (f'<td class="claim"><blockquote>{self.val(b + ("claim_text",))}</blockquote>'
                  f'<div class="small muted">kind: {self.val(b + ("claim_kind",), "label")} · id {self.val(b + ("claim_id",), cls="mono")}</div>')
+        if r.get("attributed_to"):
+            claim += f'<div class="small">attributed in the document to <strong>{self.val(b + ("attributed_to",))}</strong></div>'
         if r.get("scope") not in (None, "none"):
             claim += (f'<div class="small muted">scope: {self.val(b + ("scope",), "label")}'
                       + (f' ({self.val(b + ("scope_target",))})' if r.get("scope_target") else "") + "</div>")
@@ -590,9 +613,19 @@ class Page:
                      "Factual claims the pipeline failed on. The candidate DID claim these; Crucible could not turn them into "
                      "checkable claims, and they are not verdicts of any kind.", "None: every factual claim was processed."),
                     ("not_a_claim", "Not a claim",
-                     "Text with no factual assertion (opinion, contact details, formatting text, a bare date).", "None.")):
+                     "Text with no factual assertion (opinion, contact details, formatting text, a bare date).", "None."),
+                    ("another_person", "Attributed to someone else",
+                     "The document itself attributes this work to a person other than the candidate. It was not searched "
+                     "and has no verdict.", "None."),
+                    ("names_unresolved", "Named, but not matched to the candidate",
+                     "The document attributes this work to a named person, and the candidate's name could not be found in "
+                     "the document, so it cannot be known whether it is the candidate's. None of it was verified.", "None.")):
                 rows = [(i, u) for i, u in enumerate(units or []) if u.get("category") == cat]
+                if cat in ("another_person", "names_unresolved") and not rows:
+                    continue  # only a document that attributes work to people has this list
                 out.append(f"<h3>{title}</h3><p class=\"small muted\">{blurb}</p>")
+                if cat == "names_unresolved" and self.get("header", "attribution", "note"):
+                    out.append(f'<p class="warn small">{self.val(("header", "attribution", "note"))}</p>')
                 if not rows:
                     out.append(f"<p class=\"small\">{empty}</p>")
                     continue
@@ -604,6 +637,56 @@ class Page:
                     out.append(f'<li>{text}<span class="small"><strong>{self.val(b + ("reason_code",), "label")}</strong> at '
                                f'{self.val(b + ("stage",), "label")}: {self.val(b + ("detail",))}</span></li>')
                 out.append("</ul>")
+        out.append("</section>")
+        return "".join(out)
+
+    def not_yet_done(self) -> str:
+        """Stage 1: what the document states as not yet done, and the claims the tense guard rejected. No verdicts."""
+        na = self.get("header", "non_assertions") or []
+        rc = self.get("header", "rejected_claims") or []
+        tg = self.get("header", "tense_guard") or {}
+        if not na and not rc:
+            return ""
+        out = ['<section id="not-yet-done"><h2>Stated as not yet done, and the tense guard</h2><p class="small muted">The document itself says '
+               'this work is pending, planned, scheduled or in progress. It is listed here as written and was never '
+               'checked against code: there is no verdict.</p>']
+        research = [(i, n) for i, n in enumerate(na) if n.get("rule") == "research_activity"]
+        na_items = [(i, n) for i, n in enumerate(na) if n.get("rule") != "research_activity"]
+        if na_items:
+            out.append("<ul>")
+            for i, _n in na_items:
+                b = ("header", "non_assertions", i)
+                who = (f' Attributed in the document to <strong>{self.val(b + ("attributed_to",))}</strong>.'
+                       if _n.get("attributed_to") else "")
+                out.append(f'<li><blockquote>{self.val(b + ("text",))}</blockquote><span class="small">'
+                           f'{self.val(b + ("rule",), "label")}: {self.val(b + ("detail",))}.{who}</span></li>')
+            out.append("</ul>")
+        else:
+            out.append('<p class="small">None.</p>')
+        if research:
+            out.append('<h3>Research activity</h3><p class="small muted">The document says this is being studied or '
+                       'investigated. Reading, studying and evaluating leave nothing in a repository, so this is not '
+                       'knowable from code; it is listed as written, with no verdict.</p><ul>')
+            for i, _n in research:
+                out.append(f'<li><blockquote>{self.val(("header", "non_assertions", i, "text"))}</blockquote></li>')
+            out.append("</ul>")
+        if rc:
+            out.append('<h3>Claims rejected</h3><p class="small muted">Claim extraction rewrote these so that they no '
+                       'longer said what the document says (a changed tense or modality, an added or dropped negation), '
+                       'or they still contained a reference that could not be resolved. They were dropped; the '
+                       'document\'s own words are shown beside each.</p><ul>')
+            for i, _r in enumerate(rc):
+                b = ("header", "rejected_claims", i)
+                out.append(f'<li><blockquote>{self.val(b + ("claim_text",))}</blockquote><span class="small">the document says: '
+                           f'“{self.val(b + ("source_text",))}”. <strong>{self.val(b + ("reason_code",), "label")}</strong>: '
+                           f'{self.val(b + ("detail",))}</span></li>')
+            out.append("</ul>")
+        if tg:
+            g = ("header", "tense_guard")
+            out.append(f'<p class="small">The tense guard compares only explicit modality-bearing constructions (to + verb, a '
+                       f'bare -ing fragment, a participle, will / plan to) with the claim. It passed '
+                       f'{self.val(g + ("passed",))} claim(s) that kept such a construction; for '
+                       f'{self.val(g + ("not_applicable",))} the source had none to compare.</p>')
         out.append("</section>")
         return "".join(out)
 
@@ -657,8 +740,13 @@ def render_html(data: dict, title: str = "Claim evidence report") -> str:
     if re.search(r"\d", title):
         raise TraceError("the page title is static text and may not carry numbers")
     pg = Page(data)
-    body = "".join([pg.identity_banner(), pg.analysed(), pg.shield(), pg.claims(), pg.questions(), pg.not_checkable(),
-                    pg.excluded(), pg.provenance()])
+    cov = (data.get("header") or {}).get("coverage") or {}
+    short = ((cov.get("units_processed") is not None and cov.get("units_processed") < cov.get("units_total"))
+             or (cov.get("claims_judged") is not None and cov.get("claims_judged") < cov.get("claims_total")))
+    if short and cov.get("complete"):
+        raise TraceError("coverage says complete, but not every unit was analysed or every claim judged")
+    body = "".join([pg.coverage_banner(), pg.identity_banner(), pg.analysed(), pg.shield(), pg.claims(), pg.questions(), pg.not_yet_done(),
+                    pg.not_checkable(), pg.excluded(), pg.provenance()])
     page = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<meta name="color-scheme" content="light dark"><title>{E(title)}</title><style>{CSS}</style></head><body><main>'
@@ -667,4 +755,6 @@ def render_html(data: dict, title: str = "Claim evidence report") -> str:
             f"</header>{body}</main></body></html>")
     assert_traceable(page, data)
     assert_self_contained(page)
+    if short and 'id="partial-analysis"' not in page:
+        raise TraceError("a partial analysis cannot render as complete: the partial-analysis banner is missing")
     return page

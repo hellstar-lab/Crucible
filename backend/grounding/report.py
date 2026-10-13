@@ -68,6 +68,29 @@ def _provenance(run, extraction, run_label) -> dict:
     return out
 
 
+def coverage_of(extraction, run, n_rows: int) -> dict:
+    """Stage 1 item 4: how much of the document was analysed, and how many claims were judged. {} = not measured."""
+    out: dict = {}
+    total, done = getattr(extraction, "units_total", None), getattr(extraction, "units_processed", None)
+    if total is not None and done is not None:
+        why = None
+        if done < total:
+            why = ("model unavailable" if any(e.reason_code == "model_unavailable" for e in extraction.excluded or [])
+                   else "cost cap reached")
+        out.update(units_total=total, units_processed=done, units_ratio=round(done / total, 4) if total else None,
+                   extraction_complete=done >= total, extraction_reason=why)
+    if run is not None:
+        missing = len(run.not_judged or [])
+        out.update(claims_total=n_rows + missing, claims_judged=n_rows,
+                   claims_ratio=round(n_rows / (n_rows + missing), 4) if n_rows + missing else None,
+                   verdicts_complete=missing == 0,
+                   verdicts_reason=("verdict cost cap reached" if run.truncated else "no evidence set") if missing else None)
+    if out:
+        out["complete"] = bool(out.get("extraction_complete", True) and out.get("verdicts_complete", True))
+        out["source"] = "4A units / 4C not_judged"
+    return out
+
+
 def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, grounding_failures=None, run=None,
                  run_label: str | None = None, claims=None, candidate: dict | None = None,
                  identity_check: dict | None = None) -> ClaimEvidenceReport:
@@ -78,6 +101,9 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
             if isinstance(v, str) and "@" in v:
                 raise ValueError(f"candidate {k} looks like an email; the report never carries emails (3.6 redaction)")
     by_id = {es.claim_id: es for es in evidence_sets}
+    _claims = claims if claims is not None else (getattr(extraction, "claims", None) or [])
+    attributed = {(c.get("claim_id") if isinstance(c, dict) else c.claim_id): (c.get("attributed_to") if isinstance(c, dict) else c.attributed_to)
+                  for c in _claims}
     auth_by_repo = {t.repo_facts.full_name: t.authorship for t in target_reports if t.repo_facts is not None}
     rows = []
     for v in verdicts:
@@ -89,7 +115,8 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
                                                "end_line": item.end_line}
         ra = auth_by_repo.get(item.repo_full_name) if item else None
         rows.append(ReportRow(
-            claim_id=v.claim_id, claim_text=v.claim_text, claim_kind=v.claim_kind, verdict=v.verdict, reason=v.reason,
+            claim_id=v.claim_id, claim_text=v.claim_text, attributed_to=attributed.get(v.claim_id), claim_kind=v.claim_kind,
+            verdict=v.verdict, reason=v.reason,
             citation=citation, authored_by_candidate=item.authored_by_candidate if item else None,
             authored_ratio=item.authored_ratio if item else None, authorship_caveat=item.authorship_caveat if item else None,
             authorship_confidence=item.authorship_confidence if item else None,
@@ -143,16 +170,40 @@ def build_report(*, verdicts, evidence_sets, target_reports, extraction=None, gr
     doc_text = getattr(extraction, "document_text", None) or ""
     excluded_units = []
     for u in (getattr(extraction, "excluded", None) or []):
-        cat = "not_a_claim" if u.reason_code in NOT_A_CLAIM else "could_not_process"
+        cat = ("another_person" if u.reason_code == "names_another_person" else
+               "names_unresolved" if u.reason_code == "names_unresolved" else
+               "not_a_claim" if u.reason_code in NOT_A_CLAIM else "could_not_process")
         a, b = u.source_span
         text = None if u.reason_code == "contact_info" else (" ".join(doc_text[a:b].split()) or None)
         excluded_units.append({"unit_id": u.unit_id, "category": cat, "text": text, "section": u.source_section,
                                "stage": u.stage, "reason_code": u.reason_code, "detail": u.detail, "source": "4A"})
+    non_assertions = [{"unit_id": n.unit_id, "text": n.text, "section": n.source_section, "rule": n.rule, "detail": n.detail,
+                       "attributed_to": n.attributed_to,
+                       "source": "4A modality (Stage 1): stated as not yet done; never verified"}
+                      for n in (getattr(extraction, "non_assertions", None) or [])]
+    rejected_claims = [{"unit_id": r.unit_id, "claim_text": r.claim_text, "source_text": r.source_text, "section": None,
+                        "reason_code": r.reason_code, "detail": r.detail, "source": "4A tense guard (Stage 1)"}
+                       for r in (getattr(extraction, "rejected_claims", None) or [])]
     versions = {"retrieval": next((es.retrieval_version for es in evidence_sets), None)}
+    coverage = coverage_of(extraction, run, len(rows))
+    guard: dict = {}
+    if extraction is not None and getattr(extraction, "claims", None) is not None:
+        from collections import Counter as _C
+        rejected = getattr(extraction, "rejected_claims", None) or []
+        guard = {"passed": sum(1 for c in extraction.claims if c.tense_guard == "passed"),
+                 "rejected": sum(1 for r in rejected if r.reason_code in ("tense_changed", "negation_inverted")),
+                 "rejected_by_reason": dict(_C(r.reason_code for r in rejected)),
+                 "not_applicable": sum(1 for c in extraction.claims if c.tense_guard == "not_applicable"),
+                 "source": "4A tense guard (Stage 3: modality-bearing constructions only, no verb lexicon)"}
+    attribution_info = ({"candidate_name": getattr(extraction, "candidate_name", None),
+                         "note": getattr(extraction, "attribution_note", None), "source": "4A (Stage 1)"}
+                        if extraction is not None else {})
     header = ReportHeader(candidate=dict(candidate) if candidate else None, identity_check=identity_check, references=references,
                           analysed=analysed, excluded=excluded, authorship=authorship, shield=shield, not_checkable=not_checkable,
                           grounding_failures=(None if grounding_failures is None else
                                               {c: grounding_failures.get(c, 0) for c in CHECKS}), excluded_units=excluded_units,
+                          non_assertions=non_assertions, rejected_claims=rejected_claims, coverage=coverage,
+                          tense_guard=guard, attribution=attribution_info,
                           provenance=_provenance(run, extraction, run_label), stage_versions=versions)
     return ClaimEvidenceReport(header=header, rows=rows)
 

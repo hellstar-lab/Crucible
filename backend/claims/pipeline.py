@@ -35,10 +35,10 @@ from collections import Counter
 from pathlib import Path
 
 from backend import llm
-from backend.contracts import (ClaimExtraction, ClaimUnit, DocumentReport, ExcludedUnit, ExtractedClaim, ProjectReference, ShieldGate,
+from backend.contracts import (ClaimExtraction, ClaimUnit, DocumentReport, ExcludedUnit, ExtractedClaim, NonAssertion, RejectedClaim, ProjectReference, ShieldGate,
                                ShieldItem, StageDecision, SHIELD_SPAN_CAP)
 
-from . import config, entries, guards, routing, skills, stages, support, verbs
+from . import attribution, config, entries, guards, modality, routing, skills, stages, support, tense, verbs
 from .split import Unit, split_structure
 
 log = logging.getLogger(__name__)
@@ -186,6 +186,13 @@ class _Run:
         self.reason_first = config.REASON_FIRST  # C2: reason before verdict by default (verdict-first kept for A/B)
         self.claims: list[ExtractedClaim] = []
         self.references: list[ProjectReference] = []  # M1
+        self.modality: dict[str, tuple[str, str]] = {}  # unit_id -> (rule, detail): a non-assertion (modality.classify)
+        self.non_assertions: list[NonAssertion] = []
+        self.attribution: dict[str, str] = {}  # unit_id -> the person its table row names (attribution.attribute)
+        self.test_status: dict[str, str] = {}  # unit_id -> the test result its table row reports (Stage 2)
+        self.row_units: set[str] = set()  # units that are reconstructed table rows
+        self.candidate: str | None = None  # the candidate's name as the document writes it
+        self.rejected: list[RejectedClaim] = []
         self.excluded: list[ExcludedUnit] = []
         self.units: list[ClaimUnit] = []
         self.truncated, self.truncation_reason = False, None
@@ -275,7 +282,8 @@ class _Run:
             self.claims.append(ExtractedClaim(
                 claim_id=f"{u.unit_id}.c{i}", unit_id=u.unit_id, text=item, qualifiers=[], source_span=(a, b),
                 source_section=u.section, kind="technology_use", secondary_kinds=[], checkable_from_code=checkable,
-                evidence_kind=evidence, why_not_checkable=why, scope="none", scope_target=None, decomposition_tier="deterministic"))
+                evidence_kind=evidence, why_not_checkable=why, scope="none", scope_target=None, decomposition_tier="deterministic",
+                attributed_to=self.attribution.get(u.unit_id)))
         if over:
             self.counters["skills_items_over_cap"] += len(over)
             self.exclude(u, "decomposition", "list_cap", f"skills list has {len(items)} items; the first {skills.MAX_ITEMS} became claims, "
@@ -290,6 +298,45 @@ class _Run:
         if is_bare_date_range(u.text):  # F3: never reaches a model, 4B or 4C
             self.counters["bare_date_units"] += 1
             return self.exclude(u, "selection", "no_verifiable_claims", BARE_DATE_REASON)
+        person = self.attribution.get(u.unit_id)
+        if person and self.candidate is None and not attribution.GROUP.match(person):
+            # Stage 1: the row names someone and the candidate's name is unknown: never assume it is the candidate
+            self.counters["names_unresolved"] += 1
+            cu.decisions.append(StageDecision(stage="selection", tier="deterministic", verdict="names_unresolved",
+                                              reason=f"the row names {person!r}; the candidate's name is unknown; no model call"))
+            return self.exclude(u, "selection", "names_unresolved",
+                                f"the document attributes this to {person!r}, and the candidate's name was not found in the "
+                                "document, so it cannot be matched to the candidate: not verified")
+        if person and attribution.names_another(person, self.candidate):  # Stage 1: not the candidate's work
+            self.counters["names_another_person"] += 1
+            cu.decisions.append(StageDecision(stage="selection", tier="deterministic", verdict="names_another_person",
+                                              reason=f"the document attributes this to {person!r}; no model call"))
+            return self.exclude(u, "selection", "names_another_person",
+                                f"the document attributes this to {person!r}, not to the candidate ({self.candidate!r}): "
+                                "no retrieval, no verdict")
+        if u.unit_id in self.modality:  # Stage 1: stated as not yet done. Verbatim, no model call, never verified
+            rule, detail = self.modality[u.unit_id]
+            self.counters["non_assertions"] += 1
+            cu.decisions.append(StageDecision(stage="selection", tier="deterministic", verdict="non_assertion",
+                                              reason=f"{rule}: {detail}; extracted verbatim, never verified"))
+            self.non_assertions.append(NonAssertion(unit_id=u.unit_id, text=" ".join(u.text.split()), source_span=(u.start, u.end),
+                                                    source_section=u.section, rule=rule, detail=detail, attributed_to=person))
+            return None
+        status = self.test_status.get(u.unit_id)
+        if status:  # Stage 2 close-out: a test-status row has exactly one possible verdict, so it gets no model call
+            self.counters["test_status_rows"] += 1
+            text = " ".join(u.text.split())
+            cu.decisions.append(StageDecision(stage="selection", tier="deterministic", verdict="test_status",
+                                              reason=f"a table row reporting a test result ({status!r}): kept verbatim as one "
+                                                     "claim; its verdict is inconclusive by rule, so no model is asked"))
+            rt = routing.route(text)
+            self.claims.append(ExtractedClaim(
+                claim_id=f"{u.unit_id}.c0", unit_id=u.unit_id, text=text, qualifiers=[], source_span=(u.start, u.end),
+                source_section=u.section, kind=rt["kind"], secondary_kinds=rt["secondary_kinds"],
+                checkable_from_code=rt["checkable_from_code"], evidence_kind=rt["evidence_kind"],
+                why_not_checkable=rt["why_not_checkable"], checkability_note=rt["checkability_note"], decomposition_tier="deterministic",
+                attributed_to=self.attribution.get(u.unit_id), test_status=status))
+            return None
         if skills.is_skills_unit(u.text, u.section, u.heading_path):  # J1: a list decomposes in code, no model call
             items = skills.split_items(self.text, u.start, u.end)
             if items is not None:
@@ -320,6 +367,7 @@ class _Run:
             cu.selected_text = selected
 
             # Stage 3: disambiguation, behind a deterministic pre-gate (S2)
+            unresolved: list[str] = []  # Stage 3 fail-open: spans no claim may contain
             trigger = stages.needs_disambiguation(selected)
             if trigger is None:
                 self.counters["stage3_pregate_skips"] += 1
@@ -337,11 +385,25 @@ class _Run:
                     self.counters["stage3_escalations"] += 1
                     r = self.stage(fn3, cu, selected, context, self.escalation)
                     hit = self._stage3_problem(r, selected, source, u)
-                if hit:
+                if hit and hit[0] == "cannot_be_disambiguated" and r.data.get("reason") == "resolutions disagreed":
+                    # Stage 3 item 2: FAIL OPEN, FILTER BY CONTAINMENT. The samples disagreed: discard EVERY resolution
+                    # (one may have invented a referent), decompose the ORIGINAL sentence, and drop any claim that still
+                    # contains an unresolved span. Nothing is rewritten, so no fabricated resolution can enter. Measured:
+                    # the "automatic rollback triggers" sentence was refused in 5 of 5 runs over "these OS filters", a
+                    # referent its checkable content does not depend on, while one sample had invented "transactions
+                    # (student submissions)".
+                    self.counters["stage3_fail_open"] += 1
+                    unresolved = unresolved_spans(selected, cu.decisions[-1].samples or [])
+                    _redact_resolutions(cu.decisions[-1])
+                    cu.decisions[-1].reason = ("resolutions disagreed: every resolution discarded; the original text is "
+                                               f"decomposed and claims containing {unresolved} are dropped")
+                    clarified = selected
+                elif hit:
                     if hit[0] in ("cannot_be_disambiguated", "unparseable_response"):
                         return self.exclude(u, "disambiguation", *hit)
                     return self.fail(u, "disambiguation", *hit)
-                clarified = r.data.get("clarified_text") or selected
+                else:
+                    clarified = r.data.get("clarified_text") or selected
             cu.clarified_text = clarified
 
             # Stage 4: decomposition
@@ -364,9 +426,10 @@ class _Run:
             fab = [c["text"] for c in raw_claims if verbs.fabricated_assertion(u.text, c["text"])]
             if fab:
                 self.counters["fabricated_assertion"] += 1
-                amb = " (its first word is verb_ambiguous: read as a noun)" if verbs.verb_ambiguous(u.text) else ""
+                added = verbs.added_assertion(u.text, fab[0])
                 return self.exclude(u, "decomposition", "fabricated_assertion",
-                                    f"the unit states no verb{amb}, but the claim {fab[0]!r} asserts one")
+                                    f"the unit is a fragment ({len(u.text.split())} words, no clause boundary), but the claim "
+                                    f"{fab[0]!r} asserts what it does not: {added}")
             kept = []
             for c in list(raw_claims):
                 if is_bare_date_range(c["text"]):  # F3: a date range produced by decomposition is a field value too
@@ -382,6 +445,58 @@ class _Run:
                     self.exclude(u, "decomposition", "qualifier_dropped", f"claim {c['text']!r} lost {missing}")
                     continue
                 kept.append(c)
+            if unresolved:  # Stage 3 fail-open: a claim that still carries an unresolved referent is dropped, the rest kept
+                contained = []
+                for c in kept:
+                    span = next((sp for sp in unresolved if _contains(c["text"], sp)), None)
+                    if span is None:
+                        contained.append(c)
+                        continue
+                    self.counters["unresolved_referent"] += 1
+                    self.rejected.append(RejectedClaim(unit_id=u.unit_id, claim_text=c["text"], source_span=(u.start, u.end),
+                                                       source_text=" ".join(u.text.split()), reason_code="unresolved_referent",
+                                                       detail=f"contains {span!r}, which Stage 3 could not resolve (samples disagreed)"))
+                    cu.dropped_claims.append(c["text"])
+                if kept and not contained:
+                    return self.exclude(u, "disambiguation", "cannot_be_disambiguated",
+                                        f"resolutions disagreed, and every claim contains an unresolved span {unresolved}")
+                kept = contained
+            # Stage 2 follow-up: a claim that is a gerund fragment ("Preventing CPU saturation.") names an activity and
+            # asserts nothing: the modality layer takes it, not the tense guard
+            asserted = []
+            for c in kept:
+                if modality.gerund_fragment(c["text"]):
+                    self.counters["non_assertions"] += 1
+                    self.non_assertions.append(NonAssertion(
+                        unit_id=u.unit_id, text=c["text"], source_span=(u.start, u.end), source_section=u.section,
+                        rule="gerund_fragment", attributed_to=self.attribution.get(u.unit_id),
+                        detail=f"claim extraction produced a gerund phrase with no subject and no finite verb from "
+                               f"{' '.join(u.text.split())[:160]!r}: it names an activity, it does not state that it was done"))
+                    continue
+                asserted.append(c)
+            if kept and not asserted:
+                return None  # every claim was an activity, now listed as a non-assertion
+            kept = asserted
+            # Stage 1 tense guard: a claim may not change the tense, modality or polarity of its own source span
+            guarded = []
+            for c in kept:
+                verdict, hit = tense.judge(u.text, c["text"])
+                if verdict == "not_applicable":
+                    self.counters["tense_guard_not_applicable"] += 1
+                    c["_guard"] = ("not_applicable", hit)
+                elif verdict == "passed":
+                    c["_guard"] = ("passed", None)
+                if verdict == "rejected":
+                    self.counters[hit[0]] += 1
+                    self.rejected.append(RejectedClaim(unit_id=u.unit_id, claim_text=c["text"], source_span=(u.start, u.end),
+                                                       source_text=" ".join(u.text.split()), reason_code=hit[0], detail=hit[1]))
+                    cu.dropped_claims.append(c["text"])
+                    continue
+                guarded.append(c)
+            if kept and not guarded:
+                last = self.rejected[-1]
+                return self.exclude(u, "decomposition", last.reason_code, f"every claim was rejected; e.g. {last.claim_text!r}: {last.detail}")
+            kept = guarded
             for i, c in enumerate(kept):
                 rt = routing.route(c["text"])
                 scope, target = routing.scope_of(c["text"], rt["kind"], u.text, u.section)
@@ -391,7 +506,9 @@ class _Run:
                     source_span=(u.start, u.end), source_section=u.section, kind=rt["kind"], secondary_kinds=rt["secondary_kinds"],
                     checkable_from_code=rt["checkable_from_code"], evidence_kind=rt["evidence_kind"], why_not_checkable=rt["why_not_checkable"],
                     checkability_note=rt["checkability_note"], support_ratio=support.claim_support_ratio(c["text"], unit_source),
-                    decomposition_tier=self.tiers["decomposition"]))
+                    decomposition_tier=self.tiers["decomposition"], attributed_to=self.attribution.get(u.unit_id),
+                    tense_guard=(c.get("_guard") or (None, None))[0], tense_guard_note=(c.get("_guard") or (None, None))[1],
+                    test_status=self.test_status.get(u.unit_id)))
         except llm.LLMRefusalError as exc:
             self.counters["model_refused"] += 1
             where = exc.refusal if isinstance(exc.refusal, dict) else {"kind": "api_refusal_field"}
@@ -408,12 +525,17 @@ def _finish(run: _Run, document: str, gate_info: ShieldGate, extra_excluded: lis
     for k in ("model_refused", "sentinel_normalized", "injection_suspected", "fabricated_quantity", "fabricated_entity",
               "qualifier_dropped", "stage3_pregate_skips", "rubric_leak", "ungrounded_qualifier", "stage3_escalations",
               "greedy_disagreement", "stage3_ensemble_disagreements", "bare_date_units", "bare_date_claims_dropped",
-              "skills_units", "skills_claims", "skills_items_over_cap", "references", "fabricated_assertion"):
+              "skills_units", "skills_claims", "skills_items_over_cap", "references", "fabricated_assertion",
+              "non_assertions", "tense_changed", "negation_inverted", "names_another_person", "names_unresolved",
+              "tense_guard_not_applicable", "test_status_rows", "stage3_fail_open", "unresolved_referent"):
         counters.setdefault(k, 0)
     counters["model_decisions"] = run.decisions
     return ClaimExtraction(
         document=document, document_text=run.text, shield=gate_info, units=run.units, claims=run.claims, excluded=run.excluded,
-        references=run.references,
+        references=run.references, non_assertions=run.non_assertions, rejected_claims=run.rejected, candidate_name=run.candidate,
+        attribution_note=(None if run.candidate or not run.attribution else
+                          f"{len(run.attribution)} table row(s) name a person, but the candidate's name was not found in the "
+                          "document (from --email): none of the rows naming a person was verified (names_unresolved)"),
         counters=counters, tiers=run.tiers, calls=run.calls, cost_usd=round(run.cost, 8) if run.cost_known else None,
         cost_cap_usd=run.cap, truncated=run.truncated, truncation_reason=run.truncation_reason,
         sufficiency_disagreement_rate=None,  # the judgement contract (and its override) is 4C only; not measured in 4A
@@ -422,8 +544,12 @@ def _finish(run: _Run, document: str, gate_info: ShieldGate, extra_excluded: lis
 
 def _run_units(units: list[Unit], document_text: str, tiers: dict[str, str], cap: float, run_tag: str | None,
                cache: StageCache | None = None, escalation: str | None = None, stage3_n: int | None = None,
-               reason_first: bool = config.REASON_FIRST) -> _Run:
+               reason_first: bool = config.REASON_FIRST, tables=None, candidate: str | None = None) -> _Run:
     run = _Run(document_text, tiers, cap, run_tag, cache, escalation)
+    run.modality = modality.classify(units, tables)
+    run.attribution, run.candidate = attribution.attribute(units, tables), candidate
+    run.test_status = modality.test_status(units, tables)
+    run.row_units = modality.row_units(units, tables)
     if stage3_n is not None:
         run.stage3_n = stage3_n
     run.reason_first = reason_first
@@ -445,16 +571,106 @@ def _run_units(units: list[Unit], document_text: str, tiers: dict[str, str], cap
     return run
 
 
+_DETERMINER_PRONOUNS = frozenset("this these those such same its their his her aforementioned former latter".split())
+_SPAN_STOP = frozenset("of to in on for with from by at into before after while where when which that who and or but is are "
+                       "was were be been has have had will would can could".split())
+
+
+def unresolved_spans(text: str, samples: list[dict]) -> list[str]:
+    """What Stage 3 could not resolve: every refusing sample's failed referent, and each pre-gate trigger with the noun
+    phrase it heads ("these OS filters", "it", "the database"), cut at punctuation or a function word."""
+    spans = [s.get("failed_referent") for s in samples if s.get("failed_referent")]
+    for rx in (stages._PRONOUN, stages._LEADING_THAT, stages._GENERIC_HEAD):
+        for m in rx.finditer(text or ""):
+            if rx is stages._PRONOUN and m.group(0) == "IT":
+                continue
+            words = [m.group(0)]
+            if rx is stages._PRONOUN and m.group(0).lower() not in _DETERMINER_PRONOUNS:
+                spans.append(m.group(0))  # "it", "they": the pronoun alone, never the verb after it
+                continue
+            for w in re.findall(r"[A-Za-z][A-Za-z0-9'-]*|[^\sA-Za-z]", text[m.end():])[:3]:
+                if not re.match(r"[A-Za-z]", w) or w.lower() in _SPAN_STOP:
+                    break
+                words.append(w)
+            spans.append(" ".join(words))
+            if rx is stages._PRONOUN:
+                spans.append(m.group(0))  # the bare demonstrative: "this" still unresolved, whatever follows it
+    out: list[str] = []
+    for sp in spans:
+        if sp and sp.lower() not in {x.lower() for x in out}:
+            out.append(sp)
+    return out
+
+
+def _contains(text: str, span: str) -> bool:
+    return re.search(rf"(?i)(?<![\w-]){re.escape(span)}(?![\w-])", text or "") is not None
+
+
+def _redact_resolutions(decision) -> None:
+    """A discarded resolution never leaves Stage 3: its text is replaced by a hash (the audit keeps verdict, failed
+    referent and reason, and proves which text was discarded without carrying it)."""
+    for smp in decision.samples or []:
+        txt = smp.get("clarified_text")
+        if txt:
+            smp["clarified_text"] = None
+            smp["clarified_text_discarded_sha256"] = hashlib.sha256(txt.encode()).hexdigest()[:16]
+
+
+def isolate_rows(units, tables) -> None:
+    """A reconstructed table row is self-contained: its context keeps the headings but never its sibling rows.
+    Measured (Stage 2 follow-up): the Request-handling row's claim read "The queue buffers handle incoming items
+    without dropping data", the NEXT row's notes, taken from the unit's "After:" context. The table reconstruction was
+    clean; the text crossed in 4A's context. No guard catches it (no entity or quantity is involved)."""
+    rows = {" ".join(rl.text.split()) for t in (tables or []) for rl in (getattr(t, "row_lines", None) or [])}
+    if not rows:
+        return
+    in_row = lambda text: any(" ".join((text or "").split()) in r for r in rows)  # noqa: E731
+    for u in units:
+        if in_row(u.text):
+            u.context_before = [c for c in u.context_before if not in_row(c)]
+            u.context_after = [c for c in u.context_after if not in_row(c)]
+
+
+SIBLING_CONTEXT = False  # True restores the pre-close-out context (sibling bullets as Before/After), for A/B measurement
+
+
+def isolate_siblings(units) -> None:
+    """Neighbour contamination is a class (Stage 2 close-out): a bullet's context keeps its headings (heading_path), its
+    parent bullet, its own sub-bullets, the other sentences of the SAME bullet and any non-bullet line, but never another
+    item of the list. Same rule as isolate_rows for table rows."""
+    if SIBLING_CONTEXT:
+        return
+    by_text: dict[str, list] = {}
+    for x in units:
+        by_text.setdefault(x.text, []).append(x)
+
+    def sibling(u, text):
+        """Another item of the same list: not this bullet, not its parent, not one of its sub-bullets."""
+        return any(x.kind == "bullet" and x.bullet_id and x.bullet_id != u.bullet_id and x.bullet_id != u.parent_bullet_id
+                   and x.parent_bullet_id != u.bullet_id for x in by_text.get(text, []))
+
+    for u in units:
+        if u.kind == "bullet" and u.bullet_id:
+            u.context_before = [c for c in u.context_before if not sibling(u, c)]
+            u.context_after = [c for c in u.context_after if not sibling(u, c)]
+
+
 def extract_claims(report: DocumentReport, *, decomposition_tier: str, selection_tier: str = "nano",
                    disambiguation_tier: str = config.STAGE3_TIER, stage3_escalation: str | None = None,
-                   cost_cap_usd: float | None = None, run_tag: str | None = None) -> ClaimExtraction:
+                   cost_cap_usd: float | None = None, run_tag: str | None = None,
+                   candidate_emails: list[str] | None = None) -> ClaimExtraction:
+    """``candidate_emails``: the operator's --email; used ONLY to find the candidate's name in the document (Stage 1
+    names_another_person). Never sent to a model."""
     tiers = {"selection": selection_tier, "disambiguation": disambiguation_tier, "decomposition": decomposition_tier}
-    cap = config.DEFAULT_COST_CAP_USD if cost_cap_usd is None else cost_cap_usd
     g = gate(report)
     if report.structure is None:
-        return ClaimExtraction(document=report.document.path, shield=g, tiers=tiers, cost_cap_usd=cap,
+        return ClaimExtraction(document=report.document.path, shield=g, tiers=tiers, cost_cap_usd=cost_cap_usd or config.DEFAULT_COST_CAP_USD,
                                not_extracted_reason="the document analyzer produced no text structure (image-only, encrypted or over a cap)")
     document_text, units, contact = split_structure(report.structure)
+    isolate_rows(units, report.structure.tables)
+    isolate_siblings(units)
+    cap = config.cost_cap_for(len(units)) if cost_cap_usd is None else cost_cap_usd  # scales with document size
+    n_total = len(units) + len(contact)
     pre: list[ExcludedUnit] = [ExcludedUnit(unit_id=u.unit_id, source_span=(u.start, u.end), source_section=u.section, stage="split",
                                             reason_code="contact_info", detail="contact details are never sent to a model")
                                for u in contact]
@@ -469,9 +685,12 @@ def extract_claims(report: DocumentReport, *, decomposition_tier: str, selection
                 kept.append(u)
         g.units_removed = len(units) - len(kept)
         units = kept
-    run = _run_units(units, document_text, tiers, cap, run_tag, escalation=stage3_escalation)
+    run = _run_units(units, document_text, tiers, cap, run_tag, escalation=stage3_escalation, tables=report.structure.tables,
+                     candidate=attribution.candidate_name(report.structure, candidate_emails))
     out = _finish(run, report.document.path, g, pre)
     out.units = [x.to_contract() for x in contact] + out.units
+    out.units_total = n_total
+    out.units_processed = n_total - sum(1 for e in out.excluded if e.reason_code in ("cost_cap", "model_unavailable"))
     return out
 
 
@@ -487,9 +706,13 @@ def extract_from_text(text: str, *, headings: list[str] | None = None, before: l
         lines.append((pos, pos + len(line), line))
         pos += len(line) + 1
     units = split_lines(lines, text, section=(headings or [None])[-1], heading_path=headings or [])
+    isolate_siblings(units)
     for u in units:
         u.context_before = list(before or []) + u.context_before
     tiers = {"selection": selection_tier, "disambiguation": disambiguation_tier, "decomposition": decomposition_tier}
-    cap = config.DEFAULT_COST_CAP_USD if cost_cap_usd is None else cost_cap_usd
+    cap = config.cost_cap_for(len(units)) if cost_cap_usd is None else cost_cap_usd
     run = _run_units(units, text, tiers, cap, run_tag, cache, stage3_escalation, stage3_n, reason_first)
-    return _finish(run, "<text>", ShieldGate(applied=False, document_status="clean"), [])
+    out = _finish(run, "<text>", ShieldGate(applied=False, document_status="clean"), [])
+    out.units_total = len(units)
+    out.units_processed = len(units) - sum(1 for e in out.excluded if e.reason_code in ("cost_cap", "model_unavailable"))
+    return out

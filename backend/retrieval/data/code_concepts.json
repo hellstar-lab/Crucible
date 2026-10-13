@@ -1,0 +1,33 @@
+{
+ "_comment": "Stage 2: code concepts a claim can name without naming a technology ('worker thread pools', 'row-level locking'). aliases: phrases matched in the claim (case-insensitive, whole words). patterns: regexes searched in eligible source files; a hit is evidence the concept is IMPLEMENTED there, cited at its enclosing function. A concept no pattern finds is 'looked and found nothing', never a guess.",
+ "concepts": {
+  "thread_pool": {"aliases": ["thread pool", "thread pools", "worker pool", "worker pools", "worker thread pool", "worker thread pools", "worker threads", "pool of workers"],
+                  "patterns": ["ThreadPoolExecutor", "ProcessPoolExecutor", "multiprocessing\\.Pool\\(", "threading\\.Thread\\(", "\\bThread\\(\\s*target\\s*=", "class \\w*(?:Worker|Thread)Pool\\b"]},
+  "semaphore": {"aliases": ["semaphore", "semaphores", "semaphore-regulated"],
+                "patterns": ["\\b(?:Bounded)?Semaphore\\(", "asyncio\\.Semaphore\\("]},
+  "bounded_queue": {"aliases": ["bounded queue", "bounded queues", "fixed-capacity", "fixed capacity", "buffer queue", "bounded buffer", "queue buffer", "queue buffers", "request queue", "queue structures"],
+                    "patterns": ["\\bQueue\\([^)]*maxsize\\s*=", "\\bqueue\\.Queue\\(", "deque\\([^)]*maxlen\\s*=", "asyncio\\.Queue\\(", "\\bmaxsize\\s*="]},
+  "mutex_lock": {"aliases": ["mutex", "mutexes", "lock management", "locking routines", "thread lock", "thread locks"],
+                 "patterns": ["threading\\.R?Lock\\(", "\\bR?Lock\\(\\)", "\\.acquire\\(", "asyncio\\.Lock\\("]},
+  "row_lock": {"aliases": ["row-level lock", "row-level locks", "row-level locking", "row lock", "row locks", "select for update", "pessimistic lock", "pessimistic locking"],
+               "patterns": ["with_for_update\\(", "\\bFOR\\s+UPDATE\\b", "select_for_update\\("]},
+  "transaction": {"aliases": ["transaction", "transactions", "transaction blocks", "acid", "commit", "rollback", "rollbacks"],
+                  "patterns": ["\\.commit\\(\\)", "\\.rollback\\(\\)", "\\.begin(?:_nested)?\\(\\)", "\\bSTART\\s+TRANSACTION\\b", "\\bBEGIN\\s+TRANSACTION\\b"]},
+  "unique_constraint": {"aliases": ["duplicate", "duplicates", "duplicate entries", "duplicate enrollments", "unique constraint", "unique constraints"],
+                        "patterns": ["UniqueConstraint\\(", "unique\\s*=\\s*True", "\\bUNIQUE\\s*\\(", "IntegrityError"]},
+  "check_constraint": {"aliases": ["seat limit", "seat limits", "seating caps", "seat overbooking", "overbooking", "check constraint", "check constraints", "capacity check", "capacity checks"],
+                       "patterns": ["CheckConstraint\\(", "\\bCHECK\\s*\\("]},
+  "stored_procedure": {"aliases": ["stored procedure", "stored procedures", "stored procedure scripts"],
+                       "patterns": ["\\bCREATE\\s+(?:OR\\s+REPLACE\\s+)?PROCEDURE\\b", "\\.callproc\\(", "\\bCALL\\s+\\w+\\s*\\("]},
+  "db_trigger": {"aliases": ["database trigger", "database triggers", "db trigger", "sql trigger", "rollback triggers"],
+                 "patterns": ["\\bCREATE\\s+(?:OR\\s+REPLACE\\s+)?TRIGGER\\b", "\\bDDL\\(.*TRIGGER", "event\\.listen\\("]},
+  "retry": {"aliases": ["retry", "retries", "retry rate", "retry rates", "retry logic"],
+            "patterns": ["\\bretr(?:y|ies)\\b", "\\bbackoff\\b", "\\btenacity\\b"]},
+  "schema": {"aliases": ["relational schema", "database schema", "schema design", "data model", "tables"],
+             "patterns": ["__tablename__\\s*=", "\\bCREATE\\s+TABLE\\b", "\\bTable\\(\\s*[\"']"]},
+  "dispatcher": {"aliases": ["dispatcher", "request dispatcher", "request routing"],
+                 "patterns": ["\\bdispatch\\w*\\(", "class \\w*Dispatcher\\b", "def (?:route|dispatch)\\w*\\("]},
+  "admission_control": {"aliases": ["admission control", "admission filters", "throttling", "rate limiting", "rate limit"],
+                        "patterns": ["\\badmission\\w*\\b", "\\bthrottl\\w*\\b", "\\brate_?limit\\w*\\b", "\\b429\\b", "\\breject\\w*\\("]}
+ }
+}

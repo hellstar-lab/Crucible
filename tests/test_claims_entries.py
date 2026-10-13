@@ -92,13 +92,27 @@ def test_report_lists_references_with_the_repos_they_name(fake):
 
 @pytest.mark.parametrize("source,claim", [("Release pipeline for mobile apps", "Built a release pipeline"),
                                           ("Design system for the checkout", "Designed the checkout design system")])
-def test_verb_ambiguous_first_word_is_treated_as_verbless(source, claim):
-    assert verbs.verb_ambiguous(source) and verbs.fabricated_assertion(source, claim)
+def test_a_fragment_given_an_action_fires(source, claim):
+    """M2 is structural now (claim track close-out): a short line with no clause boundary, and a claim that asserts an
+    action it does not state (an added word, or a bare word turned into an -ed verb)."""
+    assert verbs.is_fragment(source) and verbs.fabricated_assertion(source, claim)
 
 
-def test_unambiguous_initial_verbs_still_count():
-    assert not verbs.verb_ambiguous("Redesigned the checkout flow")
+def test_a_claim_that_keeps_the_lines_own_words_passes():
     assert not verbs.fabricated_assertion("Migrated the billing service to Go", "Migrated the billing service to Go")
+    assert not verbs.fabricated_assertion("Redesigned the checkout flow", "Redesigned the checkout flow")
+
+
+ROLLBACK = ("Once cleared through these OS filters, queries reach our MySQL instance where transactions execute under strict "
+            "isolation with automatic rollback triggers for race conditions or full classes.")
+
+
+def test_a_full_sentence_is_never_a_fragment():
+    """Canary I1: the verb-lexicon M2 read this 25-word sentence as verbless (it knew none of cleared / reach / execute /
+    trigger) and dropped it at decomposition."""
+    assert not verbs.is_fragment(ROLLBACK)
+    assert not verbs.fabricated_assertion(ROLLBACK, "Automatic rollback triggers are in place for race conditions.")
+    assert verbs.is_fragment("B.Sc. Computer Science, University of Example")  # an abbreviation is not a sentence end
 
 
 def test_verb_ambiguous_drop_is_listed_as_could_not_process(fake):
@@ -107,4 +121,4 @@ def test_verb_ambiguous_drop_is_listed_as_could_not_process(fake):
                                                                           "qualifiers": []}])
     out = pipeline.extract_from_text(unit, headings=["SUMMARY"], decomposition_tier="nano")
     [e] = out.excluded
-    assert e.reason_code == "fabricated_assertion" and "verb_ambiguous" in e.detail
+    assert e.reason_code == "fabricated_assertion" and "fragment" in e.detail and "'Built'" in e.detail

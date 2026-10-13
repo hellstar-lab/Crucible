@@ -394,6 +394,45 @@
    "code_artifacts": true,
    "note": null
   },
+  "mysql": {
+   "aliases": [
+    "MySQL"
+   ],
+   "deps": [
+    "pymysql",
+    "mysqlclient",
+    "mysql-connector-python",
+    "aiomysql",
+    "asyncmy",
+    "mysql2",
+    "mysql",
+    "github.com/go-sql-driver/mysql",
+    "mysql:mysql-connector-java",
+    "com.mysql:mysql-connector-j"
+   ],
+   "imports": [
+    "pymysql",
+    "MySQLdb",
+    "mysql.connector",
+    "aiomysql",
+    "asyncmy",
+    "github.com/go-sql-driver/mysql",
+    "mysql2"
+   ],
+   "files": [],
+   "config_keys": [
+    "mysql://",
+    "mysql+pymysql://",
+    "mysql+mysqldb://",
+    "mysql+aiomysql://",
+    "mysql+asyncmy://",
+    "MYSQL_ROOT_PASSWORD",
+    "MYSQL_DATABASE",
+    "MYSQL_HOST"
+   ],
+   "code_artifacts": true,
+   "note": "Stage 2 (OSDBMS phase-II report): 'Implementation Stack: MySQL' was unverifiable as unknown_technology"
+  },
   "kafka": {
    "aliases": [
     "Kafka",

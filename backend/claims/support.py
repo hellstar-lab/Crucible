@@ -89,6 +89,9 @@ def entities(text: str) -> list[str]:
     """Technologies (lexicon canonical names) and proper nouns, as written."""
     table, norm = _lexicon()
     raw = re.findall(r"[A-Za-z0-9][A-Za-z0-9+#./-]*", (text or "").replace("-", " "))
+    # sentence punctuation is not part of a word: "Pass." in a claim is "Pass" (measured: "Status (Pass/Fail): Pass."
+    # failed against the source's "Pass;" as a fabricated entity 'Pass.'). Internal dots stay ("Node.js", "ASP.NET").
+    raw = [w.rstrip("./") for w in raw if w.rstrip("./")]
     out, used = [], set()
     for i, n, phrase in _ngrams(raw):
         if any(j in used for j in range(i, i + n)):

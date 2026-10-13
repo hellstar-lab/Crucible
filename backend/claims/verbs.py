@@ -108,9 +108,45 @@ def has_verb(text: str, *, source: bool = False) -> bool:
     return False
 
 
+MAX_FRAGMENT_WORDS = 12
+# a sentence end (after a lower-case word, so "B.Sc." is not one), a semicolon, or a subordinating / coordinating clause
+_BOUNDARY = re.compile(r"(?<=[a-z]{2})[.!?]\s+[A-Za-z]|;\s*\S|(?i:,\s*(?:and|but|or|so|which|where|who|that|while|because)\b)|"
+                       r"(?i:\b(?:which|where|who|whom|whose|because|although|though|while|whereas|since|unless|if)\b)")
+_FRAG_STOP = frozenset("""a an the and or of for to in on at by with from into via as is are was were be been being has have
+had do does did its it this that these those our their his her my your we they i he she them us""".split())
+
+
+def is_fragment(text: str) -> bool:
+    """A SHORT line with no clause boundary: an entry heading, a title line, a bullet fragment ("Crucible, hiring-evidence
+    system", "Release pipeline for mobile apps", "Implementation Stack: Python and MySQL"). A colon is a label, not a
+    boundary. Structural, no verb list (claim track close-out)."""
+    words = _TOKEN.findall(re.sub(r"^\s*(?:\d{1,2}[.)]|[-*•])\s*", "", text or ""))
+    return 0 < len(words) <= MAX_FRAGMENT_WORDS and not _BOUNDARY.search((text or "").strip().rstrip(".!?"))
+
+
+def added_assertion(source: str, claim: str) -> list[str]:
+    """Claim words that assert something the fragment does not: a content word whose stem the source lacks ("Built"),
+    or an -ed form of a word the source has only bare ("Design system" -> "Designed")."""
+    from .tense import stem
+    src_tokens = [t.lower() for t in _TOKEN.findall(source or "")]
+    src_stems = {stem(t) for t in src_tokens}
+    inflected = {stem(t) for t in src_tokens if t.endswith(("ed", "ing"))}
+    out = []
+    for tok in _TOKEN.findall(claim or ""):
+        low = tok.lower()
+        if low in _FRAG_STOP or len(low) < 3:
+            continue
+        st = stem(low)
+        if st not in src_stems or (low.endswith("ed") and st not in inflected and low not in src_tokens):
+            out.append(tok)
+    return out
+
+
 def fabricated_assertion(source: str, claim: str) -> bool:
-    """M2: the source states no verb, the claim does."""
-    return not has_verb(source, source=True) and has_verb(claim)
+    """M2, structural (claim track close-out): the SOURCE is a fragment, and the claim asserts something it does not.
+    Replaces the verb-lexicon reading. Measured: verbs.py knew none of "cleared / reach / execute / trigger", so the
+    25-word "automatic rollback triggers" sentence read as verbless, and canary I1 was dropped at decomposition."""
+    return is_fragment(source) and bool(added_assertion(source, claim))
 
 
 def verb_ambiguous(text: str) -> bool:

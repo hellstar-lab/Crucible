@@ -35,6 +35,8 @@ No scores, no ranking, no hire/reject signal anywhere.
 
 from __future__ import annotations
 
+import re
+
 from collections import Counter
 
 from backend import llm
@@ -53,6 +55,26 @@ def no_artifact_possible(claim, es) -> bool:
     techs = (es.searched.technologies if es.searched else None) or lexicon.recognise(_get(claim, "text") or "")
     lex = lexicon.technologies()
     return bool(techs) and not es.items and all(not lex[t].get("code_artifacts", True) for t in techs if t in lex)
+
+
+GUARANTEE = re.compile(r"(?i)\b(guarantee[sd]?|guaranteeing|never|always|fully)\b")
+GUARANTEE_REASON = ("the mechanism the claim names is implemented (cited); {word!r} is a guarantee about every execution, "
+                    "which reading the code cannot establish")
+
+
+def _mechanism_item(claim, es) -> int | None:
+    """Index of the r_artifact item for the FIRST code concept the claim names (the mechanism, before the guarantee)."""
+    from backend.retrieval import lexicon as rlex
+    concepts = rlex.recognise_concepts(_get(claim, "text") or "")
+    for concept in concepts:
+        for i, it in enumerate(es.items):
+            if it.rule == "r_artifact" and f"concept {concept!r}" in (it.match_detail or ""):
+                return i
+    return None
+
+
+TEST_STATUS_REASON = ("the document reports this test as {status!r}; a pass or a fail is the outcome of running the test, "
+                      "which a repository does not record: the test can be found in the code, its result cannot")
 
 
 def _base(claim, es) -> dict:
@@ -117,6 +139,11 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
     base = _base(claim, es)
     scope, target = _scope(claim)
     base.update(scope=scope, scope_target=target)
+    status = _get(claim, "test_status")
+    if status:  # Stage 2: a test-status row is a RUN result, which no repository records; never a model call
+        counters["test_status"] += 1
+        return ClaimVerdict(**base, verdict="inconclusive", reason=TEST_STATUS_REASON.format(status=status),
+                            matrix_row="gate:test_status", gates=["gate:test_status"]), 0, 0.0
     if not es.retrieval_performed:
         counters["unverifiable"] += 1
         return ClaimVerdict(**base, verdict="unverifiable", reason=es.skip_reason or "retrieval was not performed",
@@ -125,6 +152,17 @@ def verdict_for(claim, es, counters: Counter | None = None, run_tag: str | None 
         counters["no_artifact_possible"] += 1
         return ClaimVerdict(**base, verdict="inconclusive", reason=matrix.NO_ARTIFACT_REASON, matrix_row="gate:no_artifact_possible",
                             gates=["gate:no_artifact_possible"]), 0, 0.0
+    g = GUARANTEE.search(_get(claim, "text") or "")
+    idx = _mechanism_item(claim, es) if g and es.items else None
+    if idx is not None:
+        # claim track close-out: one possible verdict, so no model call (FEEDBACK #16). Measured: "Row-level locking in
+        # MySQL guarantees that class seating caps are never exceeded" came back no_evidence, although the row lock is
+        # implemented (registration_service.py:107): the guarantee is unknowable, the mechanism is not absent.
+        counters["guarantee_over_mechanism"] += 1
+        return ClaimVerdict(**base, verdict="inconclusive", reason=GUARANTEE_REASON.format(word=g.group(0)),
+                            matrix_row="gate:guarantee_over_mechanism", gates=["gate:guarantee_over_mechanism"],
+                            content_supported="supported", cited_item_index=idx, cited_item=es.items[idx],
+                            content_reason=f"item {idx} implements the mechanism; the guarantee itself is not checkable"), 0, 0.0
     if not es.items:
         counters["no_evidence_without_call"] += 1
         excluded = [m for m in (es.searched.rules_fired if es.searched else []) if "excluded_by_3.5" in m]

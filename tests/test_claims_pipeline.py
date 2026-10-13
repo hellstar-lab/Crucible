@@ -128,7 +128,8 @@ def test_stage3_pregate_skips_units_with_nothing_to_resolve(fake):
     ("Skills: Python, Docker.", None), ("Built a routing engine in Go that processes 1,200 requests/s.", None),
     ("Reduced p95 latency by 70% on the read path", None), ("Moved IT tickets to Jira", None),
     ("Improved it by 40%", "it"), ("Rewrote the service in Go", "the service"), ("Same as above for the mobile app", "Same"),
-    ("That cut costs by half", "That"), ("Our team shipped the beta", "Our"),
+    ("That cut costs by half", "That"),
+    ("Our team shipped the beta", None),  # Stage 3 item 1: first person refers to the author; it never triggers Stage 3
 ])
 def test_pregate_triggers(text, trigger):
     from backend.claims.stages import needs_disambiguation

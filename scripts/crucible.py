@@ -96,6 +96,8 @@ def main() -> int:
     ap.add_argument("--email", action="append", default=[], help="extra commit emails (never shown in the report)")
     ap.add_argument("--reference", help="an opaque operator reference for the candidate (no emails)")
     ap.add_argument("--decomposition-tier", default="nano")
+    ap.add_argument("--cost-cap-usd", type=float, help="4A per-document cost cap (default: about 40 Nano calls, sized for a "
+                                                       "one-page resume); the value used is recorded in the report")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--no-questions", action="store_true", help="skip Phase 4G question generation")
     ap.add_argument("--max-questions", type=int, default=8)
@@ -115,7 +117,8 @@ def main() -> int:
         return 2
 
     with PromptAudit(needles) as audit:
-        extraction = extract_claims(doc, decomposition_tier=a.decomposition_tier, run_tag=f"{tag}:4A")
+        extraction = extract_claims(doc, decomposition_tier=a.decomposition_tier, cost_cap_usd=a.cost_cap_usd, run_tag=f"{tag}:4A",
+                                    candidate_emails=a.email)
         claims = extraction.claims or []
 
         report = analyze_targets(repos, user=a.user, emails=a.email or None, opts=Options())  # 3.6
@@ -195,11 +198,34 @@ def main() -> int:
             print(f"  REJECTED {r['rule']} {r['claim_id']}: {r['text']!r} ({r['detail']})")
         for sk in qset.skipped:
             print(f"  not asked {sk['claim_id']} [{sk['verdict']}]: {sk['reason']}")
+    cov = data["header"].get("coverage") or {}
+    print(f"\nCOVERAGE  units {cov.get('units_processed')}/{cov.get('units_total')} ({cov.get('units_ratio')}) "
+          f"{cov.get('extraction_reason') or 'complete'};  claims judged {cov.get('claims_judged')}/{cov.get('claims_total')} "
+          f"{cov.get('verdicts_reason') or 'complete'};  4A cap ${extraction.cost_cap_usd}")
+    print(f"candidate name found in the document: {extraction.candidate_name!r}" + (f"  ({extraction.attribution_note})" if extraction.attribution_note else ""))
+    print(f"\nSTATED AS NOT YET DONE ({len(extraction.non_assertions)}): no verdict")
+    for n in extraction.non_assertions:
+        print(f"  {n.unit_id:<7} {n.rule:<17} [{n.source_section}] {n.text!r}" + (f"  (attributed to {n.attributed_to})" if n.attributed_to else ""))
+    print(f"\nREJECTED CLAIMS ({len(extraction.rejected_claims)}): tense guard and unresolved referents")
+    for r in extraction.rejected_claims:
+        print(f"  {r.unit_id:<7} {r.reason_code:<17} claim {r.claim_text!r}\n          source {r.source_text!r}\n          {r.detail}")
+    tg = data["header"].get("tense_guard") or {}
+    print(f"\nTENSE GUARD  passed={tg.get('passed')}  rejected={tg.get('rejected')}  not_applicable={tg.get('not_applicable')}  "
+          f"rejected_by_reason={tg.get('rejected_by_reason')}")
+    unres = [e for e in extraction.excluded if e.reason_code == "names_unresolved"]
+    if unres:
+        print(f"\nNAMES UNRESOLVED ({len(unres)}): {extraction.attribution_note}")
+    another = [e for e in extraction.excluded if e.reason_code == "names_another_person"]
+    print(f"\nNAMES ANOTHER PERSON ({len(another)}): no retrieval, no verdict")
+    for e in another:
+        a_, b_ = e.source_span
+        print(f"  {e.unit_id:<7} {' '.join(extraction.document_text[a_:b_].split())!r}")
     print("\nCLAIMS")
     for r in rep.rows:
         c = r.citation
         cite = f"{c['repo']}:{c['path']}:{c['start_line']}-{c['end_line']}" if c else "-"
-        print(f"  {r.claim_id:<8} {r.verdict:<13} [{r.claim_kind}] {r.claim_text!r}")
+        g = next((c.tense_guard for c in extraction.claims or [] if c.claim_id == r.claim_id), None)
+        print(f"  {r.claim_id:<8} {r.verdict:<13} [{r.claim_kind}] guard={g} {r.claim_text!r}" + (f"  (attributed to {r.attributed_to})" if r.attributed_to else ""))
         print(f"           reason: {r.reason}")
         print(f"           basis: {r.matrix_row}  agreement={r.agreement} tier={r.model_tier} escalated={r.escalated}  cite: {cite}")
     return 3 if audit.hits else 0

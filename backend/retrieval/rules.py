@@ -392,5 +392,85 @@ def r_benchmark(claim: str, techs: list[str], view: RepoView) -> RuleResult:
     return res
 
 
-RULES = {"r_dependency": r_dependency, "r_import": r_import, "r_config": r_config, "r_ownership": r_ownership,
+# --------------------------------------------------------------------------
+# Stage 2: artifact implementation (a code concept the claim names, found in the code itself)
+# --------------------------------------------------------------------------
+
+def _prose_lines(path: str, text: str) -> set[int]:
+    """Lines of a Python file that are comments or docstrings: prose ABOUT the code, never its implementation.
+    (Measured: "SELECT ... FOR UPDATE" in lock_section's docstring, line 106, was cited instead of the with_for_update()
+    call on line 107.) A SQL string inside code ("text('... FOR UPDATE')") is code and stays."""
+    if not path.endswith(".py"):
+        return set()
+    import ast
+    import io
+    import tokenize
+    out: set[int] = set()
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT:
+                out.add(tok.start[0])
+        for node in ast.walk(ast.parse(text)):
+            body = getattr(node, "body", None)
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and body:
+                first = body[0]
+                if isinstance(first, ast.Expr) and isinstance(getattr(first, "value", None), ast.Constant) and isinstance(first.value.value, str):
+                    out.update(range(first.lineno, (first.end_lineno or first.lineno) + 1))
+    except (SyntaxError, tokenize.TokenError, ValueError):
+        return set()
+    return out
+
+
+_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|spec|__tests__)/|(?:^|/)(?:test_[^/]*|[^/]*_test\.\w+|conftest\.py)$")
+ARTIFACT_HITS_PER_CONCEPT = 3
+
+
+def r_artifact(claim: str, techs: list[str], view: RepoView) -> RuleResult:
+    """Code concepts the claim names ("worker thread pools", "row-level locking", "stored procedures"; data/code_concepts.json)
+    searched in the CONTENT of eligible, non-test source files; each hit is cited at its enclosing function. A concept no
+    pattern finds is recorded as r_artifact:<concept>:none: looked and found nothing (a stored procedure that is not
+    there), never a guess. Measured on the OSDBMS phase-II report: 22 claims naming thread pools, semaphores, a bounded
+    queue or row locks routed to "other" and were never searched."""
+    res = RuleResult()
+    concepts = lexicon.recognise_concepts(claim)
+    if not concepts:
+        res.outcomes.append("r_artifact:no_concept_named")
+        return res
+    if not view.snap:
+        res.outcomes.append("r_artifact:no_snapshot")
+        return res
+    paths = [p for p in sorted(view.blamed) if view.eligible(p) and not _TEST_PATH.search(p)]
+    funcs = [f for f in view.snap.get("functions", []) if view.eligible(f["path"])]
+    lex = lexicon.concepts()
+    for concept in concepts:
+        found = 0
+        for path in paths:
+            text = view.text(path)
+            if text is None:
+                res.outcomes.append("r_artifact:needs_checkout")
+                return res
+            prose = _prose_lines(path, text)
+            for ln, line in enumerate(text.splitlines(), 1):
+                if ln in prose:
+                    continue
+                rx = next((r for r in lex[concept]["_patterns"] if r.search(line)), None)
+                if rx is None:
+                    continue
+                fn = min((f for f in funcs if f["path"] == path and f["start_line"] <= ln <= f["end_line"]),
+                         key=lambda f: f["end_line"] - f["start_line"], default=None)
+                where = f"in function {fn['name']} (lines {fn['start_line']}-{fn['end_line']})" if fn else "module level"
+                # the citation is the LINE that implements the concept (registration_service.py:107 with_for_update(),
+                # not the whole lock_section function), so a reviewer lands on it
+                res.items.append(_item(view, path=path, start_line=ln, end_line=ln, kind="function" if fn else "file_presence",
+                                       excerpt=view.excerpt(path, ln, ln), rule="r_artifact", match="pattern",
+                                       match_detail=f"concept {concept!r}: line {ln} matches {rx.pattern!r} ({where})"))
+                found += 1
+                break  # one hit per file per concept: the next file is more informative than a second line here
+            if found >= ARTIFACT_HITS_PER_CONCEPT:
+                break
+        res.outcomes.append(f"r_artifact:{concept}:{found or 'none'}")
+    return res
+
+
+RULES = {"r_artifact": r_artifact, "r_dependency": r_dependency, "r_import": r_import, "r_config": r_config, "r_ownership": r_ownership,
          "r_structure": r_structure, "r_scale": r_scale, "r_history": r_history, "r_benchmark": r_benchmark}

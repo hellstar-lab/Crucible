@@ -46,8 +46,8 @@ SKIPPED_KINDS = {
 
 KIND_RULES: dict[str, tuple[str, ...]] = {
     "technology_use": ("r_dependency", "r_import", "r_config"),
-    "ownership": ("r_ownership",),
-    "artifact_exists": ("r_structure", "r_config"),
+    "ownership": ("r_ownership", "r_artifact"),  # Stage 2: r_artifact finds a named code concept in the code itself
+    "artifact_exists": ("r_structure", "r_config", "r_artifact"),
     "scale": ("r_scale",),
     "timeline": ("r_history",),
     "metric": ("r_benchmark",),
@@ -59,6 +59,7 @@ _HERE = Path(__file__).resolve().parent
 def retrieval_version() -> str:
     """Changes whenever a rule, the lexicon or a cutoff changes, so a cached EvidenceSet invalidates."""
     h = hashlib.sha256()
-    for name in ("config.py", "rules.py", "rank.py", "lexicon.py", "sources.py", "data/tech_artifacts.json"):
+    for name in ("config.py", "rules.py", "rank.py", "lexicon.py", "sources.py", "data/tech_artifacts.json",
+                 "data/code_concepts.json"):
         h.update((_HERE / name).read_bytes())
     return f"{RETRIEVAL_VERSION_BASE}+{h.hexdigest()[:10]}"

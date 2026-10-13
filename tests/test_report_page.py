@@ -221,6 +221,24 @@ def test_identity_check(links, user, repos, status, analysed, source):
         assert "the repositories the resume names were analysed" in ic["message"]
 
 
+@pytest.mark.parametrize("user", ["hellstar-lab", "KasakRathi"])
+def test_a_document_repository_that_is_not_the_analysed_one_is_a_mismatch(user, degraded):
+    """Measured: an OSDBMS report links KasakRathi/ConcurrentReg, the analysed repo is hellstar-lab/Concurrent_Reg. The
+    account check alone said "unconfirmed" (or "agree" under --user KasakRathi) and no banner was shown."""
+    from backend.grounding.identity import compare
+    doc = _doc(("KasakRathi", "KasakRathi/ConcurrentReg"))
+    ic, use = compare(doc, user, ["hellstar-lab/Concurrent_Reg"])
+    assert (ic["status"], ic["mismatch_on"], use) == ("mismatch", "repository", ["hellstar-lab/Concurrent_Reg"])
+    assert "KasakRathi/ConcurrentReg" in ic["message"] and "similarly named repository under a different owner" in ic["message"]
+    d = copy.deepcopy(degraded)
+    d["header"]["identity_check"] = ic
+    page = render_html(d)
+    banner = page.split('id="analysed"')[0]
+    assert "<h2>Identity mismatch</h2>" in banner and "repository analysed (operator)" in banner
+    same, _ = compare(doc, "KasakRathi", ["kasakrathi/concurrentreg"])  # the same repository, any case: no mismatch
+    assert same["status"] == "agree" and same["mismatch_on"] is None
+
+
 def test_mismatch_is_at_the_top_and_on_every_authorship_cell(degraded):
     from backend.grounding.identity import compare
     d = copy.deepcopy(degraded)

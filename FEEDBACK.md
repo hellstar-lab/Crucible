@@ -294,3 +294,108 @@ The model did not refuse; the detector misread reasoning as a refusal.
 
 **Regression test:** `tests/test_llm.py::test_long_agent_reasoning_is_not_a_refusal`. It uses a labelled
 RECONSTRUCTION of the crashing text. The log stores prompt hashes only, by design, so the verbatim text was never kept.
+
+### 15. The tense guard: what it actually catches is a purpose stated as an outcome (n=3; not acted on yet)
+
+**About:** Crucible's own Stage 1 tense guard (`backend/claims/tense.py`), on the OSDBMS phase-II report. It is not a
+platform issue. Recorded so the next change to the guard starts from the data.
+
+**Every correct rejection so far is one construction: a stated PURPOSE rendered as an achieved OUTCOME.**
+
+| Source | Claim the model produced |
+|---|---|
+| "Deployed worker thread pools … **to regulate** execution threads" | "**Regulated** execution threads" |
+| "… required careful experimentation **to avoid** performance bottlenecks" | "The tuning **avoided** performance bottlenecks" |
+| "4. **Preventing** Race Conditions and Overselling" (a heading) | "**Prevented** race conditions." |
+
+The third was a MISS on the first re-run: "prevent" was not in the guard's verb list. It is caught only since that
+amendment; it was never a live firing.
+
+**False positives: 4 of the guard's live firings,** all fixed since, each with a regression test. Two causes:
+- **The claim TRUNCATED the source.** It kept one half of the source and dropped a negated phrase, which the guard
+  read as an inverted negation. Both are from the second re-run:
+  - "…, requiring front-end throttling **instead of** direct database hammering";
+  - "… workflows **without triggering** deadlocks".
+
+  Fixed by negation scoping: a source negation counts only when its scope words appear in the claim.
+- **The claim REWORDED the source without changing it.** Both are from the first re-run:
+  - passive to active: "a buffer **managed by** the OS layer" became "The OS layer **manages** …";
+  - a negation spelled differently: "**without** triggering deadlocks" became "does **not** trigger deadlocks".
+
+  Fixed by participle inheritance and by negation parity.
+
+Two more were introduced while making those fixes, and caught before any run: "supporting" under the copula "is", and
+"without dropping" vs "do not drop" (stem mismatch). The "seven firings" count in the request had the false positives
+as all truncations; the record above is per firing.
+
+**What this suggests, and why it is not being done yet:**
+- **Suggests:** narrow the guard to MODALITY-BEARING constructions, i.e. a purpose infinitive ("to regulate"), a gerund
+  heading or title ("Preventing …"), an imperative or pending task, a future or conditional. Then reject only a claim
+  that turns one of those into a finite past or present assertion. A general tense comparison over every verb is what
+  produced every false positive. A modality-bearing construction is what produced every true one.
+- **Not done yet:** n=3. Three true rejections, all from one document, is not enough to define the construction set,
+  and a narrower guard would also stop catching the two original live fixtures:
+  - "Develop the dynamic decision script" → "Developed", an imperative pending task, which IS modality-bearing;
+  - "An automated concurrency adjuster scaling throughput" → "scales", a participle in a future-tense list, which IS
+    modality-bearing.
+
+  Neither has reached the guard live in two re-runs: modality inheritance and names_another_person now catch both
+  earlier.
+- **Revisit:** when the guard has fired on at least one more document.
+
+### 16. Rule: a claim class with exactly one possible verdict gets no model call
+
+**About:** Crucible's own design rule, recorded 2026-10-13. It is not a platform issue.
+
+**The rule:** when the verdict for a whole class of claims is fixed by policy before any evidence is read, the claim is
+built and judged in code. The model would only add run-to-run variance and cost, and it cannot change the outcome.
+
+**Measured:**
+- Test-status rows ("Test Type: Transaction test; Status (Pass/Fail): Pass; …") always come out inconclusive: a run
+  result is not recorded in a repository.
+- Through the model path, a DIFFERENT one of the six Pass rows was lost in each of two consecutive runs on the OSDBMS
+  phase-II report:
+  - one to a misread gerund;
+  - one to the entity check, where "Pass." with a trailing period did not match "Pass;".
+- After the change, each row is one verbatim claim with no model call, and 4C's `gate:test_status` judges it. All six
+  rows, every run.
+
+**Classes that already followed the rule, and the one added now:**
+
+| Class | Stage | Fixed outcome |
+|---|---|---|
+| skills lists (4J J1) | 4A | split in code |
+| entry headings (4M M1) | 4A | references, never claims |
+| non-assertions (Stage 1 modality) | 4A | no verdict, ever |
+| names_another_person / names_unresolved | 4A | no verdict |
+| career-scope timeline / scale | 4A routing | not searched |
+| no-artifact-possible technologies | 4C | inconclusive |
+| empty evidence | 4C | no_evidence without a call |
+| **test-status rows** | **4A + 4C** | **inconclusive** (new) |
+
+**How to apply:** before sending a claim to a model, ask whether its verdict can differ. If not, decide it in code and
+record the gate (`matrix_row`) so the reviewer sees why no model was asked.
+
+### 17. Principle: replace a lexical proxy with the structural test it stands in for
+
+**About:** Crucible's own design principle, recorded 2026-10-13 at the close of the claim track. It is not a platform
+issue.
+
+**The pattern:** four hand-maintained word lists have each stood in for a STRUCTURAL question, and each failed where
+the list ran out before the structure did. Each fix asked the structural question directly.
+
+| # | List | The question it stood in for | Measured cost | Replaced by |
+|---|---|---|---|---|
+| 1 | Tense guard verb lexicon (`tense.py` + `verbs.py`) | "does the claim state, as done, what the source states as a purpose, plan or fragment?" | Five live runs on the OSDBMS report: 7 correct catches against **5 false positives and 10 misses**. 4 were list-caused: "prevent" missing (2 misses), the noun "queue" read as the main verb (1), and "pass" missing (1 false positive). | Explicit modality constructions (to + VERB, a bare VERBing fragment, a passive participle, will / plan to) against the claim's finite verb, matched by stem. Replay: **18 catches, 0 false positives, 0 misses**. |
+| 2 | M2's verb lexicon (`verbs.py`: "is the SOURCE verbless?") | "is the source a fragment (an entry heading, a title, a bullet) that a claim could pad with an action?" | The canary I1 sentence (25 words) read as verbless, because none of cleared / reach / execute / trigger is in the list, and it was dropped at decomposition. Before the row fix, 5 of 6 Pass rows were dropped ("Test" is verb_ambiguous). On 93 recorded résumé claims, 12 firings were false ("Engineer, Contoso Freight", a summary sentence verbatim). | A short line (≤ 12 words) with no clause boundary, and a claim that adds a content word or turns a bare word into an -ed verb. The 4M fixtures still fire, and it adds 19 true catches ("Proficient in X", "Attended …"). |
+| 3 | Role words (`routing._RX["role_or_team"]`) | "is the AGENT a person or a team?" | "a semaphore-regulated buffer managed by the OS layer" routed to role_or_team, so that claim was unverifiable in every run before the fix. | One condition: a role word followed by "by <determiner> <agent>" whose agent names no person or team is an artifact claim. |
+| 4 | Refusal detector (`llm.detect_refusal`, FEEDBACK #14) | "is the model refusing THE REQUEST?" | "I cannot see which document triggered it yet", an agent reasoning aloud in a `thought` field, matched `first_person_cannot`. It raised LLMRefusalError and crashed a Phase 5 run. | Reasoning fields and long strings count only refusal-SHAPED language (refusal of the request, an opening apology, "as an AI"). |
+
+**How to apply:**
+- Before adding a word to a list, name the structural property the list approximates and test THAT. Examples: clause
+  boundaries, sentence length, a construction, the agent of a passive, a field's role.
+- A list of an OPEN class (verbs, nouns, job titles) will always run out. A list of a CLOSED class is acceptable, because
+  it can be complete: negators, determiners, auxiliaries, guarantee quantifiers ("guarantee / never / always / fully"),
+  -ing adjectives.
+- **Still lexical, not changed yet:** M1 (`entries.reference_kind`, "is this entry line verbless?") still asks
+  `verbs.has_verb`. It is the same question as M2, and the next candidate.
